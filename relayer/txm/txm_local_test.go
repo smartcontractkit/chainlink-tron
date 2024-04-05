@@ -1,0 +1,232 @@
+//go:build integration
+
+package txm
+
+import (
+	"bytes"
+	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/contract"
+	"github.com/fbsobreira/gotron-sdk/pkg/keystore"
+	"github.com/pborman/uuid"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTxmLocal(t *testing.T) {
+	logger := logger.Test(t)
+
+	var genesisAddress string
+	var genesisPrivateKey *ecdsa.PrivateKey
+
+	privateKeyHex := os.Getenv("PRIVATE_KEY")
+	if privateKeyHex == "" {
+		genesisAccountKey := createKey(rand.Reader)
+		genesisAddress = genesisAccountKey.Address.String()
+		genesisPrivateKey = genesisAccountKey.PrivateKey
+	} else {
+		privateKey, err := crypto.HexToECDSA(privateKeyHex)
+		require.NoError(t, err)
+
+		genesisAddress = address.PubkeyToAddress(privateKey.PublicKey).String()
+		genesisPrivateKey = privateKey
+	}
+	logger.Debugw("Using genesis account", "address", genesisAddress)
+
+	err := startTronNode(genesisAddress)
+	require.NoError(t, err)
+	logger.Debugw("Started TRON node")
+
+	keystore := newTestKeystore(genesisAddress, genesisPrivateKey)
+
+	config := TronTxmConfig{
+		RPCAddress:        "127.0.0.1:16669",
+		RPCInsecure:       true,
+		BroadcastChanSize: 100,
+		ConfirmPollSecs:   2,
+	}
+
+	runTxmTest(t, logger, config, keystore, genesisAddress)
+}
+
+func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keystore loop.Keystore, fromAddress string) {
+	txm := New(logger, keystore, config)
+	err := txm.Start(context.Background())
+	require.NoError(t, err)
+
+	contractAddress := deployTestContract(t, txm, fromAddress)
+	logger.Debugw("Deployed test contract", "contractAddress", contractAddress)
+
+	err = txm.Enqueue(fromAddress, contractAddress, "increment()", []map[string]interface{}{})
+	require.NoError(t, err)
+	err = txm.Enqueue(fromAddress, contractAddress, "increment()", []map[string]interface{}{})
+	require.NoError(t, err)
+	err = txm.Enqueue(fromAddress, contractAddress, "increment()", []map[string]interface{}{})
+	require.NoError(t, err)
+	err = txm.Enqueue(fromAddress, contractAddress, "increment()", []map[string]interface{}{})
+	require.NoError(t, err)
+}
+
+func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
+	// small test counter contract:
+	//  contract Counter {
+	//    uint256 public count = 0;
+	//
+	//    function increment() public returns (uint256) {
+	//        count += 1;
+	//        return count;
+	//    }
+	//  }
+
+	abiJson := "[{\"inputs\":[],\"name\":\"count\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"increment\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+	codeHex := "60806040526000805534801561001457600080fd5b5060cd806100236000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c806306661abd146037578063d09de08a146051575b600080fd5b603f60005481565b60405190815260200160405180910390f35b603f60006001600080828254606591906072565b9091555050600054919050565b60008219821115609257634e487b7160e01b600052601160045260246000fd5b50019056fea2646970667358221220284cf0954add409bb70c33eb619edc1952a37b3b677a1ed024454ba17e9904b364736f6c63430008070033"
+
+	abi, err := contract.JSONtoABI(abiJson)
+	require.NoError(t, err)
+
+	txExtention, err := txm.client.DeployContract(
+		fromAddress,
+		"Counter",
+		abi,
+		codeHex,
+		/* feeLimit= */ 1000000000,
+		/* curPercent= */ 30,
+		/* oeLimit= */ 10000000)
+	require.NoError(t, err)
+
+	txHash, err := txm.signAndBroadcast(context.Background(), fromAddress, txExtention)
+	require.NoError(t, err)
+
+	for i := 1; i <= 30; i++ {
+		txInfo, err := txm.client.GetTransactionInfoByID(txHash)
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+		contractAddress := address.Address(txInfo.ContractAddress).String()
+		return contractAddress
+	}
+
+	require.FailNow(t, "failed to confirm deployed test contract")
+	return ""
+}
+
+type testKeystore struct {
+	Keys map[string]*ecdsa.PrivateKey
+}
+
+var _ loop.Keystore = &testKeystore{}
+
+func newTestKeystore(address string, privateKey *ecdsa.PrivateKey) *testKeystore {
+	// TODO: we don't actually need a map if we only have a single key pair.
+	keys := map[string]*ecdsa.PrivateKey{}
+	keys[address] = privateKey
+	return &testKeystore{Keys: keys}
+}
+
+func (tk *testKeystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, error) {
+	privateKey, ok := tk.Keys[id]
+	if !ok {
+		return nil, fmt.Errorf("no such key")
+	}
+
+	// used to check if the account exists.
+	if hash == nil {
+		return nil, nil
+	}
+
+	return crypto.Sign(hash, privateKey)
+}
+
+func (tk *testKeystore) Accounts(ctx context.Context) ([]string, error) {
+	accounts := make([]string, 0, len(tk.Keys))
+	for id := range tk.Keys {
+		accounts = append(accounts, id)
+	}
+	return accounts, nil
+}
+
+// this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
+// recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
+// the function we need is keystore.newKey which is unfortunately private.
+// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
+func createKey(rand io.Reader) *keystore.Key {
+	randBytes := make([]byte, 64)
+	_, err := rand.Read(randBytes)
+	if err != nil {
+		panic("key generation: could not read from random source: " + err.Error())
+	}
+	reader := bytes.NewReader(randBytes)
+	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), reader)
+	if err != nil {
+		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
+	}
+	key := newKeyFromECDSA(privateKeyECDSA)
+	return key
+}
+
+func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *keystore.Key {
+	id := uuid.NewRandom()
+	key := &keystore.Key{
+		ID:         id,
+		Address:    address.PubkeyToAddress(privateKeyECDSA.PublicKey),
+		PrivateKey: privateKeyECDSA,
+	}
+	return key
+}
+
+// Finds the closest git repo root, assuming that a directory with a .git directory is a git repo.
+func findGitRoot() (string, error) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		gitDir := filepath.Join(currentDir, ".git")
+		if _, err := os.Stat(gitDir); err == nil {
+			return currentDir, nil
+		}
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			return "", fmt.Errorf("no Git repository found")
+		}
+
+		currentDir = parentDir
+	}
+}
+
+func startTronNode(genesisAddress string) error {
+	gitRoot, err := findGitRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find Git root: %v", err)
+	}
+
+	scriptPath := filepath.Join(gitRoot, "scripts/java-tron.sh")
+	cmd := exec.Command(scriptPath, genesisAddress)
+
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			fmt.Printf("Failed to start java-tron, dumping output:\n%s\n", string(output))
+			return fmt.Errorf("Failed to start java-tron, bad exit code: %v", exitError.ExitCode())
+		}
+		return fmt.Errorf("Failed to start java-tron: %+v", err)
+	}
+
+	return nil
+}
