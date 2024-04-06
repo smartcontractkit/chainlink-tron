@@ -6,7 +6,12 @@ dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 container_name="chainlink-tron.java-tron"
 container_version="GreatVoyage-v4.7.3.1"
-genesis_account="wasm1lsagfzrm4gz28he4wunt63sts5xzmczwda8vl6"
+
+if [ $# -ne 1 ]; then
+  genesis_address="TDRVFH1KLFhAmYvrXdk1hbuNQqgkVtdBX5"
+else
+  genesis_address="$1"
+fi
 
 set -e pipefail
 
@@ -26,6 +31,12 @@ else
 fi
 
 echo "Starting java-tron container"
+echo "Genesis test account address: ${genesis_address}"
+
+temp_dir=$(mktemp -d)
+temp_conf="${temp_dir}/java-tron.conf"
+sed "s/#genesis_address#/${genesis_address}/g" "${dir}/java-tron.conf" > "${temp_conf}"
+echo "Created temp config: ${temp_conf}"
 
 listen_args=()
 for ip in $listen_ips; do
@@ -40,7 +51,7 @@ docker run \
   -d \
 	--platform linux/amd64 \
 	--name "${container_name}" \
-  --mount "type=bind,source=$dir/java-tron.conf,target=/java-tron.conf" \
+  --mount "type=bind,source=${temp_conf},target=/java-tron.conf" \
   --entrypoint bash \
 	"tronprotocol/java-tron:${container_version}" \
   "-c" \
