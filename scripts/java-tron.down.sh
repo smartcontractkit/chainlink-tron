@@ -13,4 +13,6 @@ else
     docker rm $dpid;
 fi
 
+docker network rm chainlink-tron.network
+
 echo "Cleanup finished."
