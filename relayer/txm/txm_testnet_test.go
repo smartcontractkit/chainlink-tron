@@ -36,5 +36,5 @@ func TestTxmShasta(t *testing.T) {
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, config, keystore, pubAddress)
+	runTxmTest(t, logger, config, keystore, pubAddress, 5)
 }

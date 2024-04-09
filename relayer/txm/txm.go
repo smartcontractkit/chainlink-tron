@@ -40,7 +40,7 @@ type tronTx struct {
 	fromAddress     string
 	contractAddress string
 	method          string
-	params          []map[string]interface{}
+	params          []map[string]string
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, config TronTxmConfig) *TronTxm {
@@ -98,12 +98,20 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params []map[string]interface{}) error {
+func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ...string) error {
 	if _, err := t.keystore.Sign(context.Background(), fromAddress, nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	tx := &tronTx{fromAddress: fromAddress, contractAddress: contractAddress, method: method, params: params}
+	encodedParams := make([]map[string]string, 0)
+	if len(params)%2 == 1 {
+		return fmt.Errorf("odd number of params")
+	}
+	for i := 0; i < len(params); i += 2 {
+		encodedParams = append(encodedParams, map[string]string{params[i]: params[i+1]})
+	}
+
+	tx := &tronTx{fromAddress: fromAddress, contractAddress: contractAddress, method: method, params: encodedParams}
 
 	select {
 	case t.broadcastChan <- tx:

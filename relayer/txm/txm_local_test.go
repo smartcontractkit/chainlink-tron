@@ -12,13 +12,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
 	"github.com/fbsobreira/gotron-sdk/pkg/keystore"
+	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/pborman/uuid"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -58,14 +61,14 @@ func TestTxmLocal(t *testing.T) {
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, config, keystore, genesisAddress)
+	runTxmTest(t, logger, config, keystore, genesisAddress, 20)
 }
 
 func int64Ptr(i int64) *int64 {
 	return &i
 }
 
-func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keystore loop.Keystore, fromAddress string) {
+func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
 	txm := New(logger, keystore, config)
 	err := txm.Start(context.Background())
 	require.NoError(t, err)
@@ -73,13 +76,52 @@ func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keysto
 	contractAddress := deployTestContract(t, txm, fromAddress)
 	logger.Debugw("Deployed test contract", "contractAddress", contractAddress)
 
-	err = txm.Enqueue(fromAddress, contractAddress, "increment()", []map[string]interface{}{})
-	require.NoError(t, err)
-	err = txm.Enqueue(fromAddress, contractAddress, "increment_mult(uint256,uint256)", []map[string]interface{}{
-		map[string]interface{}{"uint256": "5"},
-		map[string]interface{}{"uint256": "7"},
-	})
-	require.NoError(t, err)
+	expectedValue := 0
+
+	for i := 0; i < iterations; i++ {
+		err = txm.Enqueue(fromAddress, contractAddress, "increment()")
+		require.NoError(t, err)
+		expectedValue += 1
+
+		err = txm.Enqueue(fromAddress, contractAddress,
+			"increment_mult(uint256,uint256)",
+			"uint256", "5",
+			"uint256", "7",
+		)
+		require.NoError(t, err)
+		expectedValue += 5 * 7
+	}
+
+	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
+	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address
+	// prefix.
+	zeroAddress := "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
+
+	for i := 0; i < 30; i++ {
+		txExtention, err := txm.client.TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
+		require.NoError(t, err)
+
+		constantResult := txExtention.ConstantResult
+		require.Equal(t, len(constantResult), 1)
+
+		actualValueStr := common.BytesToHexString(constantResult[0])
+		actualValue, err := strconv.ParseInt(actualValueStr[2:], 16, 32)
+		require.NoError(t, err)
+		logger.Debugw("Read count value", "countStr", actualValueStr, "count", actualValue, "expected", expectedValue)
+
+		if actualValue > int64(expectedValue) {
+			require.FailNow(t, "Count value larger than expected")
+		}
+
+		if actualValue < int64(expectedValue) {
+			time.Sleep(time.Second)
+			continue
+		}
+
+		return
+	}
+
+	require.FailNow(t, "Unexpected count value")
 }
 
 func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
@@ -130,18 +172,24 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 	txHash, err := txm.signAndBroadcast(context.Background(), fromAddress, txExtention)
 	require.NoError(t, err)
 
-	for i := 1; i <= 30; i++ {
+	txInfo := waitForTransactionInfo(t, txm, txHash, 30)
+	contractAddress := address.Address(txInfo.ContractAddress).String()
+	return contractAddress
+}
+
+func waitForTransactionInfo(t *testing.T, txm *TronTxm, txHash string, waitSecs int) *core.TransactionInfo {
+	for i := 1; i <= waitSecs; i++ {
 		txInfo, err := txm.client.GetTransactionInfoByID(txHash)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue
 		}
-		contractAddress := address.Address(txInfo.ContractAddress).String()
-		return contractAddress
+		return txInfo
 	}
 
-	require.FailNow(t, "failed to confirm deployed test contract")
-	return ""
+	require.FailNow(t, fmt.Sprintf("failed to wait for transaction: %s", txHash))
+
+	return nil
 }
 
 type testKeystore struct {
