@@ -164,7 +164,7 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 		/* oeLimit= */ 10000000)
 	require.NoError(t, err)
 
-	_, err = txm.signAndBroadcast(context.Background(), fromAddress, txExtention)
+	_, err = txm.SignAndBroadcast(context.Background(), fromAddress, txExtention)
 	require.NoError(t, err)
 
 	txHash := common.BytesToHexString(txExtention.Txid)

@@ -127,7 +127,7 @@ func (t *TronTxm) broadcastLoop() {
 	for {
 		select {
 		case tx := <-t.broadcastChan:
-			txExtention, err := t.triggerSmartContract(ctx, tx)
+			txExtention, err := t.TriggerSmartContract(ctx, tx)
 			if err != nil {
 				t.logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
@@ -139,7 +139,7 @@ func (t *TronTxm) broadcastLoop() {
 			// RefBlockNum is optional and does not seem in use anymore.
 			t.logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
 
-			_, err = t.signAndBroadcast(ctx, tx.FromAddress, txExtention)
+			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
 				t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
 				continue
@@ -157,7 +157,7 @@ func (t *TronTxm) broadcastLoop() {
 	}
 }
 
-func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *TronTx) (*api.TransactionExtention, error) {
+func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.TransactionExtention, error) {
 	// TODO: consider calling GrpcClient.Client.TriggerContract directly to avoid
 	// the extra marshal/unmarshal steps.
 	paramsJsonBytes, err := json.Marshal(tx.Params)
@@ -200,7 +200,7 @@ func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 	return txExtention, nil
 }
 
-func (t *TronTxm) signAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (*api.Return, error) {
+func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (*api.Return, error) {
 	coreTx := txExtention.Transaction
 
 	// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/keystore.go#L273
