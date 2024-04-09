@@ -145,7 +145,7 @@ func (t *TronTxm) broadcastLoop() {
 				continue
 			}
 
-			t.logger.Infow("transaction broadcasted successfully", "txHash", txHash)
+			t.logger.Infow("transaction broadcasted", "txHash", txHash)
 
 			txStore := t.accountStore.GetTxStore(tx.FromAddress)
 			txStore.AddUnconfirmed(txHash, coreTx.RawData.Timestamp, tx)
@@ -244,7 +244,7 @@ func (t *TronTxm) confirmLoop() {
 		case <-tick:
 			start := time.Now()
 
-			// TODO
+			t.checkUnconfirmed()
 
 			remaining := time.Duration(t.config.ConfirmPollSecs) - time.Since(start)
 			tick = time.After(utils.WithJitter(remaining.Abs()))
@@ -254,4 +254,26 @@ func (t *TronTxm) confirmLoop() {
 			return
 		}
 	}
+}
+
+func (t *TronTxm) checkUnconfirmed() {
+	allUnconfirmedTxs := t.accountStore.GetAllUnconfirmed()
+	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
+		for _, unconfirmedTx := range unconfirmedTxs {
+			txInfo, err := t.client.GetTransactionInfoByID(unconfirmedTx.Hash)
+			if err != nil {
+				continue
+			}
+			err = t.accountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
+			if err != nil {
+				t.logger.Errorw("could not confirm transaction locally", "error", err)
+				continue
+			}
+			t.logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+		}
+	}
+}
+
+func (t *TronTxm) InflightCount() (int, int) {
+	return len(t.broadcastChan), t.accountStore.GetTotalInflightCount()
 }

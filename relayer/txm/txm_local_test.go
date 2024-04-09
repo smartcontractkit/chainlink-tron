@@ -61,7 +61,7 @@ func TestTxmLocal(t *testing.T) {
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, config, keystore, genesisAddress, 20)
+	runTxmTest(t, logger, config, keystore, genesisAddress, 10)
 }
 
 func int64Ptr(i int64) *int64 {
@@ -92,36 +92,31 @@ func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keysto
 		expectedValue += 5 * 7
 	}
 
+	for {
+		queueLen, unconfirmedLen := txm.InflightCount()
+		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
+		if queueLen == 0 && unconfirmedLen == 0 {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
 	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address
 	// prefix.
 	zeroAddress := "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
+	txExtention, err := txm.client.TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
+	require.NoError(t, err)
 
-	for i := 0; i < 30; i++ {
-		txExtention, err := txm.client.TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
-		require.NoError(t, err)
+	constantResult := txExtention.ConstantResult
+	require.Equal(t, len(constantResult), 1)
 
-		constantResult := txExtention.ConstantResult
-		require.Equal(t, len(constantResult), 1)
+	actualValueStr := common.BytesToHexString(constantResult[0])
+	actualValue, err := strconv.ParseInt(actualValueStr[2:], 16, 32)
+	require.NoError(t, err)
+	logger.Debugw("Read count value", "countStr", actualValueStr, "count", actualValue, "expected", expectedValue)
 
-		actualValueStr := common.BytesToHexString(constantResult[0])
-		actualValue, err := strconv.ParseInt(actualValueStr[2:], 16, 32)
-		require.NoError(t, err)
-		logger.Debugw("Read count value", "countStr", actualValueStr, "count", actualValue, "expected", expectedValue)
-
-		if actualValue > int64(expectedValue) {
-			require.FailNow(t, "Count value larger than expected")
-		}
-
-		if actualValue < int64(expectedValue) {
-			time.Sleep(time.Second)
-			continue
-		}
-
-		return
-	}
-
-	require.FailNow(t, "Unexpected count value")
+	require.Equal(t, int64(expectedValue), actualValue)
 }
 
 func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
