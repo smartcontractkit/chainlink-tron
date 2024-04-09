@@ -6,7 +6,7 @@ dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 container_image="tronprotocol/java-tron:GreatVoyage-v4.7.4"
 
-node_count=2
+node_count=1
 
 if [ -n "${CUSTOM_IMAGE:-}" ]; then
   container_image="${CUSTOM_IMAGE}"
@@ -23,6 +23,15 @@ fi
 set -e pipefail
 
 bash "${dir}/java-tron.down.sh"
+
+git_root_path="$(git rev-parse --show-toplevel)"
+tronctl_path="${git_root_path}/.tronctl/tronctl"
+if [ ! -f "${tronctl_path}" ]; then
+  echo "Installing tronctl"
+  tronctl_parent_path="$(dirname "${tronctl_path}")"
+  GOBIN="${tronctl_parent_path}" go install github.com/fbsobreira/gotron-sdk/cmd@latest
+  mv -vf "${tronctl_parent_path}/cmd" "${tronctl_path}"
+fi
 
 listen_ips=""
 if [ "$(uname)" = "Darwin" ]; then
@@ -55,8 +64,16 @@ for ((i=1; i<=$node_count; i++)); do
 
   echo "Starting ${container_name} (${container_ip})"
 
+  if [ $i -eq 1 ]; then
+    need_sync_check="false"
+    startup_args="--witness"
+  else
+    need_sync_check="true"
+    startup_args=""
+  fi
+
   temp_conf="${temp_dir}/java-tron-$i.conf"
-  sed "s/#genesis_address#/${genesis_address}/g; s/#container_ip#/${container_ip}/g" "${dir}/java-tron.conf" > "${temp_conf}"
+  sed "s/#genesis_address#/${genesis_address}/g; s/#container_ip#/${container_ip}/g; s/#need_sync_check#/${need_sync_check}/" "${dir}/java-tron.conf" > "${temp_conf}"
   echo "Created temp config: ${temp_conf}"
 
   full_node_http_port="${i}6666"
@@ -83,7 +100,7 @@ for ((i=1; i<=$node_count; i++)); do
     --entrypoint bash \
     "${container_image}" \
     "-c" \
-    "./bin/FullNode -c /java-tron.conf --witness & mkdir -p logs && touch ./logs/tron.log && tail -F ./logs/tron.log" \
+    "./bin/FullNode -c /java-tron.conf --debug $startup_args & mkdir -p logs && touch ./logs/tron.log && tail -F ./logs/tron.log" \
 
   echo "Waiting for ${container_name} container to become ready.."
   start_time=$(date +%s)
@@ -95,7 +112,7 @@ for ((i=1; i<=$node_count; i++)); do
       prev_output="${output}"
     fi
 
-    if [[ $output == *"All api services started."* ]]; then
+    if [[ $output == *"Update solid block number to 2"* ]]; then
       echo ""
       echo "${container_name} is ready."
       break
