@@ -30,17 +30,11 @@ type TronTxm struct {
 	config   TronTxmConfig
 
 	client        *client.GrpcClient
-	broadcastChan chan *tronTx
+	broadcastChan chan *TronTx
+	accountStore  *AccountStore
 	starter       utils.StartStopOnce
 	done          sync.WaitGroup
 	stop          chan struct{}
-}
-
-type tronTx struct {
-	fromAddress     string
-	contractAddress string
-	method          string
-	params          []map[string]string
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, config TronTxmConfig) *TronTxm {
@@ -50,7 +44,8 @@ func New(lgr logger.Logger, keystore loop.Keystore, config TronTxmConfig) *TronT
 		config:   config,
 
 		client:        client.NewGrpcClientWithTimeout(config.RPCAddress, 15*time.Second),
-		broadcastChan: make(chan *tronTx, config.BroadcastChanSize),
+		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
+		accountStore:  newAccountStore(),
 		stop:          make(chan struct{}),
 	}
 }
@@ -111,7 +106,7 @@ func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ..
 		encodedParams = append(encodedParams, map[string]string{params[i]: params[i+1]})
 	}
 
-	tx := &tronTx{fromAddress: fromAddress, contractAddress: contractAddress, method: method, params: encodedParams}
+	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams}
 
 	select {
 	case t.broadcastChan <- tx:
@@ -137,10 +132,14 @@ func (t *TronTxm) broadcastLoop() {
 				t.logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
 			}
-			_, err = t.signAndBroadcast(ctx, tx.fromAddress, txExtention)
+			txHash, err := t.signAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
 				t.logger.Errorw("transaction failed to broadcast", "error", err, "tx", tx, "txExtention", txExtention)
 			}
+
+			txStore := t.accountStore.GetTxStore(tx.FromAddress)
+			txStore.AddUnconfirmed(txHash, tx)
+
 		case <-t.stop:
 			t.logger.Debugw("broadcastLoop: stopped")
 			return
@@ -148,10 +147,10 @@ func (t *TronTxm) broadcastLoop() {
 	}
 }
 
-func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *tronTx) (*api.TransactionExtention, error) {
+func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *TronTx) (*api.TransactionExtention, error) {
 	// TODO: consider calling GrpcClient.Client.TriggerContract directly to avoid
 	// the extra marshal/unmarshal steps.
-	paramsJsonBytes, err := json.Marshal(tx.params)
+	paramsJsonBytes, err := json.Marshal(tx.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal params: %+w", err)
 	}
@@ -159,7 +158,7 @@ func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *tronTx) (*api.Tr
 	paramsJsonStr := string(paramsJsonBytes)
 
 	// TODO: estimateEnergy is closed by default but more accurate, consider using that if possible.
-	estimateTxExtention, err := t.client.TriggerConstantContract(tx.fromAddress, tx.contractAddress, tx.method, paramsJsonStr)
+	estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call TriggerConstantContract: %+w", err)
 	}
@@ -174,11 +173,10 @@ func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *tronTx) (*api.Tr
 
 	t.logger.Debugw("Estimated energy", "energyUsed", estimateTxExtention.EnergyUsed, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit)
 
-	// TODO: estimate using TriggerConstantContract and update fee limit
 	txExtention, err := t.client.TriggerContract(
-		tx.fromAddress,
-		tx.contractAddress,
-		tx.method,
+		tx.FromAddress,
+		tx.ContractAddress,
+		tx.Method,
 		paramsJsonStr,
 		feeLimit,
 		/* tAmount= (TRX amount) */ 0,
@@ -188,6 +186,10 @@ func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *tronTx) (*api.Tr
 	if err != nil {
 		return nil, fmt.Errorf("failed to call TriggerContract: %+w", err)
 	}
+
+	coreTx := txExtention.Transaction
+	// RefBlockNum is optional and does not seem in use anymore.
+	t.logger.Debugw("Created transaction", "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
 
 	return txExtention, nil
 }
