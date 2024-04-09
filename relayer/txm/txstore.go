@@ -2,16 +2,17 @@ package txm
 
 import (
 	"fmt"
-	//"sort"
+	"sort"
 	"sync"
 
 	"golang.org/x/exp/maps"
 )
 
 type UnconfirmedTx struct {
-	Hash   string
-	Method string
-	Params []map[string]string
+	Hash      string
+	Timestamp int64
+	Method    string
+	Params    []map[string]string
 }
 
 // TxStore tracks broadcast & unconfirmed txs per account address per chain id
@@ -27,7 +28,7 @@ func NewTxStore() *TxStore {
 	}
 }
 
-func (s *TxStore) AddUnconfirmed(hash string, tx *TronTx) error {
+func (s *TxStore) AddUnconfirmed(hash string, timestamp int64, tx *TronTx) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -36,9 +37,10 @@ func (s *TxStore) AddUnconfirmed(hash string, tx *TronTx) error {
 	}
 
 	s.unconfirmedTxes[hash] = &UnconfirmedTx{
-		Hash:   hash,
-		Method: tx.Method,
-		Params: tx.Params,
+		Hash:      hash,
+		Timestamp: timestamp,
+		Method:    tx.Method,
+		Params:    tx.Params,
 	}
 
 	return nil
@@ -61,12 +63,11 @@ func (s *TxStore) GetUnconfirmed() []*UnconfirmedTx {
 
 	unconfirmed := maps.Values(s.unconfirmedTxes)
 
-	// TODO: sort by expiration or timestamp
-	//sort.Slice(unconfirmed, func(i, j int) bool {
-	//a := unconfirmed[i]
-	//b := unconfirmed[j]
-	//return a.Nonce.Cmp(b.Nonce) < 0
-	//})
+	sort.Slice(unconfirmed, func(i, j int) bool {
+		a := unconfirmed[i]
+		b := unconfirmed[j]
+		return a.Timestamp < b.Timestamp
+	})
 
 	return unconfirmed
 }

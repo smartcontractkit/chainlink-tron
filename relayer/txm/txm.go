@@ -132,13 +132,23 @@ func (t *TronTxm) broadcastLoop() {
 				t.logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
 			}
-			txHash, err := t.signAndBroadcast(ctx, tx.FromAddress, txExtention)
+
+			txHash := common.BytesToHexString(txExtention.Txid)
+
+			coreTx := txExtention.Transaction
+			// RefBlockNum is optional and does not seem in use anymore.
+			t.logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
+
+			_, err = t.signAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
-				t.logger.Errorw("transaction failed to broadcast", "error", err, "tx", tx, "txExtention", txExtention)
+				t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
+				continue
 			}
 
+			t.logger.Infow("transaction broadcasted successfully", "txHash", txHash)
+
 			txStore := t.accountStore.GetTxStore(tx.FromAddress)
-			txStore.AddUnconfirmed(txHash, tx)
+			txStore.AddUnconfirmed(txHash, coreTx.RawData.Timestamp, tx)
 
 		case <-t.stop:
 			t.logger.Debugw("broadcastLoop: stopped")
@@ -187,20 +197,16 @@ func (t *TronTxm) triggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 		return nil, fmt.Errorf("failed to call TriggerContract: %+w", err)
 	}
 
-	coreTx := txExtention.Transaction
-	// RefBlockNum is optional and does not seem in use anymore.
-	t.logger.Debugw("Created transaction", "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
-
 	return txExtention, nil
 }
 
-func (t *TronTxm) signAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (string, error) {
+func (t *TronTxm) signAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (*api.Return, error) {
 	coreTx := txExtention.Transaction
 
 	// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/keystore.go#L273
 	rawData, err := proto.Marshal(coreTx.GetRawData())
 	if err != nil {
-		return "", fmt.Errorf("failed to marshall transaction data: %+w", err)
+		return nil, fmt.Errorf("failed to marshall transaction data: %+w", err)
 	}
 
 	h256h := sha256.New()
@@ -209,20 +215,18 @@ func (t *TronTxm) signAndBroadcast(ctx context.Context, fromAddress string, txEx
 
 	signature, err := t.keystore.Sign(ctx, fromAddress, hash)
 	if err != nil {
-		return "", fmt.Errorf("failed to sign transaction: %+w", err)
+		return nil, fmt.Errorf("failed to sign transaction: %+w", err)
 	}
 
 	coreTx.Signature = append(coreTx.Signature, signature)
 
+	// the *api.Return error message and code is embedded in err.
 	apiReturn, err := t.client.Broadcast(coreTx)
 	if err != nil {
-		return "", fmt.Errorf("failed to broadcast transaction: %+w", err)
+		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
 
-	txHash := common.BytesToHexString(txExtention.Txid)
-	t.logger.Infow("Transaction broadcasted", "txHash", txHash, "apiReturn", apiReturn)
-
-	return txHash, nil
+	return apiReturn, nil
 }
 
 func (t *TronTxm) confirmLoop() {

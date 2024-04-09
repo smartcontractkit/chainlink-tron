@@ -165,12 +165,14 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 		abi,
 		codeHex,
 		/* feeLimit= */ 1000000000,
-		/* curPercent= */ 30,
+		/* curPercent= */ 100,
 		/* oeLimit= */ 10000000)
 	require.NoError(t, err)
 
-	txHash, err := txm.signAndBroadcast(context.Background(), fromAddress, txExtention)
+	_, err = txm.signAndBroadcast(context.Background(), fromAddress, txExtention)
 	require.NoError(t, err)
+
+	txHash := common.BytesToHexString(txExtention.Txid)
 
 	txInfo := waitForTransactionInfo(t, txm, txHash, 30)
 	contractAddress := address.Address(txInfo.ContractAddress).String()
