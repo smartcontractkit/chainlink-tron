@@ -24,15 +24,6 @@ set -e pipefail
 
 bash "${dir}/java-tron.down.sh"
 
-git_root_path="$(git rev-parse --show-toplevel)"
-tronctl_path="${git_root_path}/.tronctl/tronctl"
-if [ ! -f "${tronctl_path}" ]; then
-  echo "Installing tronctl"
-  tronctl_parent_path="$(dirname "${tronctl_path}")"
-  GOBIN="${tronctl_parent_path}" go install github.com/fbsobreira/gotron-sdk/cmd@latest
-  mv -vf "${tronctl_parent_path}/cmd" "${tronctl_path}"
-fi
-
 listen_ips=""
 if [ "$(uname)" = "Darwin" ]; then
 	echo "Listening on all interfaces on MacOS"
