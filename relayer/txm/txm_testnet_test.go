@@ -13,6 +13,14 @@ import (
 )
 
 func TestTxmShasta(t *testing.T) {
+	runTestnetTest(t, "grpc.shasta.trongrid.io:50051")
+}
+
+func TestTxmNile(t *testing.T) {
+	runTestnetTest(t, "grpc.nile.trongrid.io:50051")
+}
+
+func runTestnetTest(t *testing.T, grpcAddress string) {
 	logger := logger.Test(t)
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
@@ -30,7 +38,7 @@ func TestTxmShasta(t *testing.T) {
 	keystore := newTestKeystore(pubAddress, privateKey)
 
 	config := TronTxmConfig{
-		RPCAddress:        "grpc.shasta.trongrid.io:50051",
+		RPCAddress:        grpcAddress,
 		RPCInsecure:       true,
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
