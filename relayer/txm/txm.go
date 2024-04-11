@@ -62,6 +62,10 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.starter.Healthy()}
 }
 
+func (t *TronTxm) GetClient() *client.GrpcClient {
+	return t.client
+}
+
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.starter.StartOnce("TronTxm", func() error {
 		var transportCredentials credentials.TransportCredentials
