@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink-tron/relayer
+module github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer
 
 go 1.21.5
 
