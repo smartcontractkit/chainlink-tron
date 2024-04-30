@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
+	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -110,7 +112,7 @@ func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ..
 		encodedParams = append(encodedParams, map[string]string{params[i]: params[i+1]})
 	}
 
-	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams}
+	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams, Attempt: 1}
 
 	select {
 	case t.broadcastChan <- tx:
@@ -171,28 +173,54 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 
 	paramsJsonStr := string(paramsJsonBytes)
 
-	// TODO: estimateEnergy is closed by default but more accurate, consider using that if possible.
-	estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call TriggerConstantContract: %+w", err)
+	var energyUsed int64
+
+	if t.config.EnableEstimateEnergy {
+		estimateEnergyMessage, err := t.client.EstimateEnergy(
+			tx.FromAddress,
+			tx.ContractAddress,
+			tx.Method,
+			paramsJsonStr,
+			/* tAmount= */ 0,
+			/* tTokenID= */ "",
+			/* tTokenAmount= */ 0,
+		)
+		if err == nil {
+			energyUsed = estimateEnergyMessage.EnergyRequired
+			t.logger.Debugw("Estimated energy (EE)", "energyRequired", estimateEnergyMessage.EnergyRequired)
+		} else {
+			// Falls back to TriggerConstantContract estimation.
+			t.logger.Errorw("failed to call EstimateEnergy", "err", err)
+		}
+	}
+
+	if energyUsed == 0 {
+		estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call TriggerConstantContract: %+w", err)
+		}
+		energyUsed = estimateTxExtention.EnergyUsed
+
+		t.logger.Debugw("Estimated energy (TCC)", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty)
 	}
 
 	// TODO: GetEnergyPrices returns history energy pricing data, but is not available in gotron-sdk.
 	// It was recently added to the gRPC interface, see TIP-586.
 	// ref: https://developers.tron.network/reference/getenergyprices
 	// ref: https://github.com/tronprotocol/tips/blob/master/tip-586.md
-	energyUnitPrice := int64(1000)
+	energyUnitPrice := int64(800)
 
-	feeLimit := energyUnitPrice * estimateTxExtention.EnergyUsed
+	feeLimit := energyUnitPrice * energyUsed
+	paddedFeeLimit := int64(float64(feeLimit) * math.Pow(1.5, float64(tx.Attempt)))
 
-	t.logger.Debugw("Estimated energy", "energyUsed", estimateTxExtention.EnergyUsed, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit)
+	t.logger.Debugw("Trigger contract", "attempt", tx.Attempt, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
 	txExtention, err := t.client.TriggerContract(
 		tx.FromAddress,
 		tx.ContractAddress,
 		tx.Method,
 		paramsJsonStr,
-		feeLimit,
+		paddedFeeLimit,
 		/* tAmount= (TRX amount) */ 0,
 		/* tTokenID= (TRC10 token id) */ "",
 		/* tTokenAmount= (TRC10 token amount) */ 0)
@@ -273,8 +301,34 @@ func (t *TronTxm) checkUnconfirmed() {
 				t.logger.Errorw("could not confirm transaction locally", "error", err)
 				continue
 			}
-			t.logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+			receipt := txInfo.Receipt
+			if receipt == nil {
+				t.logger.Errorw("could not read transaction receipt", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				continue
+			}
+			contractResult := receipt.Result
+			if contractResult == core.Transaction_Result_OUT_OF_ENERGY || contractResult == core.Transaction_Result_OUT_OF_TIME {
+				t.logger.Debugw("transaction failed due to time/energy", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
+				t.maybeRetry(unconfirmedTx)
+				continue
+			}
+			t.logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
 		}
+	}
+}
+
+func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx) {
+	tx := unconfirmedTx.Tx
+	if tx.Attempt >= 5 {
+		t.logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash)
+		return
+	}
+
+	newTx := &TronTx{FromAddress: tx.FromAddress, ContractAddress: tx.ContractAddress, Method: tx.Method, Params: tx.Params, Attempt: tx.Attempt + 1}
+	select {
+	case t.broadcastChan <- newTx:
+	default:
+		t.logger.Errorw("failed to enqueue transaction")
 	}
 }
 
