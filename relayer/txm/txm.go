@@ -308,7 +308,7 @@ func (t *TronTxm) checkUnconfirmed() {
 			}
 			contractResult := receipt.Result
 			if contractResult == core.Transaction_Result_OUT_OF_ENERGY || contractResult == core.Transaction_Result_OUT_OF_TIME {
-				t.logger.Debugw("transaction failed due to time/energy", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
+				t.logger.Debugw("transaction failed due to time/energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
 				t.maybeRetry(unconfirmedTx)
 				continue
 			}
