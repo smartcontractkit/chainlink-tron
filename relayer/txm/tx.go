@@ -5,4 +5,5 @@ type TronTx struct {
 	ContractAddress string
 	Method          string
 	Params          []map[string]string
+	Attempt         uint64
 }
