@@ -38,10 +38,11 @@ func runTestnetTest(t *testing.T, grpcAddress string) {
 	keystore := newTestKeystore(pubAddress, privateKey)
 
 	config := TronTxmConfig{
-		RPCAddress:        grpcAddress,
-		RPCInsecure:       true,
-		BroadcastChanSize: 100,
-		ConfirmPollSecs:   2,
+		RPCAddress:           grpcAddress,
+		RPCInsecure:          true,
+		BroadcastChanSize:    100,
+		ConfirmPollSecs:      2,
+		EnableEstimateEnergy: true,
 	}
 
 	runTxmTest(t, logger, config, keystore, pubAddress, 5)
