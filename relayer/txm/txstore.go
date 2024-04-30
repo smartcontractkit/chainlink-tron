@@ -11,8 +11,7 @@ import (
 type UnconfirmedTx struct {
 	Hash      string
 	Timestamp int64
-	Method    string
-	Params    []map[string]string
+	Tx        *TronTx
 }
 
 // TxStore tracks broadcast & unconfirmed txs per account address per chain id
@@ -39,8 +38,7 @@ func (s *TxStore) AddUnconfirmed(hash string, timestamp int64, tx *TronTx) error
 	s.unconfirmedTxes[hash] = &UnconfirmedTx{
 		Hash:      hash,
 		Timestamp: timestamp,
-		Method:    tx.Method,
-		Params:    tx.Params,
+		Tx:        tx,
 	}
 
 	return nil
