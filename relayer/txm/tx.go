@@ -6,4 +6,6 @@ type TronTx struct {
 	Method          string
 	Params          []map[string]string
 	Attempt         uint64
+	OutOfTimeErrors uint64
+	EnergyBumpTimes uint64
 }
