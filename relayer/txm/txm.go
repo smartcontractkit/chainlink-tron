@@ -26,6 +26,8 @@ import (
 
 var _ services.Service = &TronTxm{}
 
+const DEFAULT_ENERGY_UNIT_PRICE int64 = 420
+
 type TronTxm struct {
 	logger   logger.Logger
 	keystore loop.Keystore
@@ -204,11 +206,17 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 		t.logger.Debugw("Estimated energy (TCC)", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty)
 	}
 
-	// TODO: GetEnergyPrices returns history energy pricing data, but is not available in gotron-sdk.
-	// It was recently added to the gRPC interface, see TIP-586.
-	// ref: https://developers.tron.network/reference/getenergyprices
-	// ref: https://github.com/tronprotocol/tips/blob/master/tip-586.md
-	energyUnitPrice := int64(800)
+	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
+
+	if energyPrices, err := t.client.GetEnergyPrices(); err == nil {
+		if parsedPrice, err := parseLatestEnergyPrice(energyPrices.Prices); err == nil {
+			energyUnitPrice = parsedPrice
+		} else {
+			t.logger.Errorw("error parsing energy unit price", err)
+		}
+	} else {
+		t.logger.Errorw("failed to get energy unit price", "error", err)
+	}
 
 	feeLimit := energyUnitPrice * energyUsed
 	paddedFeeLimit := int64(float64(feeLimit) * math.Pow(1.5, float64(tx.Attempt)))
