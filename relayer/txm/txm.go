@@ -212,7 +212,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 		if parsedPrice, err := parseLatestEnergyPrice(energyPrices.Prices); err == nil {
 			energyUnitPrice = parsedPrice
 		} else {
-			t.logger.Errorw("error parsing energy unit price", err)
+			t.logger.Errorw("error parsing energy unit price", "error", err)
 		}
 	} else {
 		t.logger.Errorw("failed to get energy unit price", "error", err)
