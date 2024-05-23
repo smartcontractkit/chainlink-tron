@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,12 +26,11 @@ import (
 
 var _ services.Service = &TronTxm{}
 
-const DEFAULT_ENERGY_UNIT_PRICE int64 = 420
-
 type TronTxm struct {
-	logger   logger.Logger
-	keystore loop.Keystore
-	config   TronTxmConfig
+	logger                logger.Logger
+	keystore              loop.Keystore
+	config                TronTxmConfig
+	estimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
 	client        *client.GrpcClient
 	broadcastChan chan *TronTx
@@ -43,9 +42,10 @@ type TronTxm struct {
 
 func New(lgr logger.Logger, keystore loop.Keystore, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
-		logger:   logger.Named(lgr, "TronTxm"),
-		keystore: keystore,
-		config:   config,
+		logger:                logger.Named(lgr, "TronTxm"),
+		keystore:              keystore,
+		config:                config,
+		estimateEnergyEnabled: true,
 
 		client:        client.NewGrpcClientWithTimeout(config.RPCAddress, 15*time.Second),
 		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
@@ -175,35 +175,9 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 
 	paramsJsonStr := string(paramsJsonBytes)
 
-	var energyUsed int64
-
-	if t.config.EnableEstimateEnergy {
-		estimateEnergyMessage, err := t.client.EstimateEnergy(
-			tx.FromAddress,
-			tx.ContractAddress,
-			tx.Method,
-			paramsJsonStr,
-			/* tAmount= */ 0,
-			/* tTokenID= */ "",
-			/* tTokenAmount= */ 0,
-		)
-		if err == nil {
-			energyUsed = estimateEnergyMessage.EnergyRequired
-			t.logger.Debugw("Estimated energy (EE)", "energyRequired", estimateEnergyMessage.EnergyRequired)
-		} else {
-			// Falls back to TriggerConstantContract estimation.
-			t.logger.Errorw("failed to call EstimateEnergy", "err", err)
-		}
-	}
-
-	if energyUsed == 0 {
-		estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call TriggerConstantContract: %+w", err)
-		}
-		energyUsed = estimateTxExtention.EnergyUsed
-
-		t.logger.Debugw("Estimated energy (TCC)", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty)
+	energyUsed, err := t.estimateEnergy(tx, paramsJsonStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to estimate energy: %+w", err)
 	}
 
 	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
@@ -219,9 +193,9 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 	}
 
 	feeLimit := energyUnitPrice * energyUsed
-	paddedFeeLimit := int64(float64(feeLimit) * math.Pow(1.5, float64(tx.Attempt)))
+	paddedFeeLimit := calculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
 
-	t.logger.Debugw("Trigger contract", "attempt", tx.Attempt, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
+	t.logger.Debugw("Trigger contract", "Energy Bump Times", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
 	txExtention, err := t.client.TriggerContract(
 		tx.FromAddress,
@@ -376,4 +350,44 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 
 func (t *TronTxm) InflightCount() (int, int) {
 	return len(t.broadcastChan), t.accountStore.GetTotalInflightCount()
+}
+
+func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error) {
+
+	if t.estimateEnergyEnabled {
+		estimateEnergyMessage, err := t.client.EstimateEnergy(
+			tx.FromAddress,
+			tx.ContractAddress,
+			tx.Method,
+			paramsJsonStr,
+			/* tAmount= */ 0,
+			/* tTokenID= */ "",
+			/* tTokenAmount= */ 0,
+		)
+
+		if err == nil {
+			t.logger.Debugw("Estimated energy using EnergyEstimation Method", "energyRequired", estimateEnergyMessage.EnergyRequired, "tx", tx)
+			return estimateEnergyMessage.EnergyRequired, nil
+		}
+
+		t.logger.Errorw("Failed to call EstimateEnergy", "err", err, "tx", tx)
+
+		if strings.Contains(err.Error(), "this node does not support estimate energy") {
+			t.estimateEnergyEnabled = false
+		}
+	}
+
+	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
+	estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
+	}
+	if estimateTxExtention.Result.Code > 0 {
+		return 0, fmt.Errorf("failed to call TriggerConstantContract due to %s", string(estimateTxExtention.Result.Message))
+	}
+
+	t.logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty, "tx", tx)
+
+	return estimateTxExtention.EnergyUsed, nil
 }

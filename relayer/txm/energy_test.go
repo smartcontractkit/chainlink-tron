@@ -1,6 +1,7 @@
 package txm
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,28 @@ func TestParseLatestEnergyPrice(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCalculatePaddedFeeLimit(t *testing.T) {
+	tests := []struct {
+		feeLimit int64
+		attempt  uint64
+		expected int64
+	}{
+		{feeLimit: 1000, attempt: 0, expected: 1000},
+		{feeLimit: 1000, attempt: 1, expected: 1500},
+		{feeLimit: 1000, attempt: 2, expected: 2250},
+		{feeLimit: 1000, attempt: 3, expected: 3375},
+	}
+
+	for _, tt := range tests {
+		t.Run("FeeLimit: "+fmt.Sprint(tt.feeLimit)+", Attempt: "+fmt.Sprint(tt.attempt), func(t *testing.T) {
+			result := calculatePaddedFeeLimit(tt.feeLimit, tt.attempt)
+			if result != tt.expected {
+				t.Errorf("calculatePaddedFeeLimit(%d, %d) = %d, want %d", tt.feeLimit, tt.attempt, result, tt.expected)
 			}
 		})
 	}
