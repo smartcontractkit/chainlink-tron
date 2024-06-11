@@ -26,13 +26,30 @@ import (
 
 var _ services.Service = &TronTxm{}
 
+type GrpcClient interface {
+	Start(opts ...grpc.DialOption) error
+	Stop()
+	GetEnergyPrices() (*api.PricesResponseMessage, error)
+	GetTransactionInfoByID(id string) (*core.TransactionInfo, error)
+	DeployContract(from, contractName string,
+		abi *core.SmartContract_ABI, codeStr string,
+		feeLimit, curPercent, oeLimit int64,
+	) (*api.TransactionExtention, error)
+	Broadcast(tx *core.Transaction) (*api.Return, error)
+	EstimateEnergy(from, contractAddress, method, jsonString string,
+		tAmount int64, tTokenID string, tTokenAmount int64) (*api.EstimateEnergyMessage, error)
+	TriggerContract(from, contractAddress, method, jsonString string,
+		feeLimit, tAmount int64, tTokenID string, tTokenAmount int64) (*api.TransactionExtention, error)
+	TriggerConstantContract(from, contractAddress, method, jsonString string) (*api.TransactionExtention, error)
+}
+
 type TronTxm struct {
 	logger                logger.Logger
 	keystore              loop.Keystore
 	config                TronTxmConfig
 	estimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	client        *client.GrpcClient
+	client        GrpcClient
 	broadcastChan chan *TronTx
 	accountStore  *AccountStore
 	starter       utils.StartStopOnce
@@ -66,7 +83,7 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.starter.Healthy()}
 }
 
-func (t *TronTxm) GetClient() *client.GrpcClient {
+func (t *TronTxm) GetClient() GrpcClient {
 	return t.client
 }
 
@@ -78,7 +95,7 @@ func (t *TronTxm) Start(ctx context.Context) error {
 		} else {
 			transportCredentials = credentials.NewTLS(nil)
 		}
-		err := t.client.Start(grpc.WithTransportCredentials(transportCredentials))
+		err := t.GetClient().Start(grpc.WithTransportCredentials(transportCredentials))
 		if err != nil {
 			return fmt.Errorf("failed to start GrpcClient: %+w", err)
 		}
@@ -93,7 +110,7 @@ func (t *TronTxm) Close() error {
 	return t.starter.StopOnce("TronTxm", func() error {
 		close(t.stop)
 		t.done.Wait()
-		t.client.Stop()
+		t.GetClient().Stop()
 		return nil
 	})
 }
@@ -147,9 +164,18 @@ func (t *TronTxm) broadcastLoop() {
 			// RefBlockNum is optional and does not seem in use anymore.
 			t.logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
 
-			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
+			result, err := t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
-				t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
+				resCode := result.GetCode()
+				if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
+					// retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
+					t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue", "txHash", txHash, "code", resCode)
+					retryTx := UnconfirmedTx{Hash: txHash, Timestamp: 0, Tx: tx}
+					t.maybeRetry(&retryTx, false, false)
+				} else {
+					// do not retry on other broadcast errors
+					t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
+				}
 				continue
 			}
 
@@ -182,7 +208,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 
 	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
 
-	if energyPrices, err := t.client.GetEnergyPrices(); err == nil {
+	if energyPrices, err := t.GetClient().GetEnergyPrices(); err == nil {
 		if parsedPrice, err := parseLatestEnergyPrice(energyPrices.Prices); err == nil {
 			energyUnitPrice = parsedPrice
 		} else {
@@ -197,7 +223,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 
 	t.logger.Debugw("Trigger contract", "Energy Bump Times", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
-	txExtention, err := t.client.TriggerContract(
+	txExtention, err := t.GetClient().TriggerContract(
 		tx.FromAddress,
 		tx.ContractAddress,
 		tx.Method,
@@ -235,9 +261,10 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txEx
 	coreTx.Signature = append(coreTx.Signature, signature)
 
 	// the *api.Return error message and code is embedded in err.
-	apiReturn, err := t.client.Broadcast(coreTx)
+	apiReturn, err := t.GetClient().Broadcast(coreTx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
+		// we also want to be able to interact with the return value methods when erroring
+		return apiReturn, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
 
 	return apiReturn, nil
@@ -274,7 +301,7 @@ func (t *TronTxm) checkUnconfirmed() {
 	allUnconfirmedTxs := t.accountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
 		for _, unconfirmedTx := range unconfirmedTxs {
-			txInfo, err := t.client.GetTransactionInfoByID(unconfirmedTx.Hash)
+			txInfo, err := t.GetClient().GetTransactionInfoByID(unconfirmedTx.Hash)
 			if err != nil {
 				// the default transaction expiration time is 60 seconds - if we still can't find the hash,
 				// rebroadcast since the transaction has expired.
@@ -355,7 +382,7 @@ func (t *TronTxm) InflightCount() (int, int) {
 func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error) {
 
 	if t.estimateEnergyEnabled {
-		estimateEnergyMessage, err := t.client.EstimateEnergy(
+		estimateEnergyMessage, err := t.GetClient().EstimateEnergy(
 			tx.FromAddress,
 			tx.ContractAddress,
 			tx.Method,
@@ -378,7 +405,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error
 	}
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
-	estimateTxExtention, err := t.client.TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
+	estimateTxExtention, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
