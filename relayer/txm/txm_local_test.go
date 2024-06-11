@@ -93,14 +93,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keysto
 		expectedValue += 5 * 7
 	}
 
-	for {
-		queueLen, unconfirmedLen := txm.InflightCount()
-		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
-		if queueLen == 0 && unconfirmedLen == 0 {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
+	WaitForInflightTxs(logger, txm, 30*time.Second)
 
 	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
 	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address

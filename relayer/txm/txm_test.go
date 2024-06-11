@@ -3,6 +3,7 @@ package txm
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"testing"
 	"time"
 
@@ -48,11 +49,11 @@ func setup(t *testing.T, client *testutils.MockClient) (*TronTxm, *observer.Obse
 	return &txm, observedlogs
 }
 
-func WaitForInflightTxs(txm *TronTxm, timeout time.Duration) {
+func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duration) {
 	start := time.Now()
 	for {
 		queueLen, unconfirmedLen := txm.InflightCount()
-		log.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
+		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
 		if queueLen == 0 && unconfirmedLen == 0 {
 			break
 		}
@@ -76,7 +77,7 @@ func TestTxm_Success(t *testing.T) {
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(txm, 10*time.Second)
+	WaitForInflightTxs(log, txm, 10*time.Second)
 
 	require.Equal(t, logs.FilterMessageSnippet("retry").Len(), 0)
 	require.Equal(t, logs.FilterMessageSnippet("confirmed transaction").Len(), 1)
@@ -84,13 +85,13 @@ func TestTxm_Success(t *testing.T) {
 
 func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
 	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_SERVER_BUSY, []byte("server busy"))
+	grpcClient.SetBroadcastResp(false, api.Return_SERVER_BUSY, []byte("server busy"), fmt.Errorf("some err"))
 	txm, logs := setup(t, grpcClient)
 
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(txm, 10*time.Second)
+	WaitForInflightTxs(log, txm, 10*time.Second)
 
 	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 5)
 	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
@@ -98,13 +99,13 @@ func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
 
 func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
 	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_BLOCK_UNSOLIDIFIED, []byte("block unsolid"))
+	grpcClient.SetBroadcastResp(false, api.Return_BLOCK_UNSOLIDIFIED, []byte("block unsolid"), fmt.Errorf("some err"))
 	txm, logs := setup(t, grpcClient)
 
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(txm, 10*time.Second)
+	WaitForInflightTxs(log, txm, 10*time.Second)
 
 	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 5)
 	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
@@ -112,13 +113,13 @@ func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
 
 func TestTxm_NoRetryOnOtherBroadcastErr(t *testing.T) {
 	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_BANDWITH_ERROR, []byte("some error"))
+	grpcClient.SetBroadcastResp(false, api.Return_BANDWITH_ERROR, []byte("some error"), fmt.Errorf("some err"))
 	txm, logs := setup(t, grpcClient)
 
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(txm, 10*time.Second)
+	WaitForInflightTxs(log, txm, 10*time.Second)
 
 	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 0)
 	require.Equal(t, logs.FilterMessageSnippet("adding transaction to retry queue").Len(), 0)
