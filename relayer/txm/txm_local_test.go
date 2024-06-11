@@ -3,15 +3,11 @@
 package txm
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"testing"
@@ -21,11 +17,10 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
-	"github.com/fbsobreira/gotron-sdk/pkg/keystore"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"github.com/pborman/uuid"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +32,7 @@ func TestTxmLocal(t *testing.T) {
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
-		genesisAccountKey := createKey(rand.Reader)
+		genesisAccountKey := testutils.CreateKey(rand.Reader)
 		genesisAddress = genesisAccountKey.Address.String()
 		genesisPrivateKey = genesisAccountKey.PrivateKey
 	} else {
@@ -49,16 +44,15 @@ func TestTxmLocal(t *testing.T) {
 	}
 	logger.Debugw("Using genesis account", "address", genesisAddress)
 
-	err := startTronNode(genesisAddress)
+	err := testutils.StartTronNode(genesisAddress)
 	require.NoError(t, err)
 	logger.Debugw("Started TRON node")
 
-	keystore := newTestKeystore(genesisAddress, genesisPrivateKey)
+	keystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
 
-	
 	// TODO: can be refactored to test utils in the future as integration tests needs this as well
 	var rpcAddress string
-	
+
 	if runtime.GOOS == "darwin" {
 		rpcAddress = "127.0.0.1:16669" // Mac OS needs local host port forwarding for docker
 	} else {
@@ -73,10 +67,6 @@ func TestTxmLocal(t *testing.T) {
 	}
 
 	runTxmTest(t, logger, config, keystore, genesisAddress, 10)
-}
-
-func int64Ptr(i int64) *int64 {
-	return &i
 }
 
 func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
@@ -165,7 +155,7 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 	abi, err := contract.JSONtoABI(abiJson)
 	require.NoError(t, err)
 
-	txExtention, err := txm.client.DeployContract(
+	txExtention, err := txm.GetClient().DeployContract(
 		fromAddress,
 		"Counter",
 		abi,
@@ -187,7 +177,7 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 
 func waitForTransactionInfo(t *testing.T, txm *TronTxm, txHash string, waitSecs int) *core.TransactionInfo {
 	for i := 1; i <= waitSecs; i++ {
-		txInfo, err := txm.client.GetTransactionInfoByID(txHash)
+		txInfo, err := txm.GetClient().GetTransactionInfoByID(txHash)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue
@@ -196,114 +186,6 @@ func waitForTransactionInfo(t *testing.T, txm *TronTxm, txHash string, waitSecs 
 	}
 
 	require.FailNow(t, fmt.Sprintf("failed to wait for transaction: %s", txHash))
-
-	return nil
-}
-
-type testKeystore struct {
-	Keys map[string]*ecdsa.PrivateKey
-}
-
-var _ loop.Keystore = &testKeystore{}
-
-func newTestKeystore(address string, privateKey *ecdsa.PrivateKey) *testKeystore {
-	// TODO: we don't actually need a map if we only have a single key pair.
-	keys := map[string]*ecdsa.PrivateKey{}
-	keys[address] = privateKey
-	return &testKeystore{Keys: keys}
-}
-
-func (tk *testKeystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, error) {
-	privateKey, ok := tk.Keys[id]
-	if !ok {
-		return nil, fmt.Errorf("no such key")
-	}
-
-	// used to check if the account exists.
-	if hash == nil {
-		return nil, nil
-	}
-
-	return crypto.Sign(hash, privateKey)
-}
-
-func (tk *testKeystore) Accounts(ctx context.Context) ([]string, error) {
-	accounts := make([]string, 0, len(tk.Keys))
-	for id := range tk.Keys {
-		accounts = append(accounts, id)
-	}
-	return accounts, nil
-}
-
-// this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
-// recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
-// the function we need is keystore.newKey which is unfortunately private.
-// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
-func createKey(rand io.Reader) *keystore.Key {
-	randBytes := make([]byte, 64)
-	_, err := rand.Read(randBytes)
-	if err != nil {
-		panic("key generation: could not read from random source: " + err.Error())
-	}
-	reader := bytes.NewReader(randBytes)
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), reader)
-	if err != nil {
-		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
-	}
-	key := newKeyFromECDSA(privateKeyECDSA)
-	return key
-}
-
-func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *keystore.Key {
-	id := uuid.NewRandom()
-	key := &keystore.Key{
-		ID:         id,
-		Address:    address.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-	return key
-}
-
-// Finds the closest git repo root, assuming that a directory with a .git directory is a git repo.
-func findGitRoot() (string, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		gitDir := filepath.Join(currentDir, ".git")
-		if _, err := os.Stat(gitDir); err == nil {
-			return currentDir, nil
-		}
-
-		parentDir := filepath.Dir(currentDir)
-		if parentDir == currentDir {
-			return "", fmt.Errorf("no Git repository found")
-		}
-
-		currentDir = parentDir
-	}
-}
-
-func startTronNode(genesisAddress string) error {
-	gitRoot, err := findGitRoot()
-	if err != nil {
-		return fmt.Errorf("failed to find Git root: %v", err)
-	}
-
-	scriptPath := filepath.Join(gitRoot, "tron/scripts/java-tron.sh")
-	cmd := exec.Command(scriptPath, genesisAddress)
-
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			fmt.Printf("Failed to start java-tron, dumping output:\n%s\n", string(output))
-			return fmt.Errorf("Failed to start java-tron, bad exit code: %v", exitError.ExitCode())
-		}
-		return fmt.Errorf("Failed to start java-tron: %+v", err)
-	}
 
 	return nil
 }

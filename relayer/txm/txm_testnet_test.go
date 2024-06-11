@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +36,7 @@ func runTestnetTest(t *testing.T, grpcAddress string) {
 
 	logger.Debugw("Loaded private key", "address", pubAddress)
 
-	keystore := newTestKeystore(pubAddress, privateKey)
+	keystore := testutils.NewTestKeystore(pubAddress, privateKey)
 
 	config := TronTxmConfig{
 		RPCAddress:        grpcAddress,
