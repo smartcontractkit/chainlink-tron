@@ -67,18 +67,21 @@ for ((i=1; i<=$node_count; i++)); do
   sed "s/#genesis_address#/${genesis_address}/g; s/#container_ip#/${container_ip}/g; s/#need_sync_check#/${need_sync_check}/" "${dir}/java-tron.conf" > "${temp_conf}"
   echo "Created temp config: ${temp_conf}"
 
-  full_node_http_port="${i}6666"
-  solidity_node_http_port="${i}6667"
-  full_node_grpc_port="${i}6668"
-  solidity_node_grpc_port="${i}6669"
+  full_node_http_port="${i}6667"
+  solidity_node_http_port="${i}6668"
+  full_node_grpc_port="${i}6669"
+  solidity_node_grpc_port="${i}6670"
 
   listen_args=()
-  for ip in $listen_ips; do
-    listen_args+=("-p" "${ip}:${full_node_http_port}:16666")
-    listen_args+=("-p" "${ip}:${solidity_node_http_port}:16667")
-    listen_args+=("-p" "${ip}:${full_node_grpc_port}:16668")
-    listen_args+=("-p" "${ip}:${solidity_node_grpc_port}:16669")
-  done
+  # On linux, we can connect to ${container_ip} directly.
+  if [ "$(uname)" = "Darwin" ]; then
+    for ip in $listen_ips; do
+      listen_args+=("-p" "${ip}:${full_node_http_port}:16667")
+      listen_args+=("-p" "${ip}:${solidity_node_http_port}:16668")
+      listen_args+=("-p" "${ip}:${full_node_grpc_port}:16669")
+      listen_args+=("-p" "${ip}:${solidity_node_grpc_port}:16670")
+    done
+  fi
 
   docker run \
     "${listen_args[@]}" \

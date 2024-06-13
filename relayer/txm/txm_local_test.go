@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -54,8 +55,18 @@ func TestTxmLocal(t *testing.T) {
 
 	keystore := newTestKeystore(genesisAddress, genesisPrivateKey)
 
+	
+	// TODO: can be refactored to test utils in the future as integration tests needs this as well
+	var rpcAddress string
+	
+	if runtime.GOOS == "darwin" {
+		rpcAddress = "127.0.0.1:16669" // Mac OS needs local host port forwarding for docker
+	} else {
+		rpcAddress = "172.255.0.101:16669" // Linux does not need port forwarding
+	}
+
 	config := TronTxmConfig{
-		RPCAddress:        "127.0.0.1:16669",
+		RPCAddress:        rpcAddress,
 		RPCInsecure:       true,
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
