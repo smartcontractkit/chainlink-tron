@@ -17,7 +17,6 @@ import (
 )
 
 var log logger.Logger
-var observedLogs observer.ObservedLogs
 var config = TronTxmConfig{
 	RPCAddress:        "",
 	RPCInsecure:       true,
@@ -64,6 +63,12 @@ func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duratio
 	}
 }
 
+func waitForExponentialRetries() {
+	// manual wait timeout as there are delays before tx is re-added to the broadcast queue
+	// exponential wait times: 2s, 4s, 8s, 16s + buffer 2s
+	time.Sleep((2 + 4 + 8 + 16 + 2) * time.Second)
+}
+
 func TestTxm_InvalidInputParams(t *testing.T) {
 	txm, _ := setup(t, testutils.NewMockClient())
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()", "param1")
@@ -91,10 +96,13 @@ func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(log, txm, 10*time.Second)
+	waitForExponentialRetries()
 
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 5)
-	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
+	queueLen, unconfirmedLen := txm.InflightCount()
+	require.Equal(t, queueLen, 0)
+	require.Equal(t, unconfirmedLen, 0)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries").Len(), 1)
 }
 
 func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
@@ -105,10 +113,13 @@ func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	WaitForInflightTxs(log, txm, 10*time.Second)
+	waitForExponentialRetries()
 
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 5)
-	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
+	queueLen, unconfirmedLen := txm.InflightCount()
+	require.Equal(t, queueLen, 0)
+	require.Equal(t, unconfirmedLen, 0)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries").Len(), 1)
 }
 
 func TestTxm_NoRetryOnOtherBroadcastErr(t *testing.T) {

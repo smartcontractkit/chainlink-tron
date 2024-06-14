@@ -14,10 +14,6 @@ import (
 	"github.com/pborman/uuid"
 )
 
-func Int64Ptr(i int64) *int64 {
-	return &i
-}
-
 // this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
 // recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
 // the function we need is keystore.newKey which is unfortunately private.

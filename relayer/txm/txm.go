@@ -26,6 +26,8 @@ import (
 
 var _ services.Service = &TronTxm{}
 
+const MAX_RETRY_ATTEMPTS = 5
+
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
 	Stop()
@@ -169,9 +171,13 @@ func (t *TronTxm) broadcastLoop() {
 				resCode := result.GetCode()
 				if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
 					// retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-					t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue", "txHash", txHash, "code", resCode)
-					retryTx := UnconfirmedTx{Hash: txHash, Timestamp: 0, Tx: tx}
-					t.maybeRetry(&retryTx, false, false)
+					if tx.Attempt >= MAX_RETRY_ATTEMPTS {
+						t.logger.Errorw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries", "txHash", txHash)
+					} else {
+						t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue", "txHash", txHash, "code", resCode)
+						tx.Attempt += 1
+						t.retryWithExponentialTimeout(tx)
+					}
 				} else {
 					// do not retry on other broadcast errors
 					t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
@@ -348,7 +354,7 @@ func (t *TronTxm) checkUnconfirmed() {
 
 func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOutOfTimeError bool) {
 	tx := unconfirmedTx.Tx
-	if tx.Attempt >= 5 {
+	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
 		t.logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash)
 		return
 	}
@@ -357,21 +363,34 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 		return
 	}
 
-	newTx := &*tx
-	newTx.Attempt += 1
+	tx.Attempt += 1
 	if bumpEnergy {
-		newTx.EnergyBumpTimes += 1
+		tx.EnergyBumpTimes += 1
 	}
 	if isOutOfTimeError {
-		newTx.OutOfTimeErrors += 1
+		tx.OutOfTimeErrors += 1
 	}
 
-	t.logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", newTx.Attempt)
+	t.logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt)
 
 	select {
-	case t.broadcastChan <- newTx:
+	case t.broadcastChan <- tx:
 	default:
 		t.logger.Errorw("failed to enqueue retry transaction", "previousTxHash", unconfirmedTx.Hash)
+	}
+}
+
+func (t *TronTxm) retryWithExponentialTimeout(tx *TronTx) {
+	// timeout exponentially increases based on number of attempts (2^(attempts-1) seconds)
+	// e.g. for MAX_RETRY_ATTEMPTS = 5, timeouts = 2s, 4s, 8s, 16s
+	t.logger.Debugw("waiting for timeout before retrying", "attempt", tx.Attempt, "seconds", 1<<(tx.Attempt-1))
+	timeout := time.Duration(1<<(tx.Attempt-1)) * time.Second
+	time.Sleep(timeout)
+
+	select {
+	case t.broadcastChan <- tx:
+	default:
+		t.logger.Errorw("failed to enqueue retry transaction", "tx", tx)
 	}
 }
 
