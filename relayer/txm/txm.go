@@ -166,22 +166,9 @@ func (t *TronTxm) broadcastLoop() {
 			// RefBlockNum is optional and does not seem in use anymore.
 			t.logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
 
-			result, err := t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
+			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
-				resCode := result.GetCode()
-				if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
-					// retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-					if tx.Attempt >= MAX_RETRY_ATTEMPTS {
-						t.logger.Errorw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries", "txHash", txHash)
-					} else {
-						t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue", "txHash", txHash, "code", resCode)
-						tx.Attempt += 1
-						t.retryWithExponentialTimeout(tx)
-					}
-				} else {
-					// do not retry on other broadcast errors
-					t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
-				}
+				t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
 				continue
 			}
 
@@ -267,12 +254,33 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txEx
 	coreTx.Signature = append(coreTx.Signature, signature)
 
 	// the *api.Return error message and code is embedded in err.
-	apiReturn, err := t.GetClient().Broadcast(coreTx)
+	apiReturn, err := t.broadcastTx(coreTx, 1)
 	if err != nil {
-		// we also want to be able to interact with the return value methods when erroring
-		return apiReturn, fmt.Errorf("failed to broadcast transaction: %+w", err)
+		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
 
+	return apiReturn, nil
+}
+
+func (t *TronTxm) broadcastTx(tx *core.Transaction, attempt int) (*api.Return, error) {
+	apiReturn, err := t.GetClient().Broadcast(tx)
+	if err != nil {
+		resCode := apiReturn.GetCode()
+		if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
+			// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
+			if attempt >= MAX_RETRY_ATTEMPTS {
+				return nil, fmt.Errorf("SERVER_BUSY or BLOCK_UNSOLIDIFIED: max retries reached, error: %w", err)
+			}
+
+			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt, "timeoutSeconds", 1<<(attempt))
+			time.Sleep(time.Duration(1<<(attempt)) * time.Second)
+
+			return t.broadcastTx(tx, attempt+1)
+		} else {
+			// do not retry on other broadcast errors
+			return nil, err
+		}
+	}
 	return apiReturn, nil
 }
 
@@ -377,20 +385,6 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 	case t.broadcastChan <- tx:
 	default:
 		t.logger.Errorw("failed to enqueue retry transaction", "previousTxHash", unconfirmedTx.Hash)
-	}
-}
-
-func (t *TronTxm) retryWithExponentialTimeout(tx *TronTx) {
-	// timeout exponentially increases based on number of attempts (2^(attempts-1) seconds)
-	// e.g. for MAX_RETRY_ATTEMPTS = 5, timeouts = 2s, 4s, 8s, 16s
-	t.logger.Debugw("waiting for timeout before retrying", "attempt", tx.Attempt, "seconds", 1<<(tx.Attempt-1))
-	timeout := time.Duration(1<<(tx.Attempt-1)) * time.Second
-	time.Sleep(timeout)
-
-	select {
-	case t.broadcastChan <- tx:
-	default:
-		t.logger.Errorw("failed to enqueue retry transaction", "tx", tx)
 	}
 }
 

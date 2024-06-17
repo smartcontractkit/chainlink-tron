@@ -101,8 +101,8 @@ func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
 	queueLen, unconfirmedLen := txm.InflightCount()
 	require.Equal(t, queueLen, 0)
 	require.Equal(t, unconfirmedLen, 0)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 4)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries").Len(), 1)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 }
 
 func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
@@ -118,8 +118,8 @@ func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
 	queueLen, unconfirmedLen := txm.InflightCount()
 	require.Equal(t, queueLen, 0)
 	require.Equal(t, unconfirmedLen, 0)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: adding transaction to retry queue").Len(), 4)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: not retrying, already reached max retries").Len(), 1)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 }
 
 func TestTxm_NoRetryOnOtherBroadcastErr(t *testing.T) {
@@ -132,7 +132,6 @@ func TestTxm_NoRetryOnOtherBroadcastErr(t *testing.T) {
 
 	WaitForInflightTxs(log, txm, 10*time.Second)
 
-	require.Equal(t, logs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 0)
-	require.Equal(t, logs.FilterMessageSnippet("adding transaction to retry queue").Len(), 0)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 0)
 	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 }
