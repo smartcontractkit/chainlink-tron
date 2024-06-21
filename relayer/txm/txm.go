@@ -27,6 +27,7 @@ import (
 var _ services.Service = &TronTxm{}
 
 const MAX_RETRY_ATTEMPTS = 5
+const MAX_BROADCAST_RETRY_DURATION_SECONDS = 30
 
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
@@ -254,7 +255,7 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txEx
 	coreTx.Signature = append(coreTx.Signature, signature)
 
 	// the *api.Return error message and code is embedded in err.
-	apiReturn, err := t.broadcastTx(coreTx, 1)
+	apiReturn, err := t.broadcastTx(coreTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
@@ -262,24 +263,33 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txEx
 	return apiReturn, nil
 }
 
-func (t *TronTxm) broadcastTx(tx *core.Transaction, attempt int) (*api.Return, error) {
-	apiReturn, err := t.GetClient().Broadcast(tx)
-	if err != nil {
+func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
+	var apiReturn *api.Return
+	var err error
+	startTime := time.Now()
+	timeout := MAX_BROADCAST_RETRY_DURATION_SECONDS / 5 * time.Second
+	attempt := 1
+	for time.Since(startTime) < MAX_BROADCAST_RETRY_DURATION_SECONDS*time.Second {
+		apiReturn, err = t.GetClient().Broadcast(tx)
+		if err == nil {
+			break
+		}
+
+		// err != nil, check response code
 		resCode := apiReturn.GetCode()
 		if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
 			// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-			if attempt >= MAX_RETRY_ATTEMPTS {
-				return nil, fmt.Errorf("SERVER_BUSY or BLOCK_UNSOLIDIFIED: max retries reached, error: %w", err)
-			}
-
-			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt, "timeoutSeconds", 1<<(attempt))
-			time.Sleep(time.Duration(1<<(attempt)) * time.Second)
-
-			return t.broadcastTx(tx, attempt+1)
+			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt, "timeoutSeconds", timeout)
+			time.Sleep(timeout)
+			attempt = attempt + 1
+			continue
 		} else {
 			// do not retry on other broadcast errors
 			return nil, err
 		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("SERVER_BUSY or BLOCK_UNSOLIDIFIED: max retry duration reached, error: %w", err)
 	}
 	return apiReturn, nil
 }

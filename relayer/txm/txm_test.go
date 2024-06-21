@@ -63,10 +63,8 @@ func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duratio
 	}
 }
 
-func waitForExponentialRetries() {
-	// manual wait timeout as there are delays before tx is re-added to the broadcast queue
-	// exponential wait times: 2s, 4s, 8s, 16s + buffer 2s
-	time.Sleep((2 + 4 + 8 + 16 + 2) * time.Second)
+func waitForMaxRetryDuration() {
+	time.Sleep((MAX_BROADCAST_RETRY_DURATION_SECONDS + 2) * time.Second)
 }
 
 func TestTxm_InvalidInputParams(t *testing.T) {
@@ -96,12 +94,12 @@ func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	waitForExponentialRetries()
+	waitForMaxRetryDuration()
 
 	queueLen, unconfirmedLen := txm.InflightCount()
 	require.Equal(t, queueLen, 0)
 	require.Equal(t, unconfirmedLen, 0)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 5)
 	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 }
 
@@ -113,12 +111,12 @@ func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
 	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 	require.NoError(t, err)
 
-	waitForExponentialRetries()
+	waitForMaxRetryDuration()
 
 	queueLen, unconfirmedLen := txm.InflightCount()
 	require.Equal(t, queueLen, 0)
 	require.Equal(t, unconfirmedLen, 0)
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 4)
+	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 5)
 	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 }
 
