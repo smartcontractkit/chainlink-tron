@@ -26,8 +26,11 @@ import (
 
 var _ services.Service = &TronTxm{}
 
-const MAX_RETRY_ATTEMPTS = 5
-const MAX_BROADCAST_RETRY_DURATION_SECONDS = 30
+const (
+	MAX_RETRY_ATTEMPTS           = 5
+	MAX_BROADCAST_RETRY_DURATION = 30 * time.Second
+	BROADCAST_DELAY_DURATION     = 2 * time.Second
+)
 
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
@@ -267,9 +270,8 @@ func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
 	var apiReturn *api.Return
 	var err error
 	startTime := time.Now()
-	timeout := MAX_BROADCAST_RETRY_DURATION_SECONDS / 5 * time.Second
 	attempt := 1
-	for time.Since(startTime) < MAX_BROADCAST_RETRY_DURATION_SECONDS*time.Second {
+	for time.Since(startTime) < MAX_BROADCAST_RETRY_DURATION {
 		apiReturn, err = t.GetClient().Broadcast(tx)
 		if err == nil {
 			break
@@ -279,8 +281,8 @@ func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
 		resCode := apiReturn.GetCode()
 		if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
 			// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt, "timeoutSeconds", timeout)
-			time.Sleep(timeout)
+			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt)
+			time.Sleep(BROADCAST_DELAY_DURATION)
 			attempt = attempt + 1
 			continue
 		} else {
