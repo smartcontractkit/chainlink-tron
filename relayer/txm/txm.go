@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 )
 
 var _ services.Service = &TronTxm{}
@@ -32,30 +33,13 @@ const (
 	BROADCAST_DELAY_DURATION     = 2 * time.Second
 )
 
-type GrpcClient interface {
-	Start(opts ...grpc.DialOption) error
-	Stop()
-	GetEnergyPrices() (*api.PricesResponseMessage, error)
-	GetTransactionInfoByID(id string) (*core.TransactionInfo, error)
-	DeployContract(from, contractName string,
-		abi *core.SmartContract_ABI, codeStr string,
-		feeLimit, curPercent, oeLimit int64,
-	) (*api.TransactionExtention, error)
-	Broadcast(tx *core.Transaction) (*api.Return, error)
-	EstimateEnergy(from, contractAddress, method, jsonString string,
-		tAmount int64, tTokenID string, tTokenAmount int64) (*api.EstimateEnergyMessage, error)
-	TriggerContract(from, contractAddress, method, jsonString string,
-		feeLimit, tAmount int64, tTokenID string, tTokenAmount int64) (*api.TransactionExtention, error)
-	TriggerConstantContract(from, contractAddress, method, jsonString string) (*api.TransactionExtention, error)
-}
-
 type TronTxm struct {
 	logger                logger.Logger
 	keystore              loop.Keystore
 	config                TronTxmConfig
 	estimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	client        GrpcClient
+	client        relayer.GrpcClient
 	broadcastChan chan *TronTx
 	accountStore  *AccountStore
 	starter       utils.StartStopOnce
@@ -89,7 +73,7 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.starter.Healthy()}
 }
 
-func (t *TronTxm) GetClient() GrpcClient {
+func (t *TronTxm) GetClient() relayer.GrpcClient {
 	return t.client
 }
 
