@@ -7,16 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
+	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-var log logger.Logger
+var keystore *testutils.TestKeystore
 var config = TronTxmConfig{
 	RPCAddress:        "",
 	RPCInsecure:       true,
@@ -26,27 +30,6 @@ var config = TronTxmConfig{
 var genesisAccountKey = testutils.CreateKey(rand.Reader)
 var genesisAddress = genesisAccountKey.Address.String()
 var genesisPrivateKey = genesisAccountKey.PrivateKey
-
-func setup(t *testing.T, client *testutils.MockClient) (*TronTxm, *observer.ObservedLogs) {
-	testLogger, observedlogs := logger.TestObserved(t, zapcore.DebugLevel)
-	log = testLogger
-	keystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
-	txm := TronTxm{
-		logger:                log,
-		keystore:              keystore,
-		config:                config,
-		estimateEnergyEnabled: true,
-
-		client:        client,
-		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
-		accountStore:  newAccountStore(),
-		stop:          make(chan struct{}),
-	}
-
-	err := txm.Start(context.Background())
-	require.NoError(t, err)
-	return &txm, observedlogs
-}
 
 func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duration) {
 	start := time.Now()
@@ -67,69 +50,131 @@ func waitForMaxRetryDuration() {
 	time.Sleep(MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
 }
 
-func TestTxm_InvalidInputParams(t *testing.T) {
-	txm, _ := setup(t, testutils.NewMockClient())
-	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()", "param1")
-	require.Error(t, err)
-	require.ErrorContains(t, err, "odd number of params")
+func setupTxm(t *testing.T, grpcClient relayer.GrpcClient) (*TronTxm, logger.Logger, *observer.ObservedLogs) {
+	testLogger, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
+	txm := TronTxm{
+		logger:                testLogger,
+		keystore:              keystore,
+		config:                config,
+		estimateEnergyEnabled: true,
+
+		client:        grpcClient,
+		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
+		accountStore:  newAccountStore(),
+		stop:          make(chan struct{}),
+	}
+	txm.Start(context.Background())
+	return &txm, testLogger, observedLogs
 }
 
-func TestTxm_Success(t *testing.T) {
-	txm, logs := setup(t, testutils.NewMockClient())
+func TestTxm(t *testing.T) {
+	// setup
+	grpcClient := mocks.NewGrpcClient(t)
+	grpcClient.On("Start", mock.Anything).Maybe().Return(nil)
+	grpcClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&api.EstimateEnergyMessage{
+		Result: &api.Return{
+			Result: true,
+		},
+		EnergyRequired: 1000,
+	}, nil)
+	grpcClient.On("GetEnergyPrices").Maybe().Return(&api.PricesResponseMessage{Prices: "0:420"}, nil)
+	grpcClient.On("TriggerContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&api.TransactionExtention{
+		Transaction: &core.Transaction{
+			RawData: &core.TransactionRaw{
+				Timestamp:    123,
+				Expiration:   456,
+				RefBlockHash: []byte("abc"),
+				FeeLimit:     789,
+			},
+		},
+		Txid:           []byte("txid"),
+		ConstantResult: [][]byte{{0x01}},
+		Result:         &api.Return{Result: true},
+		EnergyUsed:     1000,
+	}, nil)
+	grpcClient.On("Broadcast", mock.Anything).Maybe().Return(&api.Return{
+		Result:  true,
+		Code:    api.Return_SUCCESS,
+		Message: []byte("broadcast message"),
+	}, nil)
+	grpcClient.On("GetTransactionInfoByID", mock.Anything).Maybe().Return(&core.TransactionInfo{
+		Receipt:     &core.ResourceReceipt{Result: core.Transaction_Result_SUCCESS},
+		BlockNumber: 123,
+	}, nil)
+	keystore = testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
 
-	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
-	require.NoError(t, err)
+	t.Run("Invalid input params", func(t *testing.T) {
+		txm, _, _ := setupTxm(t, grpcClient)
+		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()", "param1")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "odd number of params")
+	})
 
-	WaitForInflightTxs(log, txm, 10*time.Second)
+	t.Run("Success", func(t *testing.T) {
+		txm, lggr, observedLogs := setupTxm(t, grpcClient)
+		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		require.NoError(t, err)
 
-	require.Equal(t, logs.FilterMessageSnippet("retry").Len(), 0)
-	require.Equal(t, logs.FilterMessageSnippet("confirmed transaction").Len(), 1)
-}
+		WaitForInflightTxs(lggr, txm, 10*time.Second)
 
-func TestTxm_RetryOnBroadcastServerBusy(t *testing.T) {
-	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_SERVER_BUSY, []byte("server busy"), fmt.Errorf("some err"))
-	txm, logs := setup(t, grpcClient)
+		require.Equal(t, observedLogs.FilterMessageSnippet("retry").Len(), 0)
+		require.Equal(t, observedLogs.FilterMessageSnippet("confirmed transaction").Len(), 1)
+	})
 
-	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
-	require.NoError(t, err)
+	t.Run("Retry on broadcast server busy", func(t *testing.T) {
+		grpcClient.On("Broadcast", mock.Anything).Unset()
+		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+			Result:  false,
+			Code:    api.Return_SERVER_BUSY,
+			Message: []byte("server busy"),
+		}, fmt.Errorf("some err"))
+		txm, _, observedLogs := setupTxm(t, grpcClient)
+		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		require.NoError(t, err)
 
-	waitForMaxRetryDuration()
+		waitForMaxRetryDuration()
 
-	queueLen, unconfirmedLen := txm.InflightCount()
-	require.Equal(t, queueLen, 0)
-	require.Equal(t, unconfirmedLen, 0)
-	require.Greater(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
-	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
-}
+		queueLen, unconfirmedLen := txm.InflightCount()
+		require.Equal(t, queueLen, 0)
+		require.Equal(t, unconfirmedLen, 0)
+		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
+	})
 
-func TestTxm_RetryOnBroadcastBlockUnsolidifed(t *testing.T) {
-	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_BLOCK_UNSOLIDIFIED, []byte("block unsolid"), fmt.Errorf("some err"))
-	txm, logs := setup(t, grpcClient)
+	t.Run("Retry on broadcast block unsolidified", func(t *testing.T) {
+		grpcClient.On("Broadcast", mock.Anything).Unset()
+		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+			Result:  false,
+			Code:    api.Return_BLOCK_UNSOLIDIFIED,
+			Message: []byte("block unsolid"),
+		}, fmt.Errorf("some err"))
+		txm, _, observedLogs := setupTxm(t, grpcClient)
+		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		require.NoError(t, err)
 
-	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
-	require.NoError(t, err)
+		waitForMaxRetryDuration()
 
-	waitForMaxRetryDuration()
+		queueLen, unconfirmedLen := txm.InflightCount()
+		require.Equal(t, queueLen, 0)
+		require.Equal(t, unconfirmedLen, 0)
+		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
+	})
 
-	queueLen, unconfirmedLen := txm.InflightCount()
-	require.Equal(t, queueLen, 0)
-	require.Equal(t, unconfirmedLen, 0)
-	require.Greater(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
-	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
-}
+	t.Run("No retry on other broadcast err", func(t *testing.T) {
+		grpcClient.On("Broadcast", mock.Anything).Unset()
+		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+			Result:  false,
+			Code:    api.Return_BANDWITH_ERROR,
+			Message: []byte("some error"),
+		}, fmt.Errorf("some err"))
+		txm, lggr, observedLogs := setupTxm(t, grpcClient)
+		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		require.NoError(t, err)
 
-func TestTxm_NoRetryOnOtherBroadcastErr(t *testing.T) {
-	grpcClient := testutils.NewMockClient()
-	grpcClient.SetBroadcastResp(false, api.Return_BANDWITH_ERROR, []byte("some error"), fmt.Errorf("some err"))
-	txm, logs := setup(t, grpcClient)
+		WaitForInflightTxs(lggr, txm, 10*time.Second)
 
-	err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
-	require.NoError(t, err)
-
-	WaitForInflightTxs(log, txm, 10*time.Second)
-
-	require.Equal(t, logs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 0)
-	require.Equal(t, logs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 0)
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
+	})
 }

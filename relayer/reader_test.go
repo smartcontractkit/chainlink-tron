@@ -1,4 +1,4 @@
-package relayer
+package relayer_test
 
 import (
 	"testing"
@@ -8,57 +8,182 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 )
 
-func setup(t *testing.T, client *testutils.MockClient) (*ReaderClient, *observer.ObservedLogs) {
-	testLogger, observedlogs := logger.TestObserved(t, zapcore.DebugLevel)
-	reader := NewReader(client, testLogger)
-
-	return reader, observedlogs
+var mockTxExtention = api.TransactionExtention{
+	Transaction: &core.Transaction{
+		RawData: &core.TransactionRaw{
+			Timestamp:    123,
+			Expiration:   456,
+			RefBlockHash: []byte("abc"),
+			FeeLimit:     789,
+		},
+	},
+	Txid:           []byte("txid"),
+	ConstantResult: [][]byte{{0x01}},
+	Result:         &api.Return{Result: true},
+	EnergyUsed:     1000,
+	Logs: []*core.TransactionInfo_Log{
+		{
+			Address: []byte{0, 1, 2, 3},
+			Topics:  [][]byte{{0x02}},
+			Data:    []byte("data"),
+		},
+	},
+}
+var mockBlockExtention = api.BlockExtention{
+	BlockHeader: &core.BlockHeader{
+		RawData: &core.BlockHeaderRaw{
+			Number: 1,
+		},
+	},
+	Transactions: []*api.TransactionExtention{
+		&mockTxExtention,
+	},
 }
 
-func TestReader_LatestBlockHeight(t *testing.T) {
-	grpcClient := testutils.NewMockClient()
-	readerClient, _ := setup(t, grpcClient)
-	blockHeight, err := readerClient.LatestBlockHeight()
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), blockHeight)
-}
-
-func TestReader_CallContract_NoParams(t *testing.T) {
-	constContractRes, _ := abi.GetPaddedParam([]abi.Param{{"uint64": "123"}, {"uint64": "456"}})
-	grpcClient := testutils.NewMockClient()
-	grpcClient.SetTriggerConstantContractResp([][]byte{constContractRes}, nil)
-	readerClient, _ := setup(t, grpcClient)
-
-	addr := address.HexToAddress(TRON_ZERO_ADDR_HEX)
-	res, err := readerClient.CallContract(addr, "foo", []map[string]string{})
-	require.NoError(t, err)
-	require.Equal(t, uint64(123), res["a"])
-	require.Equal(t, uint64(456), res["b"])
-}
-
-func TestReader_GetEventLogsFromBlock(t *testing.T) {
-	addr := address.Address{0, 1, 2, 3}
-	topicHash := GetEventTopicHash("foo(uint64,uint64)")
-	grpcClient := testutils.NewMockClient()
-	grpcClient.SetGetBlockByNumResp(&api.TransactionExtention{
-		Logs: []*core.TransactionInfo_Log{
-			{
-				Address: addr.Bytes(),
-				Topics:  [][]byte{topicHash},
+var mockAbi = core.SmartContract_ABI{
+	Entrys: []*core.SmartContract_ABI_Entry{
+		{
+			Name: "foo",
+			Type: core.SmartContract_ABI_Entry_Function,
+			Inputs: []*core.SmartContract_ABI_Entry_Param{
+				{
+					Name: "a",
+					Type: "uint64",
+				},
+				{
+					Name: "b",
+					Type: "uint64",
+				},
+			},
+			Outputs: []*core.SmartContract_ABI_Entry_Param{
+				{
+					Name: "a",
+					Type: "uint64",
+				},
+				{
+					Name: "b",
+					Type: "uint64",
+				},
 			},
 		},
-	}, nil)
-	readerClient, _ := setup(t, grpcClient)
+	},
+}
 
-	eventLogs, err := readerClient.GetEventLogsFromBlock(addr, "foo", 1)
-	require.NoError(t, err)
-	require.Len(t, eventLogs, 1)
-	require.Equal(t, addr.Bytes(), eventLogs[0].Address)
-	require.Equal(t, topicHash, eventLogs[0].Topics[0])
+func TestReader(t *testing.T) {
+	// setup
+	testLogger, _ := logger.TestObserved(t, zapcore.DebugLevel)
+	grpcClient := mocks.NewGrpcClient(t)
+
+	t.Run("LatestBlockHeight", func(t *testing.T) {
+		grpcClient.On(
+			"GetNowBlock",
+			mock.Anything, // ctx
+		).Return(&mockBlockExtention, nil).Once()
+		reader := relayer.NewReader(grpcClient, testLogger)
+
+		blockHeight, err := reader.LatestBlockHeight()
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), blockHeight)
+	})
+
+	t.Run("CallContract_NoParams", func(t *testing.T) {
+		grpcClient.On(
+			"GetContractABI",
+			mock.Anything, // address
+		).Return(&mockAbi, nil).Once()
+		constContractRes, _ := abi.GetPaddedParam([]abi.Param{{"uint64": "123"}, {"uint64": "456"}})
+		mockTxExtention.ConstantResult = [][]byte{constContractRes}
+		grpcClient.On(
+			"TriggerConstantContract",
+			mock.Anything, // ctx
+			mock.Anything, // contract
+			mock.Anything, // method
+			mock.Anything, // json
+		).Return(&mockTxExtention, nil).Once()
+		reader := relayer.NewReader(grpcClient, testLogger)
+
+		res, err := reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		require.NoError(t, err)
+		require.Equal(t, uint64(123), res["a"])
+		require.Equal(t, uint64(456), res["b"])
+	})
+
+	t.Run("CallContract_CachesABI", func(t *testing.T) {
+		grpcClient.On(
+			"GetContractABI",
+			mock.Anything, // address
+		).Return(&mockAbi, nil).Once()
+		constContractRes, _ := abi.GetPaddedParam([]abi.Param{{"uint64": "123"}, {"uint64": "456"}})
+		mockTxExtention.ConstantResult = [][]byte{constContractRes}
+		grpcClient.On(
+			"TriggerConstantContract",
+			mock.Anything, // ctx
+			mock.Anything, // contract
+			mock.Anything, // method
+			mock.Anything, // json
+		).Return(&mockTxExtention, nil).Twice()
+		reader := relayer.NewReader(grpcClient, testLogger)
+
+		_, err := reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		require.NoError(t, err)
+
+		// should not call GetContractABI again
+		_, err = reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		require.NoError(t, err)
+	})
+
+	t.Run("GetEventLogsFromBlock", func(t *testing.T) {
+		mockAbi.Entrys = append(mockAbi.Entrys, &core.SmartContract_ABI_Entry{
+			Name: "event",
+			Inputs: []*core.SmartContract_ABI_Entry_Param{
+				{
+					Name: "a",
+					Type: "uint64",
+				},
+				{
+					Name: "b",
+					Type: "uint64",
+				},
+				{
+					Name: "c",
+					Type: "uint32",
+				},
+			},
+		})
+		grpcClient.On(
+			"GetContractABI",
+			mock.Anything, // address
+		).Return(&mockAbi, nil).Once()
+		encodedData, _ := abi.GetPaddedParam([]abi.Param{
+			{"uint64": "123"},
+			{"uint64": "456"},
+			{"uint32": "789"},
+		})
+		mockTxExtention.Logs = []*core.TransactionInfo_Log{
+			{
+				Address: []byte{0, 1, 2, 3},
+				Topics:  [][]byte{relayer.GetEventTopicHash("event(uint64,uint64,uint32)")},
+				Data:    encodedData,
+			},
+		}
+		grpcClient.On(
+			"GetBlockByNum",
+			mock.Anything, // ctx
+		).Return(&mockBlockExtention, nil).Once()
+		reader := relayer.NewReader(grpcClient, testLogger)
+
+		events, err := reader.GetEventsFromBlock(address.Address{0, 1, 2, 3}, "event", 1)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		require.Equal(t, uint64(123), events[0]["a"])
+		require.Equal(t, uint64(456), events[0]["b"])
+		require.Equal(t, uint32(789), events[0]["c"])
+	})
 }

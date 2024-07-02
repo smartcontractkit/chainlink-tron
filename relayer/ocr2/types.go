@@ -33,8 +33,8 @@ type TransmissionDetails struct {
 }
 
 type BillingDetails struct {
-	ObservationPaymentGJuels  uint64
-	TransmissionPaymentGJuels uint64
+	ObservationPaymentGJuels  uint32
+	TransmissionPaymentGJuels uint32
 }
 
 type RoundData struct {

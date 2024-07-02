@@ -1,10 +1,11 @@
-package relayer
+package relayer_test
 
 import (
 	"encoding/hex"
 	"testing"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +25,7 @@ func TestGetFunctionSignature_Simple(t *testing.T) {
 			},
 		},
 	}
-	sigHash, err := GetFunctionSignature(abi, "foo")
+	sigHash, err := relayer.GetFunctionSignature(abi, "foo")
 	require.NoError(t, err)
 	require.Equal(t, "foo(uint64,uint64)", sigHash)
 }
@@ -46,11 +47,11 @@ func TestGetFunctionSignature_NotFound(t *testing.T) {
 		},
 	}
 
-	_, err := GetFunctionSignature(abi, "foo()") // parentheses not required
-	require.ErrorContains(t, err, "method foo() not found in abi")
+	_, err := relayer.GetFunctionSignature(abi, "foo()") // parentheses not required
+	require.ErrorContains(t, err, "entry with name foo() not found in abi")
 
-	_, err = GetFunctionSignature(abi, "bar") // method doesnt exist
-	require.ErrorContains(t, err, "method bar not found in abi")
+	_, err = relayer.GetFunctionSignature(abi, "bar") // method doesnt exist
+	require.ErrorContains(t, err, "entry with name bar not found in abi")
 }
 
 func TestGetFunctionSignature_TuplesAndArrays(t *testing.T) {
@@ -75,13 +76,13 @@ func TestGetFunctionSignature_TuplesAndArrays(t *testing.T) {
 			},
 		},
 	}
-	sigHash, err := GetFunctionSignature(abi, "foo")
+	sigHash, err := relayer.GetFunctionSignature(abi, "foo")
 	require.NoError(t, err)
 	require.Equal(t, "foo(uint64,uint64,uint256[],(uint256,uint256))", sigHash)
 }
 
 func TestGetEventTopicHash(t *testing.T) {
-	topicHash := GetEventTopicHash("Transfer(address,address,uint256)")
+	topicHash := relayer.GetEventTopicHash("Transfer(address,address,uint256)")
 	expectedHash, _ := hex.DecodeString("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 	require.Equal(t, expectedHash, topicHash)
 }

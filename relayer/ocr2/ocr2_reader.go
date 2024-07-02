@@ -6,9 +6,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	relayer "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 //go:generate mockery --name OCR2Reader --output ./mocks/
@@ -43,18 +45,18 @@ func (c *OCR2ReaderClient) BaseReader() relayer.Reader {
 }
 
 func (c *OCR2ReaderClient) BillingDetails(ctx context.Context, address tronaddress.Address) (bd BillingDetails, err error) {
-	res, err := c.r.CallContract(address, "billing", nil)
+	res, err := c.r.CallContract(address, "getBilling", nil)
 	if err != nil {
 		return bd, fmt.Errorf("failed to call contract: %w", err)
 	}
 
-	op, ok := res["observationPaymentGjuels"].(uint64)
+	op, ok := res["observationPaymentGjuels"].(uint32)
 	if !ok {
-		return bd, fmt.Errorf("cannot convert observationPaymentGjuels %+v to uint64", res["observationPaymentGjuels"])
+		return bd, fmt.Errorf("expected observationPaymentGjuels %+v to be of type uint32, got %T", res["observationPaymentGjuels"], res["observationPaymentGjuels"])
 	}
-	tp, ok := res["transmissionPaymentGjuels"].(uint64)
+	tp, ok := res["transmissionPaymentGjuels"].(uint32)
 	if !ok {
-		return bd, fmt.Errorf("cannot convert transmissionPaymentGjuels %+v to uint64", res["transmissionPaymentGjuels"])
+		return bd, fmt.Errorf("expected transmissionPaymentGjuels %+v to be of type uint32, got %T", res["transmissionPaymentGjuels"], res["transmissionPaymentGjuels"])
 	}
 
 	return BillingDetails{
@@ -68,7 +70,6 @@ func (c *OCR2ReaderClient) LatestConfigDetails(ctx context.Context, address tron
 	if err != nil {
 		return ccd, fmt.Errorf("couldn't call the contract: %w", err)
 	}
-	fmt.Println(res)
 
 	blockNumUint32, ok := res["blockNumber"].(uint32)
 	if !ok {
@@ -90,7 +91,6 @@ func (c *OCR2ReaderClient) LatestTransmissionDetails(ctx context.Context, addres
 	if err != nil {
 		return td, fmt.Errorf("couldn't call the contract: %w", err)
 	}
-	fmt.Println(res)
 
 	configDigest, ok := res["configDigest"].([32]byte)
 	if !ok {
@@ -171,30 +171,70 @@ func (c *OCR2ReaderClient) LinkAvailableForPayment(ctx context.Context, address 
 }
 
 func (c *OCR2ReaderClient) ConfigFromEventAt(ctx context.Context, address tronaddress.Address, blockNum uint64) (cc ContractConfig, err error) {
-	eventLogs, err := c.r.GetEventLogsFromBlock(address, "ConfigSet", blockNum)
+	events, err := c.r.GetEventsFromBlock(address, "ConfigSet", blockNum)
 	if err != nil {
 		return cc, fmt.Errorf("failed to fetch ConfigSet event logs: %w", err)
 	}
-	if len(eventLogs) == 0 {
-		return cc, fmt.Errorf("expected to find at least one ConfigSet event in block %d for address %s but found %d", blockNum, address, len(eventLogs))
+	if len(events) != 1 {
+		return cc, fmt.Errorf("expected to find at exactly one ConfigSet event in block %d for address %s but found %d", blockNum, address, len(events))
 	}
 
-	// todo: parse logs into ContractConfig
+	cfg := events[0]
 
-	return
-}
-
-// NewTransmissionsFromEventsAt finds events of type new_transmission emitted by the contract address in a given block number.
-func (c *OCR2ReaderClient) NewTransmissionsFromEventsAt(ctx context.Context, address tronaddress.Address, blockNum uint64) (events []NewTransmissionEvent, err error) {
-	eventLogs, err := c.r.GetEventLogsFromBlock(address, "NewTransmission", blockNum)
-	if err != nil {
-		return events, fmt.Errorf("failed to fetch NewTransmission event logs: %w", err)
+	configDigest, ok := cfg["configDigest"].([32]byte)
+	if !ok {
+		return cc, fmt.Errorf("expected configDigest %+v to be of type bytes32, got %T", cfg["configDigest"], cfg["configDigest"])
 	}
-	if len(eventLogs) == 0 {
-		return events, fmt.Errorf("expected to find at least one NewTransmission event in block %d for address %s but found %d", blockNum, address, len(eventLogs))
+	configCount, ok := cfg["configCount"].(uint64)
+	if !ok {
+		return cc, fmt.Errorf("expected configCount %+v to be of type uint64, got %T", cfg["configCount"], cfg["configCount"])
+	}
+	signers, ok := cfg["signers"].([]common.Address)
+	if !ok {
+		return cc, fmt.Errorf("expected signers %+v to be of type []common.Address, got %T", cfg["signers"], cfg["signers"])
+	}
+	transmitters, ok := cfg["transmitters"].([]common.Address)
+	if !ok {
+		return cc, fmt.Errorf("expected transmitters %+v to be of type []common.Address, got %T", cfg["transmitters"], cfg["transmitters"])
+	}
+	f, ok := cfg["f"].(uint8)
+	if !ok {
+		return cc, fmt.Errorf("expected f %+v to be of type uint8, got %T", cfg["f"], cfg["f"])
+	}
+	onchainConfig, ok := cfg["onchainConfig"].([]byte)
+	if !ok {
+		return cc, fmt.Errorf("expected onchainConfig %+v to be of type []byte, got %T", cfg["onchainConfig"], cfg["onchainConfig"])
+	}
+	offchainConfigVersion, ok := cfg["offchainConfigVersion"].(uint64)
+	if !ok {
+		return cc, fmt.Errorf("expected offchainConfigVersion %+v to be of type uint64, got %T", cfg["offchainConfigVersion"], cfg["offchainConfigVersion"])
+	}
+	offchainConfig, ok := cfg["offchainConfig"].([]byte)
+	if !ok {
+		return cc, fmt.Errorf("expected offchainConfig %+v to be of type []byte, got %T", cfg["offchainConfig"], cfg["offchainConfig"])
 	}
 
-	// todo: parse logs into NewTransmissionEvent
+	var parsedSigners []types.OnchainPublicKey
+	for _, s := range signers {
+		parsedSigners = append(parsedSigners, types.OnchainPublicKey(s.Bytes()))
+	}
+	var parsedTransmitters []types.Account
+	for _, t := range transmitters {
+		parsedTransmitters = append(parsedTransmitters, types.Account(t.Hex()))
+	}
+	cc = ContractConfig{
+		Config: types.ContractConfig{
+			ConfigDigest:          types.ConfigDigest(configDigest),
+			ConfigCount:           configCount,
+			Signers:               parsedSigners,      // note: these are in EVM format, need to convert to Tron format for use elsewhere
+			Transmitters:          parsedTransmitters, // note: these are in EVM format, need to convert to Tron format for use elsewhere
+			F:                     f,
+			OnchainConfig:         onchainConfig,
+			OffchainConfigVersion: offchainConfigVersion,
+			OffchainConfig:        offchainConfig,
+		},
+		ConfigBlock: blockNum,
+	}
 
 	return
 }

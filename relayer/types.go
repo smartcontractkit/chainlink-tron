@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+//go:generate mockery --name GrpcClient --output ./mocks/
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
 	Stop()

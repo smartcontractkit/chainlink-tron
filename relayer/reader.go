@@ -17,10 +17,11 @@ const (
 	TRON_ZERO_ADDR_HEX = "410000000000000000000000000000000000000000"
 )
 
+//go:generate mockery --name Reader --output ./mocks/
 type Reader interface {
 	CallContract(tronaddress.Address, string, []map[string]string) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
-	GetEventLogsFromBlock(address tronaddress.Address, eventType string, blockNum uint64) ([]*core.TransactionInfo_Log, error)
+	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
 	BaseClient() GrpcClient
 }
@@ -122,7 +123,7 @@ func (c *ReaderClient) LatestBlockHeight() (blockHeight uint64, err error) {
 	return uint64(nowBlock.GetBlockHeader().GetRawData().Number), nil
 }
 
-func (c *ReaderClient) GetEventLogsFromBlock(address tronaddress.Address, eventType string, blockNum uint64) ([]*core.TransactionInfo_Log, error) {
+func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
 	// get abi
 	abi, err := c.getContractABI(address)
 	if err != nil {
@@ -131,7 +132,7 @@ func (c *ReaderClient) GetEventLogsFromBlock(address tronaddress.Address, eventT
 	}
 
 	// get event topic hash
-	eventSignature, err := GetFunctionSignature(abi, eventType)
+	eventSignature, err := GetFunctionSignature(abi, eventName)
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get event signature: %w", err))
 		return nil, err
@@ -161,6 +162,20 @@ func (c *ReaderClient) GetEventLogsFromBlock(address tronaddress.Address, eventT
 		}
 	}
 
-	// todo: parse event logs into struct rather than returning raw logs
-	return eventLogs, nil
+	parser, err := tronabi.GetInputsParser(abi, eventName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input parser for event %s: %w", eventName, err)
+	}
+
+	var events = []map[string]interface{}{}
+	for _, log := range eventLogs {
+		event := make(map[string]interface{})
+		err = parser.UnpackIntoMap(event, log.Data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unpack event log: %w", err)
+		}
+		events = append(events, event)
+	}
+
+	return events, nil
 }
