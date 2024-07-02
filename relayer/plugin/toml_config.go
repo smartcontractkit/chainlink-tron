@@ -1,0 +1,171 @@
+package plugin
+
+import (
+	"errors"
+	"fmt"
+	"net/url"
+	"time"
+
+	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/exp/slices"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+)
+
+type TOMLConfigs []*TOMLConfig
+
+func (cs TOMLConfigs) ValidateConfig() (err error) {
+	return cs.validateKeys()
+}
+
+func (cs TOMLConfigs) validateKeys() (err error) {
+	// Unique chain IDs
+	chainIDs := config.UniqueStrings{}
+	for i, c := range cs {
+		if chainIDs.IsDupe(c.ChainID) {
+			err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.ChainID", i), *c.ChainID))
+		}
+	}
+
+	// Unique node names
+	names := config.UniqueStrings{}
+	for i, c := range cs {
+		for j, n := range c.Nodes {
+			if names.IsDupe(n.Name) {
+				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.Name", i, j), *n.Name))
+			}
+		}
+	}
+
+	// Unique URLs
+	urls := config.UniqueStrings{}
+	for i, c := range cs {
+		for j, n := range c.Nodes {
+			u := (*url.URL)(n.URL)
+			if urls.IsDupeFmt(u) {
+				err = errors.Join(err, config.NewErrDuplicate(fmt.Sprintf("%d.Nodes.%d.URL", i, j), u.String()))
+			}
+		}
+	}
+	return
+}
+
+func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
+	if err1 := fs.validateKeys(); err1 != nil {
+		return err1
+	}
+	for _, f := range *fs {
+		if f.ChainID == nil {
+			*cs = append(*cs, f)
+		} else if i := slices.IndexFunc(*cs, func(c *TOMLConfig) bool {
+			return c.ChainID != nil && *c.ChainID == *f.ChainID
+		}); i == -1 {
+			*cs = append(*cs, f)
+		} else {
+			(*cs)[i].SetFrom(f)
+		}
+	}
+	return
+}
+
+type NodeConfigs []*NodeConfig
+
+func (ns *NodeConfigs) SetFrom(fs *NodeConfigs) {
+	for _, f := range *fs {
+		if f.Name == nil {
+			*ns = append(*ns, f)
+		} else if i := slices.IndexFunc(*ns, func(n *NodeConfig) bool {
+			return n.Name != nil && *n.Name == *f.Name
+		}); i == -1 {
+			*ns = append(*ns, f)
+		} else {
+			setFromNode((*ns)[i], f)
+		}
+	}
+}
+
+func setFromNode(n, f *NodeConfig) {
+	if f.Name != nil {
+		n.Name = f.Name
+	}
+	if f.URL != nil {
+		n.URL = f.URL
+	}
+	if f.SolidityURL != nil {
+		n.SolidityURL = f.SolidityURL
+	}
+	if f.JsonRpcURL != nil {
+		n.JsonRpcURL = f.JsonRpcURL
+	}
+}
+
+type TOMLConfig struct {
+	ChainID *string
+	// Do not access directly, use [IsEnabled]
+	Enabled *bool
+	ChainConfig
+	Nodes NodeConfigs
+}
+
+func (c *TOMLConfig) IsEnabled() bool {
+	return c.Enabled == nil || *c.Enabled
+}
+
+func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
+	if f.ChainID != nil {
+		c.ChainID = f.ChainID
+	}
+	if f.Enabled != nil {
+		c.Enabled = f.Enabled
+	}
+	setFromChain(&c.ChainConfig, &f.ChainConfig)
+	c.Nodes.SetFrom(&f.Nodes)
+}
+
+func setFromChain(c, f *ChainConfig) {
+	if f.BroadcastChanSize != nil {
+		c.BroadcastChanSize = f.BroadcastChanSize
+	}
+	if f.ConfirmPollPeriod != nil {
+		c.ConfirmPollPeriod = f.ConfirmPollPeriod
+	}
+}
+
+func (c *TOMLConfig) ValidateConfig() (err error) {
+	if c.ChainID == nil {
+		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
+	} else if *c.ChainID == "" {
+		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
+	}
+
+	if len(c.Nodes) == 0 {
+		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
+	}
+	return
+}
+
+func (c *TOMLConfig) TOMLString() (string, error) {
+	b, err := toml.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func (c *TOMLConfig) BroadcastChanSize() uint64 {
+	return *c.ChainConfig.BroadcastChanSize
+}
+
+func (c *TOMLConfig) ConfirmPollPeriod() time.Duration {
+	return c.ChainConfig.ConfirmPollPeriod.Duration()
+}
+
+func (c *TOMLConfig) ListNodes() NodeConfigs {
+	return c.Nodes
+}
+
+func NewDefault() *TOMLConfig {
+	cfg := &TOMLConfig{}
+	cfg.SetDefaults()
+	return cfg
+}
