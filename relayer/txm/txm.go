@@ -9,13 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -47,14 +43,14 @@ type TronTxm struct {
 	stop          chan struct{}
 }
 
-func New(lgr logger.Logger, keystore loop.Keystore, config TronTxmConfig) *TronTxm {
+func New(lgr logger.Logger, keystore loop.Keystore, client relayer.GrpcClient, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
 		logger:                logger.Named(lgr, "TronTxm"),
 		keystore:              keystore,
 		config:                config,
 		estimateEnergyEnabled: true,
 
-		client:        client.NewGrpcClientWithTimeout(config.RPCAddress, 15*time.Second),
+		client:        client,
 		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
 		accountStore:  newAccountStore(),
 		stop:          make(chan struct{}),
@@ -79,16 +75,6 @@ func (t *TronTxm) GetClient() relayer.GrpcClient {
 
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.starter.StartOnce("TronTxm", func() error {
-		var transportCredentials credentials.TransportCredentials
-		if t.config.RPCInsecure {
-			transportCredentials = insecure.NewCredentials()
-		} else {
-			transportCredentials = credentials.NewTLS(nil)
-		}
-		err := t.GetClient().Start(grpc.WithTransportCredentials(transportCredentials))
-		if err != nil {
-			return fmt.Errorf("failed to start GrpcClient: %+w", err)
-		}
 		t.done.Add(2) // waitgroup: broadcast loop and confirm loop
 		go t.broadcastLoop()
 		go t.confirmLoop()

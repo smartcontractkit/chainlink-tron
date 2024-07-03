@@ -5,12 +5,17 @@ package txm
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/client"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTxmShasta(t *testing.T) {
@@ -23,6 +28,10 @@ func TestTxmNile(t *testing.T) {
 
 func runTestnetTest(t *testing.T, grpcAddress string) {
 	logger := logger.Test(t)
+
+	grpcClient := client.NewGrpcClientWithTimeout(grpcAddress, 15*time.Second)
+	err := grpcClient.Start(grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+	require.NoError(t, err)
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
@@ -39,11 +48,9 @@ func runTestnetTest(t *testing.T, grpcAddress string) {
 	keystore := testutils.NewTestKeystore(pubAddress, privateKey)
 
 	config := TronTxmConfig{
-		RPCAddress:        grpcAddress,
-		RPCInsecure:       true,
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, config, keystore, pubAddress, 5)
+	runTxmTest(t, logger, grpcClient, config, keystore, pubAddress, 5)
 }

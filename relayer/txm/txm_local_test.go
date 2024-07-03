@@ -15,13 +15,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTxmLocal(t *testing.T) {
@@ -59,18 +64,20 @@ func TestTxmLocal(t *testing.T) {
 		rpcAddress = "172.255.0.101:16669" // Linux does not need port forwarding
 	}
 
+	grpcClient := client.NewGrpcClientWithTimeout(rpcAddress, 15*time.Second)
+	err = grpcClient.Start(grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+
 	config := TronTxmConfig{
-		RPCAddress:        rpcAddress,
-		RPCInsecure:       true,
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, config, keystore, genesisAddress, 10)
+	runTxmTest(t, logger, grpcClient, config, keystore, genesisAddress, 10)
 }
 
-func runTxmTest(t *testing.T, logger logger.Logger, config TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
-	txm := New(logger, keystore, config)
+func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClient, config TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
+	txm := New(logger, keystore, grpcClient, config)
 	err := txm.Start(context.Background())
 	require.NoError(t, err)
 

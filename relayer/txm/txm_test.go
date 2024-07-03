@@ -22,8 +22,6 @@ import (
 
 var keystore *testutils.TestKeystore
 var config = TronTxmConfig{
-	RPCAddress:        "",
-	RPCInsecure:       true,
 	BroadcastChanSize: 100,
 	ConfirmPollSecs:   2,
 }
