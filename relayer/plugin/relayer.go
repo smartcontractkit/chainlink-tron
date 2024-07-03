@@ -7,12 +7,16 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
-
-	"github.com/pelletier/go-toml/v2"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
+	"github.com/pelletier/go-toml/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -183,7 +187,36 @@ func (t *TronRelayer) getClient() (relayer.Reader, error) {
 	index := rand.Perm(len(nodes))
 	node := nodes[index[0]] // random node selected from available nodes
 
-	grpcClient := client.NewGrpcClientWithTimeout(node.SolidityURL.String(), 15*time.Second)
+	// TODO: we expect the URL in the format grpc://host:port?insecure=true, move this somewhere?
+	hostname := node.URL.URL().Hostname()
+	port := node.URL.URL().Port()
+	if port == "" {
+		port = "50051"
+	}
+
+	insecureTransport := false
+	values := node.URL.URL().Query()
+	insecureValues, ok := values["insecure"]
+	if ok {
+		if len(insecureValues) > 0 {
+			insecureValue := strings.ToLower(insecureValues[0])
+			insecureTransport = insecureValue == "true" || insecureValue == "1"
+		}
+	}
+
+	var transportCredentials credentials.TransportCredentials
+	if insecureTransport {
+		transportCredentials = insecure.NewCredentials()
+	} else {
+		transportCredentials = credentials.NewTLS(nil)
+	}
+
+	grpcClient := client.NewGrpcClientWithTimeout(hostname+":"+port, 15*time.Second)
+	err := grpcClient.Start(grpc.WithTransportCredentials(transportCredentials))
+	if err != nil {
+		return nil, fmt.Errorf("failed to start GrpcClient: %+w", err)
+	}
+
 	readerClient := relayer.NewReader(grpcClient, t.lggr)
 	t.lggr.Debugw("Created client", "name", node.Name, "url", node.URL, "solidityURL", node.SolidityURL, "jsonrpcURL", node.JsonRpcURL)
 	return readerClient, nil
