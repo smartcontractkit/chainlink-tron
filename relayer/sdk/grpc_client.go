@@ -1,4 +1,4 @@
-package relayer
+package sdk
 
 import (
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//go:generate mockery --name GrpcClient --output ./mocks/
+//go:generate mockery --name GrpcClient --output ../mocks/
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
 	Stop()

@@ -1,4 +1,4 @@
-package relayer
+package reader
 
 import (
 	"bytes"
@@ -8,33 +8,31 @@ import (
 	tronabi "github.com/fbsobreira/gotron-sdk/pkg/abi"
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 )
 
-// Tron zero address - https://developers.tron.network/docs/faq#3-what-is-the-destruction-address-of-tron
-const (
-	TRON_ZERO_ADDR_B58 = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
-	TRON_ZERO_ADDR_HEX = "410000000000000000000000000000000000000000"
-)
-
-//go:generate mockery --name Reader --output ./mocks/
+//go:generate mockery --name Reader --output ../mocks/
 type Reader interface {
 	CallContract(tronaddress.Address, string, []map[string]string) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
 	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
-	BaseClient() GrpcClient
+	BaseClient() sdk.GrpcClient
 }
 
 var _ Reader = (*ReaderClient)(nil)
 
 type ReaderClient struct {
-	rpc  GrpcClient
+	rpc  sdk.GrpcClient
 	lggr logger.Logger
 	abi  map[string]*core.SmartContract_ABI
 }
 
-func NewReader(rpc GrpcClient, lggr logger.Logger) *ReaderClient {
+func NewReader(rpc sdk.GrpcClient, lggr logger.Logger) *ReaderClient {
 	return &ReaderClient{
 		rpc:  rpc,
 		lggr: lggr,
@@ -42,7 +40,7 @@ func NewReader(rpc GrpcClient, lggr logger.Logger) *ReaderClient {
 	}
 }
 
-func (c *ReaderClient) BaseClient() GrpcClient {
+func (c *ReaderClient) BaseClient() sdk.GrpcClient {
 	return c.rpc
 }
 
@@ -82,14 +80,14 @@ func (c *ReaderClient) CallContract(address tronaddress.Address, method string, 
 	}
 
 	// get method signature
-	methodSignature, err := GetFunctionSignature(abi, method)
+	methodSignature, err := relayer.GetFunctionSignature(abi, method)
 	if err != nil {
 		return result, fmt.Errorf("failed to get method sighash: %w", err)
 	}
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContract(
-		/* from= */ TRON_ZERO_ADDR_B58,
+		/* from= */ sdk.TRON_ZERO_ADDR_B58,
 		/* contractAddress= */ address.String(),
 		/* method= */ methodSignature,
 		/* jsonString= */ paramsJsonStr,
@@ -132,12 +130,12 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	}
 
 	// get event topic hash
-	eventSignature, err := GetFunctionSignature(abi, eventName)
+	eventSignature, err := relayer.GetFunctionSignature(abi, eventName)
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get event signature: %w", err))
 		return nil, err
 	}
-	eventTopicHash := GetEventTopicHash(eventSignature)
+	eventTopicHash := relayer.GetEventTopicHash(eventSignature)
 
 	// get block
 	block, err := c.rpc.GetBlockByNum(int64(blockNum))

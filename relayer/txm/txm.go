@@ -18,7 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 )
 
 var _ services.Service = &TronTxm{}
@@ -35,7 +36,7 @@ type TronTxm struct {
 	config                TronTxmConfig
 	estimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	client        relayer.GrpcClient
+	client        sdk.GrpcClient
 	broadcastChan chan *TronTx
 	accountStore  *AccountStore
 	starter       utils.StartStopOnce
@@ -43,7 +44,7 @@ type TronTxm struct {
 	stop          chan struct{}
 }
 
-func New(lgr logger.Logger, keystore loop.Keystore, client relayer.GrpcClient, config TronTxmConfig) *TronTxm {
+func New(lgr logger.Logger, keystore loop.Keystore, client sdk.GrpcClient, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
 		logger:                logger.Named(lgr, "TronTxm"),
 		keystore:              keystore,
@@ -69,7 +70,7 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.starter.Healthy()}
 }
 
-func (t *TronTxm) GetClient() relayer.GrpcClient {
+func (t *TronTxm) GetClient() sdk.GrpcClient {
 	return t.client
 }
 

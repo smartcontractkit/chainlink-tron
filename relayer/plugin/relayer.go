@@ -24,8 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -165,7 +165,7 @@ func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfi
 
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
 	// todo: unmarshal args.RelayConfig into a struct if required
-	reader := relayer.NewReader(t.client, t.lggr)
+	reader := reader.NewReader(t.client, t.lggr)
 	chainID, err := strconv.ParseUint(t.id, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)

@@ -13,8 +13,8 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,7 +48,7 @@ func waitForMaxRetryDuration() {
 	time.Sleep(MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
 }
 
-func setupTxm(t *testing.T, grpcClient relayer.GrpcClient) (*TronTxm, logger.Logger, *observer.ObservedLogs) {
+func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*TronTxm, logger.Logger, *observer.ObservedLogs) {
 	testLogger, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
 	txm := TronTxm{
 		logger:                testLogger,

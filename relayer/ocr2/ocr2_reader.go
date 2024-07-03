@@ -8,12 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	relayer "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-//go:generate mockery --name OCR2Reader --output ./mocks/
+//go:generate mockery --name OCR2Reader --output ../mocks/
 type OCR2Reader interface { //nolint:revive
 	LatestConfigDetails(context.Context, tronaddress.Address) (ContractConfigDetails, error)
 	LatestTransmissionDetails(context.Context, tronaddress.Address) (TransmissionDetails, error)
@@ -23,24 +24,24 @@ type OCR2Reader interface { //nolint:revive
 	// NewTransmissionsFromEventsAt(context.Context, tronaddress.Address, uint64) ([]NewTransmissionEvent, error) // is this needed?
 	BillingDetails(context.Context, tronaddress.Address) (BillingDetails, error)
 
-	BaseReader() relayer.Reader
+	BaseReader() reader.Reader
 }
 
 var _ OCR2Reader = (*OCR2ReaderClient)(nil)
 
 type OCR2ReaderClient struct {
-	r    relayer.Reader
+	r    reader.Reader
 	lggr logger.Logger
 }
 
-func NewOCR2Reader(reader relayer.Reader, lggr logger.Logger) *OCR2ReaderClient {
+func NewOCR2Reader(reader reader.Reader, lggr logger.Logger) *OCR2ReaderClient {
 	return &OCR2ReaderClient{
 		r:    reader,
 		lggr: lggr,
 	}
 }
 
-func (c *OCR2ReaderClient) BaseReader() relayer.Reader {
+func (c *OCR2ReaderClient) BaseReader() reader.Reader {
 	return c.r
 }
 

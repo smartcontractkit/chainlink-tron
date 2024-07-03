@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 )
 
 // type ConfigProvider interface {
@@ -31,9 +33,9 @@ type configProvider struct {
 	lggr logger.Logger
 }
 
-func NewConfigProvider(chainID uint64, contractAddress address.Address, reader relayer.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
+func NewConfigProvider(chainID uint64, contractAddress address.Address, readerClient reader.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
 	lggr = logger.Named(lggr, "ConfigProvider")
-	client := NewOCR2Reader(reader, lggr)
+	client := NewOCR2Reader(readerClient, lggr)
 	contractReader := NewContractReader(contractAddress, client, lggr)
 	cache := NewContractCache(cfg, contractReader, lggr)
 

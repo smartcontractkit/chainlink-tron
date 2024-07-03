@@ -10,14 +10,18 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
 func TestOCR2Reader(t *testing.T) {
@@ -27,8 +31,8 @@ func TestOCR2Reader(t *testing.T) {
 	ocr2AggregatorAbi, _ := contract.JSONtoABI(testutils.TRON_OCR2_AGGREGATOR_ABI)
 	grpcClient.On("GetContractABI", mock.Anything).Maybe().Return(ocr2AggregatorAbi, nil)
 
-	reader := relayer.NewReader(grpcClient, testLogger)
-	ocr2Reader := NewOCR2Reader(reader, testLogger)
+	readerClient := reader.NewReader(grpcClient, testLogger)
+	ocr2Reader := NewOCR2Reader(readerClient, testLogger)
 
 	t.Run("LatestConfigDetails", func(t *testing.T) {
 		configCount := 1
@@ -151,8 +155,8 @@ func TestOCR2Reader(t *testing.T) {
 		prevConfigBlockNumber := 12344
 		configDigest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 		configCount := 1
-		signers := []interface{}{relayer.TRON_ZERO_ADDR_B58}
-		transmitters := []interface{}{relayer.TRON_ZERO_ADDR_B58}
+		signers := []interface{}{sdk.TRON_ZERO_ADDR_B58}
+		transmitters := []interface{}{sdk.TRON_ZERO_ADDR_B58}
 		f := 3
 		onchainConfig := []byte{8, 9, 10, 11}
 		offchainConfigVersion := 2

@@ -1,4 +1,4 @@
-package relayer_test
+package reader
 
 import (
 	"testing"
@@ -7,12 +7,15 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 )
 
 var mockTxExtention = api.TransactionExtention{
@@ -86,7 +89,7 @@ func TestReader(t *testing.T) {
 			"GetNowBlock",
 			mock.Anything, // ctx
 		).Return(&mockBlockExtention, nil).Once()
-		reader := relayer.NewReader(grpcClient, testLogger)
+		reader := NewReader(grpcClient, testLogger)
 
 		blockHeight, err := reader.LatestBlockHeight()
 		require.NoError(t, err)
@@ -107,9 +110,9 @@ func TestReader(t *testing.T) {
 			mock.Anything, // method
 			mock.Anything, // json
 		).Return(&mockTxExtention, nil).Once()
-		reader := relayer.NewReader(grpcClient, testLogger)
+		reader := NewReader(grpcClient, testLogger)
 
-		res, err := reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		res, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
 		require.NoError(t, err)
 		require.Equal(t, uint64(123), res["a"])
 		require.Equal(t, uint64(456), res["b"])
@@ -129,13 +132,13 @@ func TestReader(t *testing.T) {
 			mock.Anything, // method
 			mock.Anything, // json
 		).Return(&mockTxExtention, nil).Twice()
-		reader := relayer.NewReader(grpcClient, testLogger)
+		reader := NewReader(grpcClient, testLogger)
 
-		_, err := reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		_, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
 		require.NoError(t, err)
 
 		// should not call GetContractABI again
-		_, err = reader.CallContract(address.HexToAddress(relayer.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		_, err = reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
 		require.NoError(t, err)
 	})
 
@@ -177,7 +180,7 @@ func TestReader(t *testing.T) {
 			"GetBlockByNum",
 			mock.Anything, // ctx
 		).Return(&mockBlockExtention, nil).Once()
-		reader := relayer.NewReader(grpcClient, testLogger)
+		reader := NewReader(grpcClient, testLogger)
 
 		events, err := reader.GetEventsFromBlock(address.Address{0, 1, 2, 3}, "event", 1)
 		require.NoError(t, err)
