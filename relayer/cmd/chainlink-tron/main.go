@@ -53,23 +53,21 @@ type pluginRelayer struct {
 func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore loop.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
 	d := toml.NewDecoder(strings.NewReader(config))
 	d.DisallowUnknownFields()
-	var cfg struct {
-		Tron tronplugin.TOMLConfig
-	}
+
+	var cfg tronplugin.TOMLConfig
 
 	if err := d.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
 	}
 
-	tronConfig := &cfg.Tron
-	if err := tronConfig.ValidateConfig(); err != nil {
+	if err := cfg.ValidateConfig(); err != nil {
 		return nil, fmt.Errorf("invalid tron config: %w", err)
 	}
-	if !tronConfig.IsEnabled() {
-		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *tronConfig.ChainID)
+	if !cfg.IsEnabled() {
+		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
-	relayer := tronplugin.NewRelayer(tronConfig, c.Logger, keystore)
+	relayer := tronplugin.NewRelayer(&cfg, c.Logger, keystore)
 	c.SubService(relayer)
 
 	return relayer, nil
