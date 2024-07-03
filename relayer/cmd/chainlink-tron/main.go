@@ -67,7 +67,13 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore 
 		return nil, fmt.Errorf("cannot create new chain with ID %s: chain is disabled", *cfg.ChainID)
 	}
 
-	relayer := tronplugin.NewRelayer(&cfg, c.Logger, keystore)
+	cfg.SetDefaults()
+
+	relayer, err := tronplugin.NewRelayer(&cfg, c.Logger, keystore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create relayer: %w", err)
+	}
+
 	c.SubService(relayer)
 
 	return relayer, nil
