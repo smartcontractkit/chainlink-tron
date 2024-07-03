@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -107,6 +108,8 @@ type TOMLConfig struct {
 	Nodes NodeConfigs
 }
 
+var _ ocr2.Config = (*TOMLConfig)(nil)
+
 func (c *TOMLConfig) IsEnabled() bool {
 	return c.Enabled == nil || *c.Enabled
 }
@@ -128,6 +131,12 @@ func setFromChain(c, f *ChainConfig) {
 	}
 	if f.ConfirmPollPeriod != nil {
 		c.ConfirmPollPeriod = f.ConfirmPollPeriod
+	}
+	if f.OCR2CachePollPeriod != nil {
+		c.OCR2CachePollPeriod = f.OCR2CachePollPeriod
+	}
+	if f.OCR2CacheTTL != nil {
+		c.OCR2CacheTTL = f.OCR2CacheTTL
 	}
 }
 
@@ -162,6 +171,14 @@ func (c *TOMLConfig) ConfirmPollPeriod() time.Duration {
 
 func (c *TOMLConfig) ListNodes() NodeConfigs {
 	return c.Nodes
+}
+
+func (c *TOMLConfig) OCR2CachePollPeriod() time.Duration {
+	return *c.ChainConfig.OCR2CachePollPeriod
+}
+
+func (c *TOMLConfig) OCR2CacheTTL() time.Duration {
+	return *c.ChainConfig.OCR2CacheTTL
 }
 
 func NewDefault() *TOMLConfig {

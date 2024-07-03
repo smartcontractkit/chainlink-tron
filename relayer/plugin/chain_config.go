@@ -13,17 +13,25 @@ var defaultConfigSet = chainConfigSet{
 	BroadcastChanSize: 4096,
 	// polling period for transaction confirmation
 	ConfirmPollPeriod: 500 * time.Millisecond, // polling for tx confirmation
+	// polling period for OCR2 contract cache
+	OCR2CachePollPeriod: 5 * time.Second,
+	// time to live for OCR2 contract cache
+	OCR2CacheTTL: time.Minute,
 }
 
 // opt: remove
 type chainConfigSet struct {
-	BroadcastChanSize uint64
-	ConfirmPollPeriod time.Duration
+	BroadcastChanSize   uint64
+	ConfirmPollPeriod   time.Duration
+	OCR2CachePollPeriod time.Duration
+	OCR2CacheTTL        time.Duration
 }
 
 type ChainConfig struct {
-	BroadcastChanSize *uint64
-	ConfirmPollPeriod *config.Duration
+	BroadcastChanSize   *uint64
+	ConfirmPollPeriod   *config.Duration
+	OCR2CachePollPeriod *time.Duration
+	OCR2CacheTTL        *time.Duration
 }
 
 func (c *ChainConfig) SetDefaults() {
@@ -32,6 +40,12 @@ func (c *ChainConfig) SetDefaults() {
 	}
 	if c.ConfirmPollPeriod == nil {
 		c.ConfirmPollPeriod = config.MustNewDuration(defaultConfigSet.ConfirmPollPeriod)
+	}
+	if c.OCR2CachePollPeriod == nil {
+		c.OCR2CachePollPeriod = &defaultConfigSet.OCR2CachePollPeriod
+	}
+	if c.OCR2CacheTTL == nil {
+		c.OCR2CacheTTL = &defaultConfigSet.OCR2CacheTTL
 	}
 }
 

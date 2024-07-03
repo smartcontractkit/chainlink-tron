@@ -2,9 +2,7 @@ package ocr2
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -33,20 +31,18 @@ type configProvider struct {
 	lggr logger.Logger
 }
 
-func NewConfigProvider(chainID string, contractAddress address.Address, reader relayer.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
+func NewConfigProvider(chainID uint64, contractAddress address.Address, reader relayer.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
 	lggr = logger.Named(lggr, "ConfigProvider")
 	client := NewOCR2Reader(reader, lggr)
 	contractReader := NewContractReader(contractAddress, client, lggr)
 	cache := NewContractCache(cfg, contractReader, lggr)
 
-	// todo: accept tron addr format and convert to EVM addr
-	isEVMAddr := common.IsHexAddress(contractAddress.Hex())
-	if !isEVMAddr {
-		return nil, fmt.Errorf("contract address is not a valid EVM address: %s", contractAddress)
-	}
+	evmContractAddress := relayer.TronToEVMAddress(contractAddress)
+
+	// todo: investigate if there are any issues with using the evm offchain config digester for Tron
 	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         1, // todo
-		ContractAddress: common.HexToAddress(contractAddress.Hex()),
+		ChainID:         chainID,
+		ContractAddress: evmContractAddress,
 	}
 
 	return &configProvider{

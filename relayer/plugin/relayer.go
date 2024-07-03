@@ -3,10 +3,16 @@ package plugin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -14,6 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -133,14 +141,50 @@ func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfi
 	return nil, errors.New("TODO")
 }
 
-func (t *TronRelayer) NewConfigProvider(context.Context, types.RelayArgs) (types.ConfigProvider, error) {
-	return nil, errors.New("TODO")
+func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
+	// todo: unmarshal args.RelayConfig into a struct if required
+
+	reader, err := t.getClient()
+	if err != nil {
+		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
+	}
+	chainID, err := strconv.ParseUint(t.id, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)
+	}
+	contractAddress, err := address.Base58ToAddress(args.ContractID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", args.ContractID, err)
+	}
+
+	configProvider, err := ocr2.NewConfigProvider(chainID, contractAddress, reader, t.cfg, t.lggr)
+	if err != nil {
+		return nil, fmt.Errorf("coudln't initialize ConfigProvider: %w", err)
+	}
+
+	return configProvider, nil
 }
 
 func (t *TronRelayer) NewPluginProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.PluginProvider, error) {
 	return nil, errors.New("TODO")
 }
 
-func (T *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
+func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
 	return nil, errors.New("TODO")
+}
+
+// getClient returns a reader client, randomly selecting one from available nodes
+func (t *TronRelayer) getClient() (relayer.Reader, error) {
+	nodes := t.cfg.ListNodes()
+	if len(nodes) == 0 {
+		return nil, errors.New("no nodes available")
+	}
+
+	index := rand.Perm(len(nodes))
+	node := nodes[index[0]] // random node selected from available nodes
+
+	grpcClient := client.NewGrpcClientWithTimeout(node.SolidityURL.String(), 15*time.Second)
+	readerClient := relayer.NewReader(grpcClient, t.lggr)
+	t.lggr.Debugw("Created client", "name", node.Name, "url", node.URL, "solidityURL", node.SolidityURL, "jsonrpcURL", node.JsonRpcURL)
+	return readerClient, nil
 }
