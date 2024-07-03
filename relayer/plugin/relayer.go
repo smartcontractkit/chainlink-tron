@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -36,18 +36,37 @@ type TronRelayer struct {
 	cfg  *TOMLConfig
 	lggr logger.Logger
 
-	txm *txm.TronTxm
+	client *client.GrpcClient
+	txm    *txm.TronTxm
 }
 
 var _ loop.Relayer = &TronRelayer{}
 
-func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) *TronRelayer {
+func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
 	id := *cfg.ChainID
-	return &TronRelayer{
-		id:   id,
-		cfg:  cfg,
-		lggr: logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
+
+	nodeConfig, err := cfg.ListNodes().SelectRandom()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
+	client, err := createClient(nodeConfig.URL.URL())
+	if err != nil {
+		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
+	}
+
+	txmgr := txm.New(lggr, keystore, client, txm.TronTxmConfig{
+		// TODO: stop changing uint64 fields here to uint?
+		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
+		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
+	})
+
+	return &TronRelayer{
+		id:     id,
+		cfg:    cfg,
+		lggr:   logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
+		client: client,
+		txm:    txmgr,
+	}, nil
 }
 
 // Service interface
@@ -59,7 +78,6 @@ func (t *TronRelayer) Start(ctx context.Context) error {
 	return t.StartOnce("TronRelayer", func() error {
 		t.lggr.Debug("Starting")
 		t.lggr.Debug("Starting txm")
-		t.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
 		return ms.Start(ctx, t.txm)
 	})
@@ -147,11 +165,7 @@ func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfi
 
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
 	// todo: unmarshal args.RelayConfig into a struct if required
-
-	reader, err := t.getClient()
-	if err != nil {
-		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
-	}
+	reader := relayer.NewReader(t.client, t.lggr)
 	chainID, err := strconv.ParseUint(t.id, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)
@@ -177,25 +191,17 @@ func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.Plu
 	return nil, errors.New("TODO")
 }
 
-// getClient returns a reader client, randomly selecting one from available nodes
-func (t *TronRelayer) getClient() (relayer.Reader, error) {
-	nodes := t.cfg.ListNodes()
-	if len(nodes) == 0 {
-		return nil, errors.New("no nodes available")
-	}
-
-	index := rand.Perm(len(nodes))
-	node := nodes[index[0]] // random node selected from available nodes
-
+// createClient returns a TRON gRPC client
+func createClient(grpcUrl *url.URL) (*client.GrpcClient, error) {
 	// TODO: we expect the URL in the format grpc://host:port?insecure=true, move this somewhere?
-	hostname := node.URL.URL().Hostname()
-	port := node.URL.URL().Port()
+	hostname := grpcUrl.Hostname()
+	port := grpcUrl.Port()
 	if port == "" {
 		port = "50051"
 	}
 
 	insecureTransport := false
-	values := node.URL.URL().Query()
+	values := grpcUrl.Query()
 	insecureValues, ok := values["insecure"]
 	if ok {
 		if len(insecureValues) > 0 {
@@ -217,7 +223,5 @@ func (t *TronRelayer) getClient() (relayer.Reader, error) {
 		return nil, fmt.Errorf("failed to start GrpcClient: %+w", err)
 	}
 
-	readerClient := relayer.NewReader(grpcClient, t.lggr)
-	t.lggr.Debugw("Created client", "name", node.Name, "url", node.URL, "solidityURL", node.SolidityURL, "jsonrpcURL", node.JsonRpcURL)
-	return readerClient, nil
+	return grpcClient, nil
 }
