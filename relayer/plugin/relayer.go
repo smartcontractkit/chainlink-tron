@@ -84,7 +84,7 @@ func (t *TronRelayer) Start(ctx context.Context) error {
 }
 
 func (t *TronRelayer) Close() error {
-	return t.StopOnce("Chain", func() error {
+	return t.StopOnce("TronRelayer", func() error {
 		t.lggr.Debug("Stopping")
 		t.lggr.Debug("Stopping txm")
 		return services.CloseAll(t.txm)
