@@ -3,6 +3,7 @@ package plugin
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"time"
 
@@ -83,6 +84,17 @@ func (ns *NodeConfigs) SetFrom(fs *NodeConfigs) {
 			setFromNode((*ns)[i], f)
 		}
 	}
+}
+
+func (ns NodeConfigs) SelectRandom() (*NodeConfig, error) {
+	if len(ns) == 0 {
+		return nil, errors.New("no nodes available")
+	}
+
+	index := rand.Perm(len(ns))
+	node := ns[index[0]]
+
+	return node, nil
 }
 
 func setFromNode(n, f *NodeConfig) {
