@@ -2,9 +2,10 @@ package contract
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
 // BasePath represents the base directory where JSON files are stored
@@ -43,36 +44,17 @@ type Artifact struct {
 	Bytecode string          `json:"bytecode"`
 }
 
-type Name string
-
-const (
-	Storage         Name = "storage"
-	OpCodes         Name = "opcodes"
-	GlobalVariables Name = "globalvars"
-	Ecrecover       Name = "ecrecover"
-	Sha256hash      Name = "sha256hash"
-	Ripemd160hash   Name = "ripemd160hash"
-	Datacopy        Name = "datacopy"
-	Bigmodexp       Name = "bigmodexp"
-	LinkToken       Name = "linktoken"
-	ReceiverCounter Name = "receivercounter"
-
-	// Data Feeds 1.0
-	SimpleReadAC1               Name = "simplereadac1"
-	SimpleWriteAC1              Name = "simplewriteac1"
-	DataFeeds1Registry          Name = "datafeeds1registry"
-	AcccessControlledAggregator Name = "accesscontrolledaggregator"
-	OCR2Aggregator              Name = "ocr2aggregator"
-	ValidatorProxy              Name = "validatorproxy"
-	EACAggregatorProxy          Name = "eacaggregatorproxy"
-)
-
 func loadContract(jsonPath string) (*ABI, error) {
-	data, err := os.ReadFile(filepath.Join(BasePath, jsonPath))
-
+	gitRoot, err := testutils.FindGitRoot()
 	if err != nil {
 		return nil, err
 	}
+
+	data, err := os.ReadFile(filepath.Join(gitRoot, "integration-tests", "artifacts", jsonPath))
+	if err != nil {
+		return nil, err
+	}
+
 	var abi ABI
 	if err := json.Unmarshal(data, &abi); err != nil {
 		return nil, err
@@ -80,48 +62,7 @@ func loadContract(jsonPath string) (*ABI, error) {
 	return &abi, nil
 }
 
-func ArtifactFromContract(name Name) (Artifact, error) {
-	var jsonPath string
-	switch name {
-
-	// EVM Tests
-	case Storage:
-		jsonPath = "evm-test/Storage.json"
-	case OpCodes:
-		jsonPath = "evm-test/OpCodes.json"
-	case GlobalVariables:
-		jsonPath = "evm-test/GlobalVariables.json"
-	case Ecrecover:
-		jsonPath = "evm-test/ecrecover.json"
-	case Sha256hash:
-		jsonPath = "evm-test/sha256hash.json"
-	case Ripemd160hash:
-		jsonPath = "evm-test/ripemd160hash.json"
-	case Datacopy:
-		jsonPath = "evm-test/datacopy.json"
-	case Bigmodexp:
-		jsonPath = "evm-test/bigmodexp.json"
-
-	// Data Feeds 1.0 Tests
-	case DataFeeds1Registry:
-		jsonPath = "datafeeds-v0.6/FeedRegistry.json"
-	case SimpleReadAC1:
-		jsonPath = "datafeeds-v0.6/SimpleReadAccessController.json"
-	case SimpleWriteAC1:
-		jsonPath = "datafeeds-v0.6/SimpleWriteAccessController.json"
-	case OCR2Aggregator:
-		jsonPath = "datafeeds-v0.6/OCR2Aggregator.json"
-	case AcccessControlledAggregator:
-		jsonPath = "datafeeds-v0.6/AccessControlledOCR2Aggregator.json"
-	case EACAggregatorProxy:
-		jsonPath = "datafeeds-v0.6/EACAggregatorProxy.json"
-	case LinkToken:
-		jsonPath = "link-v0.8/LinkToken.json"
-
-	default:
-		return Artifact{}, fmt.Errorf("contract name (%s) not found", name)
-	}
-
+func LoadArtifact(jsonPath string) (Artifact, error) {
 	contractJSON, err := loadContract(jsonPath)
 	if err != nil {
 		return Artifact{}, err
