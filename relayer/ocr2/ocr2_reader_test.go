@@ -1,4 +1,4 @@
-package ocr2
+package ocr2_test
 
 import (
 	"bytes"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
@@ -32,7 +33,7 @@ func TestOCR2Reader(t *testing.T) {
 	grpcClient.On("GetContractABI", mock.Anything).Maybe().Return(ocr2AggregatorAbi, nil)
 
 	readerClient := reader.NewReader(grpcClient, testLogger)
-	ocr2Reader := NewOCR2Reader(readerClient, testLogger)
+	ocr2Reader := ocr2.NewOCR2Reader(readerClient, testLogger)
 
 	t.Run("LatestConfigDetails", func(t *testing.T) {
 		configCount := 1

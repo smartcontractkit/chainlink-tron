@@ -1,6 +1,7 @@
 package relayer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -35,4 +36,16 @@ func TronToEVMAddress(addr address.Address) common.Address {
 // Convert an EVM address to a Tron-formatted address
 func EVMToTronAddress(addr common.Address) address.Address {
 	return address.HexToAddress("0x41" + addr.String()[2:])
+}
+
+func ByteArrayToStr(b [][]byte) string {
+	if len(b) == 0 {
+		return "[]"
+	}
+
+	var str string = "["
+	for _, v := range b {
+		str += "0x" + hex.EncodeToString(v[:]) + ","
+	}
+	return str[:len(str)-1] + "]"
 }

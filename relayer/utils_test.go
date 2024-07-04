@@ -126,3 +126,12 @@ func TestEVMToTronAddress(t *testing.T) {
 	expectedTronAddr = address.HexToAddress("410000000000000000000000000000000000001234")
 	require.Equal(t, expectedTronAddr, tronAddr)
 }
+
+func TestByteArrToStr(t *testing.T) {
+	b := [][]byte{
+		{0x01, 0x02, 0x03},
+		{0x04, 0x05, 0x06},
+	}
+	str := relayer.ByteArrayToStr(b)
+	require.Equal(t, "[0x010203,0x040506]", str)
+}

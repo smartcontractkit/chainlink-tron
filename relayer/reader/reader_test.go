@@ -1,4 +1,4 @@
-package reader
+package reader_test
 
 import (
 	"testing"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 )
 
@@ -89,7 +90,7 @@ func TestReader(t *testing.T) {
 			"GetNowBlock",
 			mock.Anything, // ctx
 		).Return(&mockBlockExtention, nil).Once()
-		reader := NewReader(grpcClient, testLogger)
+		reader := reader.NewReader(grpcClient, testLogger)
 
 		blockHeight, err := reader.LatestBlockHeight()
 		require.NoError(t, err)
@@ -110,7 +111,7 @@ func TestReader(t *testing.T) {
 			mock.Anything, // method
 			mock.Anything, // json
 		).Return(&mockTxExtention, nil).Once()
-		reader := NewReader(grpcClient, testLogger)
+		reader := reader.NewReader(grpcClient, testLogger)
 
 		res, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
 		require.NoError(t, err)
@@ -132,7 +133,7 @@ func TestReader(t *testing.T) {
 			mock.Anything, // method
 			mock.Anything, // json
 		).Return(&mockTxExtention, nil).Twice()
-		reader := NewReader(grpcClient, testLogger)
+		reader := reader.NewReader(grpcClient, testLogger)
 
 		_, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
 		require.NoError(t, err)
@@ -180,7 +181,7 @@ func TestReader(t *testing.T) {
 			"GetBlockByNum",
 			mock.Anything, // ctx
 		).Return(&mockBlockExtention, nil).Once()
-		reader := NewReader(grpcClient, testLogger)
+		reader := reader.NewReader(grpcClient, testLogger)
 
 		events, err := reader.GetEventsFromBlock(address.Address{0, 1, 2, 3}, "event", 1)
 		require.NoError(t, err)

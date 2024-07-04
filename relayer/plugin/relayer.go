@@ -183,8 +183,36 @@ func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArg
 	return configProvider, nil
 }
 
-func (t *TronRelayer) NewPluginProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.PluginProvider, error) {
-	return nil, errors.New("TODO")
+func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.PluginProvider, error) {
+	// todo: unmarshal args.RelayConfig if required
+
+	var chainReader types.ContractReader // nil, not required if using median contract
+	var codec types.Codec                // nil, not required if using median contract
+
+	reader := reader.NewReader(t.client, t.lggr)
+	chainID, err := strconv.ParseUint(t.id, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)
+	}
+	contractAddress, err := address.Base58ToAddress(relayargs.ContractID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", relayargs.ContractID, err)
+	}
+	configProvider, err := ocr2.NewConfigProvider(chainID, contractAddress, reader, t.cfg, t.lggr)
+	if err != nil {
+		return nil, fmt.Errorf("coudln't initialize ConfigProvider: %w", err)
+	}
+	senderAddress, err := address.Base58ToAddress(pluginargs.TransmitterID)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse transmitter id %s as base58 Tron address: %w", pluginargs.TransmitterID, err)
+	}
+	ocr2Reader := ocr2.NewOCR2Reader(reader, t.lggr)
+	contractReader := ocr2.NewContractReader(contractAddress, ocr2Reader, t.lggr)
+	contractTransmitter := ocr2.NewOCRContractTransmitter(ctx, contractReader, contractAddress, senderAddress, t.txm, t.lggr)
+
+	pluginProvider := ocr2.NewPluginProvider(chainReader, codec, contractTransmitter, configProvider, t.lggr)
+
+	return pluginProvider, nil
 }
 
 func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {

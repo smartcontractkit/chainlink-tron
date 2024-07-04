@@ -15,12 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 )
 
-// type ConfigProvider interface {
-// 	Service
-// 	OffchainConfigDigester() ocrtypes.OffchainConfigDigester
-// 	ContractConfigTracker() ocrtypes.ContractConfigTracker
-// }
-
 var _ commontypes.ConfigProvider = (*configProvider)(nil)
 
 type configProvider struct {
