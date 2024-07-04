@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -17,8 +16,6 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/contract"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
 func TestTxmLocal(t *testing.T) {
@@ -68,7 +66,7 @@ func TestTxmLocal(t *testing.T) {
 	err = grpcClient.Start(grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err)
 
-	config := TronTxmConfig{
+	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
@@ -76,22 +74,22 @@ func TestTxmLocal(t *testing.T) {
 	runTxmTest(t, logger, grpcClient, config, keystore, genesisAddress, 10)
 }
 
-func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClient, config TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
-	txm := New(logger, keystore, grpcClient, config)
-	err := txm.Start(context.Background())
+func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClient, config txm.TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
+	txmgr := txm.New(logger, keystore, grpcClient, config)
+	err := txmgr.Start(context.Background())
 	require.NoError(t, err)
 
-	contractAddress := deployTestContract(t, txm, fromAddress)
+	contractAddress := deployTestContract(t, txmgr, fromAddress)
 	logger.Debugw("Deployed test contract", "contractAddress", contractAddress)
 
 	expectedValue := 0
 
 	for i := 0; i < iterations; i++ {
-		err = txm.Enqueue(fromAddress, contractAddress, "increment()")
+		err = txmgr.Enqueue(fromAddress, contractAddress, "increment()")
 		require.NoError(t, err)
 		expectedValue += 1
 
-		err = txm.Enqueue(fromAddress, contractAddress,
+		err = txmgr.Enqueue(fromAddress, contractAddress,
 			"increment_mult(uint256,uint256)",
 			"uint256", "5",
 			"uint256", "7",
@@ -100,13 +98,13 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 		expectedValue += 5 * 7
 	}
 
-	WaitForInflightTxs(logger, txm, 30*time.Second)
+	testutils.WaitForInflightTxs(logger, txmgr, 30*time.Second)
 
 	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
 	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address
 	// prefix.
 	zeroAddress := "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
-	txExtention, err := txm.client.TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
+	txExtention, err := txmgr.GetClient().TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
 	require.NoError(t, err)
 
 	constantResult := txExtention.ConstantResult
@@ -120,7 +118,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 	require.Equal(t, int64(expectedValue), actualValue)
 }
 
-func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
+func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) string {
 	// small test counter contract:
 	//
 	//  contract Counter {
@@ -152,40 +150,8 @@ func deployTestContract(t *testing.T, txm *TronTxm, fromAddress string) string {
 		"73582212209b5ec6726bb13377d7e7824aaf14b6e31224ee82dc6a3062bc4cf9" +
 		"881233197264736f6c63430008070033"
 
-	abi, err := contract.JSONtoABI(abiJson)
-	require.NoError(t, err)
-
-	txExtention, err := txm.GetClient().DeployContract(
-		fromAddress,
-		"Counter",
-		abi,
-		codeHex,
-		/* feeLimit= */ 1000000000,
-		/* curPercent= */ 100,
-		/* oeLimit= */ 10000000)
-	require.NoError(t, err)
-
-	_, err = txm.SignAndBroadcast(context.Background(), fromAddress, txExtention)
-	require.NoError(t, err)
-
-	txHash := common.BytesToHexString(txExtention.Txid)
-
-	txInfo := waitForTransactionInfo(t, txm, txHash, 30)
+	txHash := testutils.DeployContract(t, txmgr, fromAddress, "Counter", abiJson, codeHex)
+	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
 	contractAddress := address.Address(txInfo.ContractAddress).String()
 	return contractAddress
-}
-
-func waitForTransactionInfo(t *testing.T, txm *TronTxm, txHash string, waitSecs int) *core.TransactionInfo {
-	for i := 1; i <= waitSecs; i++ {
-		txInfo, err := txm.GetClient().GetTransactionInfoByID(txHash)
-		if err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-		return txInfo
-	}
-
-	require.FailNow(t, fmt.Sprintf("failed to wait for transaction: %s", txHash))
-
-	return nil
 }

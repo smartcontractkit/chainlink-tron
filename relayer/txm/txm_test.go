@@ -30,21 +30,6 @@ var genesisAccountKey = testutils.CreateKey(rand.Reader)
 var genesisAddress = genesisAccountKey.Address.String()
 var genesisPrivateKey = genesisAccountKey.PrivateKey
 
-func WaitForInflightTxs(logger logger.Logger, txm *trontxm.TronTxm, timeout time.Duration) {
-	start := time.Now()
-	for {
-		queueLen, unconfirmedLen := txm.InflightCount()
-		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
-		if queueLen == 0 && unconfirmedLen == 0 {
-			break
-		}
-		if time.Since(start) > timeout {
-			panic("Timeout waiting for inflight txs")
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-}
-
 func waitForMaxRetryDuration() {
 	time.Sleep(trontxm.MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
 }
@@ -114,7 +99,7 @@ func TestTxm(t *testing.T) {
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 
-		WaitForInflightTxs(lggr, txm, 10*time.Second)
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("retry").Len(), 0)
 		require.Equal(t, observedLogs.FilterMessageSnippet("confirmed transaction").Len(), 1)
@@ -171,7 +156,7 @@ func TestTxm(t *testing.T) {
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 
-		WaitForInflightTxs(lggr, txm, 10*time.Second)
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), 0)
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)

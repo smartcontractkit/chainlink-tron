@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
 func TestTxmShasta(t *testing.T) {
@@ -47,7 +48,7 @@ func runTestnetTest(t *testing.T, grpcAddress string) {
 
 	keystore := testutils.NewTestKeystore(pubAddress, privateKey)
 
-	config := TronTxmConfig{
+	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
