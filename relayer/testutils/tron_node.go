@@ -9,7 +9,7 @@ import (
 func StartTronNode(genesisAddress string) error {
 	gitRoot, err := FindGitRoot()
 	if err != nil {
-		return fmt.Errorf("failed to find Git root: %v", err)
+		return fmt.Errorf("failed to find Git root: %+w", err)
 	}
 
 	scriptPath := filepath.Join(gitRoot, "tron/scripts/java-tron.sh")
@@ -22,7 +22,29 @@ func StartTronNode(genesisAddress string) error {
 			fmt.Printf("Failed to start java-tron, dumping output:\n%s\n", string(output))
 			return fmt.Errorf("Failed to start java-tron, bad exit code: %v", exitError.ExitCode())
 		}
-		return fmt.Errorf("Failed to start java-tron: %+v", err)
+		return fmt.Errorf("Failed to start java-tron: %+w", err)
+	}
+
+	return nil
+}
+
+func StopTronNode() error {
+	gitRoot, err := FindGitRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find Git root: %+w", err)
+	}
+
+	scriptPath := filepath.Join(gitRoot, "tron/scripts/java-tron.down.sh")
+	cmd := exec.Command(scriptPath)
+
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			fmt.Printf("Failed to stop java-tron, dumping output:\n%s\n", string(output))
+			return fmt.Errorf("Failed to start java-tron, bad exit code: %v", exitError.ExitCode())
+		}
+		return fmt.Errorf("Failed to stop java-tron: %+w", err)
 	}
 
 	return nil
