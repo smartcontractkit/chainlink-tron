@@ -1,6 +1,6 @@
 //go:build integration && testnet
 
-package txm
+package txm_test
 
 import (
 	"os"

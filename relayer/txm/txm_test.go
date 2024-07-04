@@ -1,4 +1,4 @@
-package txm
+package txm_test
 
 import (
 	"context"
@@ -16,12 +16,13 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	trontxm "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 var keystore *testutils.TestKeystore
-var config = TronTxmConfig{
+var config = trontxm.TronTxmConfig{
 	BroadcastChanSize: 100,
 	ConfirmPollSecs:   2,
 }
@@ -29,7 +30,7 @@ var genesisAccountKey = testutils.CreateKey(rand.Reader)
 var genesisAddress = genesisAccountKey.Address.String()
 var genesisPrivateKey = genesisAccountKey.PrivateKey
 
-func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duration) {
+func WaitForInflightTxs(logger logger.Logger, txm *trontxm.TronTxm, timeout time.Duration) {
 	start := time.Now()
 	for {
 		queueLen, unconfirmedLen := txm.InflightCount()
@@ -45,21 +46,21 @@ func WaitForInflightTxs(logger logger.Logger, txm *TronTxm, timeout time.Duratio
 }
 
 func waitForMaxRetryDuration() {
-	time.Sleep(MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
+	time.Sleep(trontxm.MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
 }
 
-func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*TronTxm, logger.Logger, *observer.ObservedLogs) {
+func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*trontxm.TronTxm, logger.Logger, *observer.ObservedLogs) {
 	testLogger, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
-	txm := TronTxm{
-		logger:                testLogger,
-		keystore:              keystore,
-		config:                config,
-		estimateEnergyEnabled: true,
+	txm := trontxm.TronTxm{
+		Logger:                testLogger,
+		Keystore:              keystore,
+		Config:                config,
+		EstimateEnergyEnabled: true,
 
-		client:        grpcClient,
-		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
-		accountStore:  newAccountStore(),
-		stop:          make(chan struct{}),
+		Client:        grpcClient,
+		BroadcastChan: make(chan *trontxm.TronTx, config.BroadcastChanSize),
+		AccountStore:  trontxm.NewAccountStore(),
+		Stop:          make(chan struct{}),
 	}
 	txm.Start(context.Background())
 	return &txm, testLogger, observedLogs
@@ -135,7 +136,7 @@ func TestTxm(t *testing.T) {
 		queueLen, unconfirmedLen := txm.InflightCount()
 		require.Equal(t, queueLen, 0)
 		require.Equal(t, unconfirmedLen, 0)
-		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
+		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(trontxm.MAX_BROADCAST_RETRY_DURATION/trontxm.BROADCAST_DELAY_DURATION)-1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 	})
 
@@ -155,7 +156,7 @@ func TestTxm(t *testing.T) {
 		queueLen, unconfirmedLen := txm.InflightCount()
 		require.Equal(t, queueLen, 0)
 		require.Equal(t, unconfirmedLen, 0)
-		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(MAX_BROADCAST_RETRY_DURATION/BROADCAST_DELAY_DURATION)-1)
+		require.Greater(t, observedLogs.FilterMessageSnippet("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout").Len(), int(trontxm.MAX_BROADCAST_RETRY_DURATION/trontxm.BROADCAST_DELAY_DURATION)-1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed to broadcast").Len(), 1)
 	})
 

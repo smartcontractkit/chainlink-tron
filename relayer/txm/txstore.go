@@ -81,7 +81,7 @@ type AccountStore struct {
 	lock  sync.RWMutex
 }
 
-func newAccountStore() *AccountStore {
+func NewAccountStore() *AccountStore {
 	return &AccountStore{
 		store: map[string]*TxStore{},
 	}

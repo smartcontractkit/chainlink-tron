@@ -1,9 +1,10 @@
-package txm
+package txm_test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,20 +28,20 @@ func TestParseLatestEnergyPrice(t *testing.T) {
 		{
 			name:            "Empty energy prices",
 			energyPricesStr: "",
-			expectedPrice:   DEFAULT_ENERGY_UNIT_PRICE,
+			expectedPrice:   txm.DEFAULT_ENERGY_UNIT_PRICE,
 			expectedErrMsg:  "invalid format for energy price component: expected 'timestamp:price', got [\"\"]",
 		},
 		{
 			name:            "Invalid last price component",
 			energyPricesStr: "0:100,invalid",
-			expectedPrice:   DEFAULT_ENERGY_UNIT_PRICE,
+			expectedPrice:   txm.DEFAULT_ENERGY_UNIT_PRICE,
 			expectedErrMsg:  "invalid format for energy price component: expected 'timestamp:price', got [\"invalid\"]",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			price, err := parseLatestEnergyPrice(tc.energyPricesStr)
+			price, err := txm.ParseLatestEnergyPrice(tc.energyPricesStr)
 
 			assert.Equal(t, tc.expectedPrice, price)
 			if tc.expectedErrMsg != "" {
@@ -66,7 +67,7 @@ func TestCalculatePaddedFeeLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("FeeLimit: "+fmt.Sprint(tt.feeLimit)+", Attempt: "+fmt.Sprint(tt.attempt), func(t *testing.T) {
-			result := calculatePaddedFeeLimit(tt.feeLimit, tt.attempt)
+			result := txm.CalculatePaddedFeeLimit(tt.feeLimit, tt.attempt)
 			if result != tt.expected {
 				t.Errorf("calculatePaddedFeeLimit(%d, %d) = %d, want %d", tt.feeLimit, tt.attempt, result, tt.expected)
 			}

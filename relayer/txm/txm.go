@@ -31,52 +31,52 @@ const (
 )
 
 type TronTxm struct {
-	logger                logger.Logger
-	keystore              loop.Keystore
-	config                TronTxmConfig
-	estimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
+	Logger                logger.Logger
+	Keystore              loop.Keystore
+	Config                TronTxmConfig
+	EstimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	client        sdk.GrpcClient
-	broadcastChan chan *TronTx
-	accountStore  *AccountStore
-	starter       utils.StartStopOnce
-	done          sync.WaitGroup
-	stop          chan struct{}
+	Client        sdk.GrpcClient
+	BroadcastChan chan *TronTx
+	AccountStore  *AccountStore
+	Starter       utils.StartStopOnce
+	Done          sync.WaitGroup
+	Stop          chan struct{}
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.GrpcClient, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
-		logger:                logger.Named(lgr, "TronTxm"),
-		keystore:              keystore,
-		config:                config,
-		estimateEnergyEnabled: true,
+		Logger:                logger.Named(lgr, "TronTxm"),
+		Keystore:              keystore,
+		Config:                config,
+		EstimateEnergyEnabled: true,
 
-		client:        client,
-		broadcastChan: make(chan *TronTx, config.BroadcastChanSize),
-		accountStore:  newAccountStore(),
-		stop:          make(chan struct{}),
+		Client:        client,
+		BroadcastChan: make(chan *TronTx, config.BroadcastChanSize),
+		AccountStore:  NewAccountStore(),
+		Stop:          make(chan struct{}),
 	}
 }
 
 func (t *TronTxm) Name() string {
-	return t.logger.Name()
+	return t.Logger.Name()
 }
 
 func (t *TronTxm) Ready() error {
-	return t.starter.Ready()
+	return t.Starter.Ready()
 }
 
 func (t *TronTxm) HealthReport() map[string]error {
-	return map[string]error{t.Name(): t.starter.Healthy()}
+	return map[string]error{t.Name(): t.Starter.Healthy()}
 }
 
 func (t *TronTxm) GetClient() sdk.GrpcClient {
-	return t.client
+	return t.Client
 }
 
 func (t *TronTxm) Start(ctx context.Context) error {
-	return t.starter.StartOnce("TronTxm", func() error {
-		t.done.Add(2) // waitgroup: broadcast loop and confirm loop
+	return t.Starter.StartOnce("TronTxm", func() error {
+		t.Done.Add(2) // waitgroup: broadcast loop and confirm loop
 		go t.broadcastLoop()
 		go t.confirmLoop()
 		return nil
@@ -84,9 +84,9 @@ func (t *TronTxm) Start(ctx context.Context) error {
 }
 
 func (t *TronTxm) Close() error {
-	return t.starter.StopOnce("TronTxm", func() error {
-		close(t.stop)
-		t.done.Wait()
+	return t.Starter.StopOnce("TronTxm", func() error {
+		close(t.Stop)
+		t.Done.Wait()
 		t.GetClient().Stop()
 		return nil
 	})
@@ -96,7 +96,7 @@ func (t *TronTxm) Close() error {
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
 func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ...string) error {
-	if _, err := t.keystore.Sign(context.Background(), fromAddress, nil); err != nil {
+	if _, err := t.Keystore.Sign(context.Background(), fromAddress, nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
@@ -111,7 +111,7 @@ func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ..
 	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams, Attempt: 1}
 
 	select {
-	case t.broadcastChan <- tx:
+	case t.BroadcastChan <- tx:
 	default:
 		return fmt.Errorf("failed to enqueue transaction: %+v", tx)
 	}
@@ -120,18 +120,18 @@ func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ..
 }
 
 func (t *TronTxm) broadcastLoop() {
-	defer t.done.Done()
+	defer t.Done.Done()
 
-	ctx, cancel := utils.ContextFromChan(t.stop)
+	ctx, cancel := utils.ContextFromChan(t.Stop)
 	defer cancel()
 
-	t.logger.Debugw("broadcastLoop: started")
+	t.Logger.Debugw("broadcastLoop: started")
 	for {
 		select {
-		case tx := <-t.broadcastChan:
+		case tx := <-t.BroadcastChan:
 			txExtention, err := t.TriggerSmartContract(ctx, tx)
 			if err != nil {
-				t.logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
+				t.Logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
 			}
 
@@ -139,21 +139,21 @@ func (t *TronTxm) broadcastLoop() {
 
 			coreTx := txExtention.Transaction
 			// RefBlockNum is optional and does not seem in use anymore.
-			t.logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
+			t.Logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
 
 			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
 			if err != nil {
-				t.logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
+				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
 				continue
 			}
 
-			t.logger.Infow("transaction broadcasted", "txHash", txHash)
+			t.Logger.Infow("transaction broadcasted", "txHash", txHash)
 
-			txStore := t.accountStore.GetTxStore(tx.FromAddress)
+			txStore := t.AccountStore.GetTxStore(tx.FromAddress)
 			txStore.AddUnconfirmed(txHash, time.Now().Unix(), tx)
 
-		case <-t.stop:
-			t.logger.Debugw("broadcastLoop: stopped")
+		case <-t.Stop:
+			t.Logger.Debugw("broadcastLoop: stopped")
 			return
 		}
 	}
@@ -177,19 +177,19 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
 
 	if energyPrices, err := t.GetClient().GetEnergyPrices(); err == nil {
-		if parsedPrice, err := parseLatestEnergyPrice(energyPrices.Prices); err == nil {
+		if parsedPrice, err := ParseLatestEnergyPrice(energyPrices.Prices); err == nil {
 			energyUnitPrice = parsedPrice
 		} else {
-			t.logger.Errorw("error parsing energy unit price", "error", err)
+			t.Logger.Errorw("error parsing energy unit price", "error", err)
 		}
 	} else {
-		t.logger.Errorw("failed to get energy unit price", "error", err)
+		t.Logger.Errorw("failed to get energy unit price", "error", err)
 	}
 
 	feeLimit := energyUnitPrice * energyUsed
-	paddedFeeLimit := calculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
+	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
 
-	t.logger.Debugw("Trigger contract", "Energy Bump Times", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
+	t.Logger.Debugw("Trigger contract", "Energy Bump Times", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
 	txExtention, err := t.GetClient().TriggerContract(
 		tx.FromAddress,
@@ -221,7 +221,7 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txEx
 	h256h.Write(rawData)
 	hash := h256h.Sum(nil)
 
-	signature, err := t.keystore.Sign(ctx, fromAddress, hash)
+	signature, err := t.Keystore.Sign(ctx, fromAddress, hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign transaction: %+w", err)
 	}
@@ -252,7 +252,7 @@ func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
 		resCode := apiReturn.GetCode()
 		if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
 			// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-			t.logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt)
+			t.Logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt)
 			time.Sleep(BROADCAST_DELAY_DURATION)
 			attempt = attempt + 1
 			continue
@@ -268,14 +268,14 @@ func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
 }
 
 func (t *TronTxm) confirmLoop() {
-	defer t.done.Done()
+	defer t.Done.Done()
 
-	_, cancel := utils.ContextFromChan(t.stop)
+	_, cancel := utils.ContextFromChan(t.Stop)
 	defer cancel()
 
-	tick := time.After(time.Duration(t.config.ConfirmPollSecs) * time.Second)
+	tick := time.After(time.Duration(t.Config.ConfirmPollSecs) * time.Second)
 
-	t.logger.Debugw("confirmLoop: started")
+	t.Logger.Debugw("confirmLoop: started")
 
 	for {
 		select {
@@ -284,18 +284,18 @@ func (t *TronTxm) confirmLoop() {
 
 			t.checkUnconfirmed()
 
-			remaining := time.Duration(t.config.ConfirmPollSecs) - time.Since(start)
+			remaining := time.Duration(t.Config.ConfirmPollSecs) - time.Since(start)
 			tick = time.After(utils.WithJitter(remaining.Abs()))
 
-		case <-t.stop:
-			t.logger.Debugw("confirmLoop: stopped")
+		case <-t.Stop:
+			t.Logger.Debugw("confirmLoop: stopped")
 			return
 		}
 	}
 }
 
 func (t *TronTxm) checkUnconfirmed() {
-	allUnconfirmedTxs := t.accountStore.GetAllUnconfirmed()
+	allUnconfirmedTxs := t.AccountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
 		for _, unconfirmedTx := range unconfirmedTxs {
 			txInfo, err := t.GetClient().GetTransactionInfoByID(unconfirmedTx.Hash)
@@ -303,42 +303,42 @@ func (t *TronTxm) checkUnconfirmed() {
 				// the default transaction expiration time is 60 seconds - if we still can't find the hash,
 				// rebroadcast since the transaction has expired.
 				if (time.Now().Unix() - unconfirmedTx.Timestamp) > 150 {
-					err = t.accountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
+					err = t.AccountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
 					if err != nil {
-						t.logger.Errorw("could not confirm expired transaction locally", "error", err)
+						t.Logger.Errorw("could not confirm expired transaction locally", "error", err)
 						continue
 					}
-					t.logger.Debugw("transaction missing after expiry", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash)
+					t.Logger.Debugw("transaction missing after expiry", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash)
 					t.maybeRetry(unconfirmedTx, false, false)
 				}
 				continue
 			}
-			err = t.accountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
+			err = t.AccountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
 			if err != nil {
-				t.logger.Errorw("could not confirm transaction locally", "error", err)
+				t.Logger.Errorw("could not confirm transaction locally", "error", err)
 				continue
 			}
 			receipt := txInfo.Receipt
 			if receipt == nil {
-				t.logger.Errorw("could not read transaction receipt", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Errorw("could not read transaction receipt", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				continue
 			}
 			contractResult := receipt.Result
 			switch contractResult {
 			case core.Transaction_Result_OUT_OF_ENERGY:
-				t.logger.Debugw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Debugw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, true, false)
 				continue
 			case core.Transaction_Result_OUT_OF_TIME:
-				t.logger.Debugw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Debugw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, true)
 				continue
 			case core.Transaction_Result_UNKNOWN:
-				t.logger.Debugw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Debugw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, false)
 				continue
 			}
-			t.logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
+			t.Logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
 		}
 	}
 }
@@ -346,11 +346,11 @@ func (t *TronTxm) checkUnconfirmed() {
 func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOutOfTimeError bool) {
 	tx := unconfirmedTx.Tx
 	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
-		t.logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash)
+		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash)
 		return
 	}
 	if tx.OutOfTimeErrors >= 2 {
-		t.logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash)
+		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash)
 		return
 	}
 
@@ -362,22 +362,22 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 		tx.OutOfTimeErrors += 1
 	}
 
-	t.logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt)
+	t.Logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt)
 
 	select {
-	case t.broadcastChan <- tx:
+	case t.BroadcastChan <- tx:
 	default:
-		t.logger.Errorw("failed to enqueue retry transaction", "previousTxHash", unconfirmedTx.Hash)
+		t.Logger.Errorw("failed to enqueue retry transaction", "previousTxHash", unconfirmedTx.Hash)
 	}
 }
 
 func (t *TronTxm) InflightCount() (int, int) {
-	return len(t.broadcastChan), t.accountStore.GetTotalInflightCount()
+	return len(t.BroadcastChan), t.AccountStore.GetTotalInflightCount()
 }
 
 func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error) {
 
-	if t.estimateEnergyEnabled {
+	if t.EstimateEnergyEnabled {
 		estimateEnergyMessage, err := t.GetClient().EstimateEnergy(
 			tx.FromAddress,
 			tx.ContractAddress,
@@ -389,14 +389,14 @@ func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error
 		)
 
 		if err == nil {
-			t.logger.Debugw("Estimated energy using EnergyEstimation Method", "energyRequired", estimateEnergyMessage.EnergyRequired, "tx", tx)
+			t.Logger.Debugw("Estimated energy using EnergyEstimation Method", "energyRequired", estimateEnergyMessage.EnergyRequired, "tx", tx)
 			return estimateEnergyMessage.EnergyRequired, nil
 		}
 
-		t.logger.Errorw("Failed to call EstimateEnergy", "err", err, "tx", tx)
+		t.Logger.Errorw("Failed to call EstimateEnergy", "err", err, "tx", tx)
 
 		if strings.Contains(err.Error(), "this node does not support estimate energy") {
-			t.estimateEnergyEnabled = false
+			t.EstimateEnergyEnabled = false
 		}
 	}
 
@@ -410,7 +410,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error
 		return 0, fmt.Errorf("failed to call TriggerConstantContract due to %s", string(estimateTxExtention.Result.Message))
 	}
 
-	t.logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty, "tx", tx)
+	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty, "tx", tx)
 
 	return estimateTxExtention.EnergyUsed, nil
 }

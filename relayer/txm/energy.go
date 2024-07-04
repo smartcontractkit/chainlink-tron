@@ -10,7 +10,7 @@ import (
 
 const DEFAULT_ENERGY_UNIT_PRICE int64 = 420
 
-func parseLatestEnergyPrice(energyPricesStr string) (int64, error) {
+func ParseLatestEnergyPrice(energyPricesStr string) (int64, error) {
 	energyPricesList := strings.Split(energyPricesStr, ",")
 	if len(energyPricesList) == 0 {
 		return DEFAULT_ENERGY_UNIT_PRICE, errors.New("empty energy prices")
@@ -29,6 +29,6 @@ func parseLatestEnergyPrice(energyPricesStr string) (int64, error) {
 	return energyUnitPrice, nil
 }
 
-func calculatePaddedFeeLimit(feeLimit int64, bumpTimes uint64) int64 {
+func CalculatePaddedFeeLimit(feeLimit int64, bumpTimes uint64) int64 {
 	return int64(float64(feeLimit) * math.Pow(1.5, float64(bumpTimes)))
 }

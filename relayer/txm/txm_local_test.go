@@ -1,6 +1,6 @@
 //go:build integration
 
-package txm
+package txm_test
 
 import (
 	"context"
