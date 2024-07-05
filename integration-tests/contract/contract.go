@@ -1,9 +1,13 @@
 package contract
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
@@ -40,8 +44,9 @@ type ABI struct {
 }
 
 type Artifact struct {
-	Abi      json.RawMessage `json:"abi"`
-	Bytecode string          `json:"bytecode"`
+	Abi      abi.ABI
+	AbiJson  string `json:"abi"`
+	Bytecode string `json:"bytecode"`
 }
 
 func loadContract(jsonPath string) (*ABI, error) {
@@ -50,7 +55,7 @@ func loadContract(jsonPath string) (*ABI, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(filepath.Join(gitRoot, "integration-tests", "artifacts", jsonPath))
+	data, err := os.ReadFile(filepath.Join(gitRoot, "tron", "integration-tests", "artifacts", jsonPath))
 	if err != nil {
 		return nil, err
 	}
@@ -62,19 +67,26 @@ func loadContract(jsonPath string) (*ABI, error) {
 	return &abi, nil
 }
 
-func LoadArtifact(jsonPath string) (Artifact, error) {
+func MustLoadArtifact(t *testing.T, jsonPath string) *Artifact {
 	contractJSON, err := loadContract(jsonPath)
 	if err != nil {
-		return Artifact{}, err
+		t.Fatal(err)
 	}
 
-	abi, err := json.Marshal(contractJSON.Abi)
+	abiJsonBytes, err := json.Marshal(contractJSON.Abi)
 	if err != nil {
-		return Artifact{}, err
+		t.Fatal(err)
+	}
+	abiJson := string(abiJsonBytes)
+
+	parsedAbi, err := abi.JSON(bytes.NewReader([]byte(abiJson)))
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	return Artifact{
-		Abi:      abi,
+	return &Artifact{
+		Abi:      parsedAbi,
+		AbiJson:  abiJson,
 		Bytecode: contractJSON.Bytecode,
-	}, nil
+	}
 }
