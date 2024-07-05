@@ -95,17 +95,22 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ...string) error {
+func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ...any) error {
 	if _, err := t.Keystore.Sign(context.Background(), fromAddress, nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	encodedParams := make([]map[string]string, 0)
+	encodedParams := make([]map[string]any, 0)
 	if len(params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
 	for i := 0; i < len(params); i += 2 {
-		encodedParams = append(encodedParams, map[string]string{params[i]: params[i+1]})
+		paramType := params[i]
+		paramTypeStr, ok := paramType.(string)
+		if !ok {
+			return fmt.Errorf("non-string param type")
+		}
+		encodedParams = append(encodedParams, map[string]any{paramTypeStr: params[i+1]})
 	}
 
 	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams, Attempt: 1}

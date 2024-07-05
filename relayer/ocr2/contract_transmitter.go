@@ -78,7 +78,7 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 	rsStr := relayer.ByteArrayToStr(rs)
 	ssStr := relayer.ByteArrayToStr(ss)
 	vsStr := "0x" + hex.EncodeToString(vs[:])
-	params := []string{
+	params := []any{
 		"bytes", reportStr,
 		"bytes32[]", rsStr,
 		"bytes32[]", ssStr,
