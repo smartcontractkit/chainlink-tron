@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-cache_path="$(git rev-parse --show-toplevel)/.local-mock-server"
+cache_path="$(cd "$(dirname -- "$0")/../.local-mock-server" && pwd)"
 binary_name="dummy-external-adapter"
 binary_path="${cache_path}/bin/${binary_name}"
 
