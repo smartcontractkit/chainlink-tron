@@ -1,11 +1,14 @@
 package common
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
@@ -54,17 +57,18 @@ func NewChainlinkClient(env *environment.Environment, nodeName string, chainId s
 func (cc *ChainlinkClient) GetNodeAddresses() []string {
 	var addresses []string
 	for _, nodeKey := range cc.NodeKeys {
-		addresses = append(addresses, mustCreateBech32Address(nodeKey.TXKey.Data.Attributes.PublicKey, cc.bech32Prefix))
+		publicKeyBytes, err := hex.DecodeString(nodeKey.TXKey.Data.Attributes.PublicKey)
+		if err != nil {
+			panic(err)
+		}
+		publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+		if err != nil {
+			panic(err)
+		}
+		a := address.PubkeyToAddress(*publicKey)
+		addresses = append(addresses, a.String())
 	}
 	return addresses
-}
-
-func mustCreateBech32Address(pubKey, accountPrefix string) string {
-	bech32Addr, err := params.CreateBech32Address(pubKey, accountPrefix)
-	if err != nil {
-		panic(err)
-	}
-	return bech32Addr
 }
 
 func (cc *ChainlinkClient) LoadOCR2Config(proposalId string) (*OCR2Config, error) {
