@@ -5,17 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/pelletier/go-toml/v2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -26,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -49,7 +44,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
-	client, err := createClient(nodeConfig.URL.URL())
+	client, err := sdk.CreateGrpcClient(nodeConfig.URL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
 	}
@@ -213,39 +208,4 @@ func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.Rel
 
 func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
 	return nil, errors.New("TODO")
-}
-
-// createClient returns a TRON gRPC client
-func createClient(grpcUrl *url.URL) (*client.GrpcClient, error) {
-	// TODO: we expect the URL in the format grpc://host:port?insecure=true, move this somewhere?
-	hostname := grpcUrl.Hostname()
-	port := grpcUrl.Port()
-	if port == "" {
-		port = "50051"
-	}
-
-	insecureTransport := false
-	values := grpcUrl.Query()
-	insecureValues, ok := values["insecure"]
-	if ok {
-		if len(insecureValues) > 0 {
-			insecureValue := strings.ToLower(insecureValues[0])
-			insecureTransport = insecureValue == "true" || insecureValue == "1"
-		}
-	}
-
-	var transportCredentials credentials.TransportCredentials
-	if insecureTransport {
-		transportCredentials = insecure.NewCredentials()
-	} else {
-		transportCredentials = credentials.NewTLS(nil)
-	}
-
-	grpcClient := client.NewGrpcClientWithTimeout(hostname+":"+port, 15*time.Second)
-	err := grpcClient.Start(grpc.WithTransportCredentials(transportCredentials))
-	if err != nil {
-		return nil, fmt.Errorf("failed to start GrpcClient: %+w", err)
-	}
-
-	return grpcClient, nil
 }
