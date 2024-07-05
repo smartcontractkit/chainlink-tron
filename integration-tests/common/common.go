@@ -24,8 +24,10 @@ const (
 	chainID                = "testing"
 	ChainBlockTime         = "200ms"
 	ChainBlockTimeSoak     = "2s"
-	defaultNodeUrl         = "http://127.0.0.1:26657"
-	defaultInternalNodeUrl = "http://host.docker.internal:26657"
+	defaultInternalGrpcUrl = "grpc://172.255.0.101:16667/?insecure=true"
+	defaultInternalHttpUrl = "http://172.255.0.101:16667"
+	defaultTTLValue        = "1m"
+	defaultNodeCountValue  = "4"
 )
 
 var (
@@ -49,7 +51,8 @@ type Common struct {
 	NodeCount             int
 	TTL                   time.Duration
 	TestDuration          time.Duration
-	NodeUrl               string
+	GrpcUrl               string
+	HttpUrl               string
 	MockUrl               string
 	Mnemonic              string
 	ObservationSource     string
@@ -71,7 +74,7 @@ func getNodeCount() int {
 	// Checking if count of OCR nodes is defined in ENV
 	nodeCountSet := getEnv("NODE_COUNT")
 	if nodeCountSet == "" {
-		panic("Please define NODE_COUNT")
+		nodeCountSet = defaultNodeCountValue
 	}
 	nodeCount, err := strconv.Atoi(nodeCountSet)
 	if err != nil {
@@ -83,7 +86,7 @@ func getNodeCount() int {
 func getTTL() time.Duration {
 	ttlValue := getEnv("TTL")
 	if ttlValue == "" {
-		panic("Please define TTL of env")
+		ttlValue = defaultTTLValue
 	}
 	duration, err := time.ParseDuration(ttlValue)
 	if err != nil {
@@ -113,13 +116,17 @@ func getTestDuration() time.Duration {
 }
 
 func NewCommon(t *testing.T) *Common {
-	nodeUrl := getEnv("NODE_URL")
-	if nodeUrl == "" {
-		nodeUrl = defaultNodeUrl
+	grpcUrl := getEnv("GRPC_URL")
+	if grpcUrl == "" {
+		grpcUrl = fmt.Sprintf("grpc://%s:16669/?insecure=true", testutils.GetTronNodeIpAddress())
 	}
-	internalNodeUrl := getEnv("INTERNAL_NODE_URL")
-	if internalNodeUrl == "" {
-		internalNodeUrl = defaultInternalNodeUrl
+	httpUrl := getEnv("HTTP_URL")
+	if httpUrl == "" {
+		httpUrl = fmt.Sprintf("http://%s:16667", testutils.GetTronNodeIpAddress())
+	}
+	internalGrpcUrl := getEnv("INTERNAL_GRPC_URL")
+	if internalGrpcUrl == "" {
+		internalGrpcUrl = defaultInternalGrpcUrl
 	}
 	chainlinkConfig := fmt.Sprintf(`
 [[Tron]]
@@ -144,7 +151,7 @@ ListenAddresses = ['0.0.0.0:6691']
 HTTPPort = 6688
 [WebServer.TLS]
 HTTPSPort = 0
-`, chainID, internalNodeUrl)
+`, chainID, internalGrpcUrl)
 	log.Debug().Str("toml", chainlinkConfig).Msg("Created chainlink config")
 
 	ttl := getTTL()
@@ -161,7 +168,8 @@ HTTPSPort = 0
 		NodeCount:             getNodeCount(),
 		TTL:                   getTTL(),
 		TestDuration:          getTestDuration(),
-		NodeUrl:               nodeUrl,
+		GrpcUrl:               grpcUrl,
+		HttpUrl:               httpUrl,
 		MockUrl:               "http://host.docker.internal:6060",
 		Mnemonic:              getEnv("MNEMONIC"),
 		ObservationSource:     observationSource,
@@ -186,8 +194,8 @@ func (c *Common) SetLocalEnvironment(t *testing.T, genesisAddress string) {
 	log.Info().Msg("Starting core nodes...")
 	cmd := exec.Command("../scripts/core.sh")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("CL_CONFIG=%s", c.ChainlinkConfig))
-	err = cmd.Run()
-	require.NoError(t, err, "Could not start core nodes")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, fmt.Sprintf("Could not start core nodes: %s", string(output)))
 	log.Info().Msg("Set up local stack complete.")
 
 	// Set ChainlinkNodeDetails
