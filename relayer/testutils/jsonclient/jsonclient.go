@@ -2,8 +2,8 @@ package jsonclient
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,6 +12,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 )
 
 const (
@@ -25,7 +27,7 @@ type DeployContractRequest struct {
 	Bytecode                   string `json:"bytecode"`
 	Parameter                  string `json:"parameter"`
 	Name                       string `json:"name"`
-	Value                      int    `json:"value"`
+	CallValue                  int    `json:"call_value"`
 	FeeLimit                   int    `json:"fee_limit"`
 	ConsumeUserResourcePercent int    `json:"consume_user_resource_percent"`
 	OriginEnergyLimit          int    `json:"origin_energy_limit"`
@@ -36,22 +38,12 @@ type Transaction struct {
 	Visible bool   `json:"visible" mapstructure:"visible"`
 	TxID    string `json:"txID" mapstructure:"txID"`
 	RawData struct {
-		Contract []struct {
-			Parameter struct {
-				Value struct {
-					Data            string `json:"data" mapstructure:"data"`
-					OwnerAddress    string `json:"owner_address" mapstructure:"owner_address"`
-					ContractAddress string `json:"contract_address" mapstructure:"contract_address"`
-				} `json:"value" mapstructure:"value"`
-				TypeUrl string `json:"type_url" mapstructure:"type_url"`
-			} `json:"parameter" mapstructure:"parameter"`
-			Type string `json:"type" mapstructure:"type"`
-		} `json:"contract" mapstructure:"contract"`
-		RefBlockBytes string `json:"ref_block_bytes" mapstructure:"ref_block_bytes"`
-		RefBlockHash  string `json:"ref_block_hash" mapstructure:"ref_block_hash"`
-		Expiration    int64  `json:"expiration" mapstructure:"expiration"`
-		FeeLimit      int64  `json:"fee_limit" mapstructure:"fee_limit"`
-		Timestamp     int64  `json:"timestamp" mapstructure:"timestamp"`
+		Contract      []map[string]interface{} `json:"contract,omitempty" mapstructure:"contract"`
+		RefBlockBytes string                   `json:"ref_block_bytes,omitempty" mapstructure:"ref_block_bytes"`
+		RefBlockHash  string                   `json:"ref_block_hash,omitempty" mapstructure:"ref_block_hash"`
+		Expiration    int64                    `json:"expiration,omitempty" mapstructure:"expiration"`
+		FeeLimit      int64                    `json:"fee_limit,omitempty" mapstructure:"fee_limit"`
+		Timestamp     int64                    `json:"timestamp,omitempty" mapstructure:"timestamp"`
 	} `json:"raw_data" mapstructure:"raw_data"`
 	RawDataHex string   `json:"raw_data_hex" mapstructure:"raw_data_hex"`
 	Signature  []string `json:"signature" mapstructure:"signature"`
@@ -76,7 +68,7 @@ func NewTronJsonClient(baseURL string) *TronJsonClient {
 	}
 }
 
-func (tc *TronJsonClient) CreateDeployContractTransaction(request *DeployContractRequest) (*Transaction, error) {
+func (tc *TronJsonClient) DeployContract(request *DeployContractRequest) (*Transaction, error) {
 	payloadBytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal payload: %v", err)
@@ -160,15 +152,31 @@ func (tc *TronJsonClient) BroadcastTransaction(transaction *Transaction) (*Broad
 	return &response, nil
 }
 
-func (t *Transaction) Sign(privateKey *ecdsa.PrivateKey) error {
-	rawDataBytes, err := hex.DecodeString(t.RawDataHex)
+func (t *Transaction) SignWithKey(privateKey *ecdsa.PrivateKey) error {
+	txIdBytes, err := hex.DecodeString(t.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to decode raw_data_hex: %v", err)
 	}
 
-	hash := sha256.Sum256(rawDataBytes)
+	signature, err := crypto.Sign(txIdBytes, privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %v", err)
+	}
 
-	signature, err := crypto.Sign(hash[:], privateKey)
+	signatureHex := hex.EncodeToString(signature)
+
+	t.Signature = []string{signatureHex}
+
+	return nil
+}
+
+func (t *Transaction) Sign(fromAddress string, keystore loop.Keystore) error {
+	txIdBytes, err := hex.DecodeString(t.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to decode raw_data_hex: %v", err)
+	}
+
+	signature, err := keystore.Sign(context.Background(), fromAddress, txIdBytes)
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction: %v", err)
 	}
