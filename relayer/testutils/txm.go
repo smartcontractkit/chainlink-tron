@@ -1,19 +1,24 @@
 package testutils
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/jsonclient"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -51,6 +56,40 @@ func DeployContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string, contra
 
 	txHash := common.BytesToHexString(txExtention.Txid)
 	return txHash
+}
+
+func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress string, contractName string, abiJson string, codeHex string, params []interface{}) string {
+	parsedABI, err := abi.JSON(bytes.NewReader([]byte(abiJson)))
+	require.NoError(t, err)
+
+	if params == nil {
+		params = []interface{}{}
+	}
+
+	encodedParams, err := parsedABI.Pack("", params...)
+	require.NoError(t, err)
+
+	jsonClient := jsonclient.NewTronJsonClient(httpUrl)
+	tx, err := jsonClient.DeployContract(&jsonclient.DeployContractRequest{
+		OwnerAddress:               fromAddress,
+		ABI:                        abiJson,
+		Bytecode:                   codeHex,
+		Parameter:                  hex.EncodeToString(encodedParams),
+		Name:                       contractName,
+		FeeLimit:                   1000000000,
+		ConsumeUserResourcePercent: 0,
+		OriginEnergyLimit:          10000000,
+		Visible:                    true,
+	})
+	require.NoError(t, err)
+
+	err = tx.Sign(fromAddress, keystore)
+	require.NoError(t, err)
+
+	broadcastResponse, err := jsonClient.BroadcastTransaction(tx)
+	require.NoError(t, err)
+
+	return broadcastResponse.TxID
 }
 
 func WaitForTransactionInfo(t *testing.T, grpcClient sdk.GrpcClient, txHash string, waitSecs int) *core.TransactionInfo {
