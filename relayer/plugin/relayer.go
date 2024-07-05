@@ -183,11 +183,9 @@ func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArg
 	return configProvider, nil
 }
 
+// note: this function should actually return a MedianProvider, and is converted into the MedianProvider type here: https://github.com/smartcontractkit/chainlink/blob/286b02739a8638be0d8d5cd8673da18fb207a1ed/core/services/ocr2/plugins/median/services.go#L101
 func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.PluginProvider, error) {
 	// todo: unmarshal args.RelayConfig if required
-
-	var chainReader types.ContractReader // nil, not required if using median contract
-	var codec types.Codec                // nil, not required if using median contract
 
 	reader := reader.NewReader(t.client, t.lggr)
 	chainID, err := strconv.ParseUint(t.id, 10, 64)
@@ -207,12 +205,10 @@ func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.Rel
 		return nil, fmt.Errorf("couldn't parse transmitter id %s as base58 Tron address: %w", pluginargs.TransmitterID, err)
 	}
 	ocr2Reader := ocr2.NewOCR2Reader(reader, t.lggr)
-	contractReader := ocr2.NewContractReader(contractAddress, ocr2Reader, t.lggr)
-	contractTransmitter := ocr2.NewOCRContractTransmitter(ctx, contractReader, contractAddress, senderAddress, t.txm, t.lggr)
+	medianContract := ocr2.NewContractReader(contractAddress, ocr2Reader, t.lggr)
+	medianProvider := ocr2.NewMedianProvider(ctx, t.cfg, medianContract, configProvider, contractAddress, senderAddress, t.txm, t.lggr)
 
-	pluginProvider := ocr2.NewPluginProvider(chainReader, codec, contractTransmitter, configProvider, t.lggr)
-
-	return pluginProvider, nil
+	return medianProvider, nil
 }
 
 func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {

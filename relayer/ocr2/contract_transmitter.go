@@ -23,27 +23,27 @@ type ContractTransmitter interface {
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
 type contractTransmitter struct {
-	contractReader  ContractReader
-	contractAddress address.Address
-	senderAddress   address.Address
-	txm             *txm.TronTxm
-	lggr            logger.Logger
+	transmissionsCache *transmissionsCache
+	contractAddress    address.Address
+	senderAddress      address.Address
+	txm                *txm.TronTxm
+	lggr               logger.Logger
 }
 
 func NewOCRContractTransmitter(
 	ctx context.Context,
-	reader ContractReader,
+	transmissionsCache *transmissionsCache,
 	contractAddress address.Address,
 	senderAddress address.Address,
 	txm *txm.TronTxm,
 	lggr logger.Logger,
 ) *contractTransmitter {
 	return &contractTransmitter{
-		contractAddress: contractAddress,
-		txm:             txm,
-		senderAddress:   senderAddress,
-		contractReader:  reader,
-		lggr:            logger.Named(lggr, "OCRContractTransmitter"),
+		contractAddress:    contractAddress,
+		txm:                txm,
+		senderAddress:      senderAddress,
+		transmissionsCache: transmissionsCache,
+		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
 	}
 }
 
@@ -95,7 +95,7 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
 	epoch uint32,
 	err error,
 ) {
-	configDigest, epoch, _, _, _, err = oc.contractReader.LatestTransmissionDetails(ctx)
+	configDigest, epoch, _, _, _, err = oc.transmissionsCache.LatestTransmissionDetails(ctx)
 	if err != nil {
 		err = fmt.Errorf("couldn't fetch latest transmission details: %w", err)
 	}
