@@ -7,7 +7,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"os"
-	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -73,7 +72,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 	err := txmgr.Start(context.Background())
 	require.NoError(t, err)
 
-	contractAddress := deployTestContract(t, txmgr, fromAddress)
+	contractAddress := deployTestContractByJson(t, txmgr, fromAddress, keystore)
 	logger.Debugw("Deployed test contract", "contractAddress", contractAddress)
 
 	expectedValue := 0
@@ -112,7 +111,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 	require.Equal(t, int64(expectedValue), actualValue)
 }
 
-func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) string {
+func getTestCounterContract() (string, string) {
 	// small test counter contract:
 	//
 	//  contract Counter {
@@ -144,7 +143,22 @@ func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) st
 		"73582212209b5ec6726bb13377d7e7824aaf14b6e31224ee82dc6a3062bc4cf9" +
 		"881233197264736f6c63430008070033"
 
+	return abiJson, codeHex
+}
+
+func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) string {
+	abiJson, codeHex := getTestCounterContract()
+
 	txHash := testutils.DeployContract(t, txmgr, fromAddress, "Counter", abiJson, codeHex)
+	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
+	contractAddress := address.Address(txInfo.ContractAddress).String()
+	return contractAddress
+}
+
+func deployTestContractByJson(t *testing.T, txmgr *txm.TronTxm, fromAddress string, keystore loop.Keystore) string {
+	abiJson, codeHex := getTestCounterContract()
+	httpUrl := "http://" + testutils.GetTronNodeIpAddress() + ":16667"
+	txHash := testutils.DeployContractByJson(t, httpUrl, keystore, fromAddress, "Counter", abiJson, codeHex, nil)
 	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
 	contractAddress := address.Address(txInfo.ContractAddress).String()
 	return contractAddress
