@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
 func StartTronNode(genesisAddress string) error {
@@ -48,4 +49,12 @@ func StopTronNode() error {
 	}
 
 	return nil
+}
+
+func GetTronNodeIpAddress() string {
+	if runtime.GOOS == "darwin" {
+		return "127.0.0.1"
+	} else {
+		return "172.255.0.101"
+	}
 }
