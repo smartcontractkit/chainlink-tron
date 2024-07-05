@@ -1,264 +1,21 @@
 package utils
 
 import (
-	"bytes"
-	"context"
-	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/keystore"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"github.com/pborman/uuid"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
-	relayer_txm "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median/evmreportcodec"
-	"github.com/stretchr/testify/require"
 )
-
-// Enum of TestEnv types
-type TestEnv string
-
-type Account struct {
-	Address    string
-	PublicKey  *ecdsa.PublicKey
-	PrivateKey *ecdsa.PrivateKey
-	Keystore   *TestKeystore
-}
-
-const (
-	TestnetShasta TestEnv = "shasta"
-	TestnetNile   TestEnv = "nile"
-	Devnet        TestEnv = "devnet"
-)
-
-func GenerateRandomAccount() (string, *ecdsa.PrivateKey) {
-	accountKey := createKey(rand.Reader)
-	randomAddress := accountKey.Address.String()
-	privateKey := accountKey.PrivateKey
-
-	return randomAddress, privateKey
-}
-
-func WaitForTransactionConfirmation(t *testing.T, logger logger.Logger, txm *relayer_txm.TronTxm, waitTime time.Duration) {
-	for {
-		queueLen, unconfirmedLen := txm.InflightCount()
-		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
-		if queueLen == 0 && unconfirmedLen == 0 {
-			break
-		}
-		time.Sleep(waitTime)
-	}
-}
-
-type CompiledArtifact struct {
-	Bytecode string    `json:"bytecode"`
-	ABI      []ABIItem `json:"abi"`
-}
-
-type ABIItem struct {
-	Inputs          []ABIInput  `json:"inputs"`
-	Name            string      `json:"name"`
-	Outputs         []ABIOutput `json:"outputs"`
-	StateMutability string      `json:"stateMutability"`
-	Type            string      `json:"type"`
-}
-
-type ABIInput struct {
-	InternalType string `json:"internalType"`
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-}
-
-type ABIOutput struct {
-	InternalType string `json:"internalType"`
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-}
-
-func WaitForTransactionInfo(t *testing.T, txm *relayer_txm.TronTxm, txHash string, waitSecs int) *core.TransactionInfo {
-	for i := 1; i <= waitSecs; i++ {
-		txInfo, err := txm.GetClient().GetTransactionInfoByID(txHash)
-		if err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-		return txInfo
-	}
-
-	require.FailNow(t, fmt.Sprintf("failed to wait for transaction: %s", txHash))
-
-	return nil
-}
-
-type TestKeystore struct {
-	Keys map[string]*ecdsa.PrivateKey
-}
-
-var _ loop.Keystore = &TestKeystore{}
-
-func NewTestKeystore(address string, privateKey *ecdsa.PrivateKey) *TestKeystore {
-	// TODO: we don't actually need a map if we only have a single key pair.
-	keys := map[string]*ecdsa.PrivateKey{}
-	keys[address] = privateKey
-	return &TestKeystore{Keys: keys}
-}
-
-func (tk *TestKeystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, error) {
-	privateKey, ok := tk.Keys[id]
-	if !ok {
-		return nil, fmt.Errorf("no such key")
-	}
-
-	// used to check if the account exists.
-	if hash == nil {
-		return nil, nil
-	}
-
-	return crypto.Sign(hash, privateKey)
-}
-
-// SignReport signs the report after computing keccak256(abi.encode(keccak256(report), reportContext)).
-func (tk *TestKeystore) SignReport(ctx context.Context, id string, report []byte, repctx ReportContext) ([]byte, error) {
-	rawReportContext := RawReportContext(repctx)
-	sigData := crypto.Keccak256(report)
-	sigData = append(sigData, rawReportContext[0][:]...)
-	sigData = append(sigData, rawReportContext[1][:]...)
-	sigData = append(sigData, rawReportContext[2][:]...)
-	return tk.Sign(ctx, id, crypto.Keccak256(sigData))
-}
-
-func (tk *TestKeystore) Accounts(ctx context.Context) ([]string, error) {
-	accounts := make([]string, 0, len(tk.Keys))
-	for id := range tk.Keys {
-		accounts = append(accounts, id)
-	}
-	return accounts, nil
-}
-
-// this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
-// recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
-// the function we need is keystore.newKey which is unfortunately private.
-// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
-func createKey(rand io.Reader) *keystore.Key {
-	randBytes := make([]byte, 64)
-	_, err := rand.Read(randBytes)
-	if err != nil {
-		panic("key generation: could not read from random source: " + err.Error())
-	}
-	reader := bytes.NewReader(randBytes)
-	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), reader)
-	if err != nil {
-		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
-	}
-	key := newKeyFromECDSA(privateKeyECDSA)
-
-	return key
-}
-
-func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *keystore.Key {
-	id := uuid.NewRandom()
-	key := &keystore.Key{
-		ID:         id,
-		Address:    address.PubkeyToAddress(privateKeyECDSA.PublicKey),
-		PrivateKey: privateKeyECDSA,
-	}
-	return key
-}
-
-// Finds the closest git repo root, assuming that a directory with a .git directory is a git repo.
-func findGitRoot() (string, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		gitDir := filepath.Join(currentDir, ".git")
-		if _, err := os.Stat(gitDir); err == nil {
-			return currentDir, nil
-		}
-
-		parentDir := filepath.Dir(currentDir)
-		if parentDir == currentDir {
-			return "", fmt.Errorf("no Git repository found")
-		}
-
-		currentDir = parentDir
-	}
-}
-
-func StartTronNodeWithGenesisAccount(genesisAddress string) error {
-	gitRoot, err := findGitRoot()
-	if err != nil {
-		return fmt.Errorf("failed to find Git root: %v", err)
-	}
-
-	scriptPath := filepath.Join(gitRoot, "./tron/scripts/java-tron.sh")
-	cmd := exec.Command(scriptPath, genesisAddress)
-
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			fmt.Printf("Failed to start java-tron, dumping output:\n%s\n", string(output))
-			return fmt.Errorf("Failed to start java-tron, bad exit code: %v", exitError.ExitCode())
-		}
-		return fmt.Errorf("Failed to start java-tron: %+v", err)
-	}
-
-	return nil
-}
-
-// Setup genesis account for tests
-func SetupTestGenesisAccount(t *testing.T) (genesisAddress string, genesisPrivateKey *ecdsa.PrivateKey, privateKeyHex string) {
-	privateKeyHex = "TODO"
-
-	if privateKeyHex == "" {
-		genesisAddress, genesisPrivateKey = GenerateRandomAccount()
-		privateKeyHex = hex.EncodeToString(crypto.FromECDSA(genesisPrivateKey))
-	} else {
-		privateKey, err := crypto.HexToECDSA(privateKeyHex)
-		require.NoError(t, err)
-		genesisAddress = address.PubkeyToAddress(privateKey.PublicKey).String()
-		genesisPrivateKey = privateKey
-	}
-
-	return genesisAddress, genesisPrivateKey, privateKeyHex
-}
-
-// CreateRandomAccounts generates a specified number of random accounts for testing purposes.
-func CreateRandomAccounts(t *testing.T, count int) []Account {
-	accounts := make([]Account, count) // Pre-allocate slice with the required length
-	for i := 0; i < count; i++ {
-		address, privateKey := GenerateRandomAccount()
-		keystore := NewTestKeystore(address, privateKey)
-		accounts[i] = Account{
-			Address:    address,
-			PublicKey:  &privateKey.PublicKey,
-			PrivateKey: privateKey,
-			Keystore:   keystore,
-		}
-	}
-
-	return accounts
-}
 
 // GetRSVFromSignature extracts r, s, and v values from the given signature.
 // r = first 32 bytes of signature
@@ -445,18 +202,34 @@ func EthereumToTronAddressBase58(ethAddress common.Address) string {
 }
 
 // Converts a Tron base58 encoded address to an Ethereum address.
-func TronAddressBase58ToEthereum(tronAddress string) (common.Address, error) {
+func MustConvertToEthAddress(t *testing.T, tronAddress string) common.Address {
 	tronHexAddress, err := address.Base58ToAddress(tronAddress)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("failed to convert Tron base58 address to hex: %v", err)
+		t.Fatal(err)
 	}
-
-	if len(tronHexAddress.Hex()) < 4 {
-		return common.Address{}, fmt.Errorf("invalid Tron hex address: %s", tronHexAddress.Hex())
-	}
-
 	ethAddressHex := "0x" + tronHexAddress.Hex()[4:]
-
 	ethAddress := common.HexToAddress(ethAddressHex)
-	return ethAddress, nil
+	return ethAddress
+}
+
+func MustMarshalParams(t *testing.T, params ...any) string {
+	encodedParams := make([]map[string]any, 0)
+	if len(params)%2 == 1 {
+		t.Fatal("odd number of params")
+	}
+	for i := 0; i < len(params); i += 2 {
+		paramType := params[i]
+		paramTypeStr, ok := paramType.(string)
+		if !ok {
+			t.Fatal("non-string param type")
+		}
+		encodedParams = append(encodedParams, map[string]any{paramTypeStr: params[i+1]})
+	}
+
+	paramsJsonBytes, err := json.Marshal(encodedParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return string(paramsJsonBytes)
 }
