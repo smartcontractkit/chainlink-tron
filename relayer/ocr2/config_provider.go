@@ -2,13 +2,13 @@ package ocr2
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
@@ -27,7 +27,7 @@ type configProvider struct {
 	lggr logger.Logger
 }
 
-func NewConfigProvider(chainID uint64, contractAddress address.Address, readerClient reader.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
+func NewConfigProvider(chainID *big.Int, contractAddress address.Address, readerClient reader.Reader, cfg Config, lggr logger.Logger) (*configProvider, error) {
 	lggr = logger.Named(lggr, "ConfigProvider")
 	client := NewOCR2Reader(readerClient, lggr)
 	contractReader := NewContractReader(contractAddress, client, lggr)
@@ -35,10 +35,9 @@ func NewConfigProvider(chainID uint64, contractAddress address.Address, readerCl
 
 	evmContractAddress := relayer.TronToEVMAddress(contractAddress)
 
-	// todo: investigate if there are any issues with using the evm offchain config digester for Tron
-	offchainConfigDigester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         chainID,
-		ContractAddress: evmContractAddress,
+	offchainConfigDigester, err := NewOffchainConfigDigester(lggr, chainID, evmContractAddress)
+	if err != nil {
+		return nil, err
 	}
 
 	return &configProvider{

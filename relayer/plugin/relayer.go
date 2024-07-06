@@ -2,10 +2,10 @@ package plugin
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -29,7 +29,7 @@ type TronRelayer struct {
 	services.StateMachine
 
 	chainId    string
-	chainIdNum uint64
+	chainIdNum *big.Int
 
 	cfg  *TOMLConfig
 	lggr logger.Logger
@@ -43,19 +43,20 @@ var _ loop.Relayer = &TronRelayer{}
 func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
 	id := *cfg.ChainID
 
-	var idNum uint64
+	var idNum *big.Int
 	if strings.HasPrefix(id, "0x") {
-		i, err := strconv.ParseUint(id[2:], 16, 64)
+		// TODO: we can just do new(big.Int).SetString(.., 16)
+		idBytes, err := hex.DecodeString(id[2:])
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse hex chain id %s as uint64: %w", id, err)
+			return nil, fmt.Errorf("couldn't parse hex chain id %s: %w", id, err)
 		}
-		idNum = i
+		idNum = new(big.Int).SetBytes(idBytes)
 	} else {
-		i, err := strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", id, err)
+		parsedNum, ok := new(big.Int).SetString(id, 10)
+		if !ok {
+			return nil, fmt.Errorf("couldn't parse numeric chain id %s", id)
 		}
-		idNum = i
+		idNum = parsedNum
 	}
 
 	nodeConfig, err := cfg.ListNodes().SelectRandom()
