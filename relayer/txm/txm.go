@@ -398,10 +398,11 @@ func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error
 			return estimateEnergyMessage.EnergyRequired, nil
 		}
 
-		t.Logger.Errorw("Failed to call EstimateEnergy", "err", err, "tx", tx)
-
 		if strings.Contains(err.Error(), "this node does not support estimate energy") {
 			t.EstimateEnergyEnabled = false
+			t.Logger.Infow("Node does not support EstimateEnergy", "err", err, "tx", tx)
+		} else {
+			t.Logger.Errorw("Failed to call EstimateEnergy", "err", err, "tx", tx)
 		}
 	}
 
