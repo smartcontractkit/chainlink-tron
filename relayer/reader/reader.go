@@ -2,6 +2,7 @@ package reader
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -147,13 +148,37 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	// iterate over transactions
 	var eventLogs []*core.TransactionInfo_Log
 	for _, tx := range block.Transactions {
-		for _, log := range tx.Logs {
-			// check log address matches contract address
+		contract := tx.Transaction.RawData.Contract
+		// This should be exactly 1 for any contract transaction.
+		if contract == nil || len(contract) < 1 {
+			continue
+		}
+		if contract[0].Parameter.TypeUrl != "type.googleapis.com/protocol.TriggerSmartContract" {
+			continue
+		}
+		triggerSmartContract := &core.TriggerSmartContract{}
+		if err := contract[0].Parameter.UnmarshalTo(triggerSmartContract); err != nil {
+			c.lggr.Error(fmt.Sprintf("failed to unmarshal TriggerSmartContract transaction %s", hex.EncodeToString(tx.Txid)))
+			continue
+		}
+
+		if !bytes.Equal(address.Bytes(), triggerSmartContract.ContractAddress) {
+			continue
+		}
+
+		transactionInfo, err := c.rpc.GetTransactionInfoByID(hex.EncodeToString(tx.Txid))
+		if err != nil {
+			c.lggr.Error(fmt.Errorf("failed to fetch transaction info: %w", err))
+			continue
+		}
+
+		for _, log := range transactionInfo.Log {
+			// TODO: do we need this check since we already checked contract aaddress above?
 			if !bytes.Equal(log.Address, address.Bytes()) {
 				continue
 			}
 			// check first topic in log against event topic hash
-			if !bytes.Equal(log.Topics[0], eventTopicHash) {
+			if len(log.Topics) == 0 || !bytes.Equal(log.Topics[0], eventTopicHash) {
 				continue
 			}
 			eventLogs = append(eventLogs, log)
