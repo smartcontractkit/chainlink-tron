@@ -194,10 +194,21 @@ func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArg
 	return configProvider, nil
 }
 
-// note: this function should actually return a MedianProvider, and is converted into the MedianProvider type here: https://github.com/smartcontractkit/chainlink/blob/286b02739a8638be0d8d5cd8673da18fb207a1ed/core/services/ocr2/plugins/median/services.go#L101
 func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.PluginProvider, error) {
-	// todo: unmarshal args.RelayConfig if required
+	// TODO: is this necessary? should we just return an error?
+	return t.NewMedianProvider(ctx, relayargs, pluginargs)
+}
 
+func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
+	return nil, errors.New("TODO")
+}
+
+// implement MedianProvider type from github.com/smartcontractkit/chainlink-common/pkg/loop/internal/types
+//
+// if the loop.Relayer returned by NewRelayer supports the internal loop type MedianProvider, it's called here:
+// see https://github.com/smartcontractkit/chainlink-common/blob/7c11e2c2ce3677f57239c40585b04fd1c9ce1713/pkg/loop/internal/relayer/relayer.go#L493
+func (t *TronRelayer) NewMedianProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.MedianProvider, error) {
+	// todo: unmarshal args.RelayConfig if required
 	reader := reader.NewReader(t.client, t.lggr)
 	contractAddress, err := address.Base58ToAddress(relayargs.ContractID)
 	if err != nil {
@@ -216,8 +227,4 @@ func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.Rel
 	medianProvider := ocr2.NewMedianProvider(ctx, t.cfg, medianContract, configProvider, contractAddress, senderAddress, t.txm, t.lggr)
 
 	return medianProvider, nil
-}
-
-func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
-	return nil, errors.New("TODO")
 }
