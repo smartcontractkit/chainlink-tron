@@ -228,9 +228,16 @@ func TestOCRBasic(t *testing.T) {
 	fmt.Printf("ONCHAIN CONFIG: %T %+v\n", onchainConfig, onchainConfig)
 	fmt.Printf("OFFCHAIN CONFIG: %T %+v\n", offchainConfig, offchainConfig)
 
+	signerAddresses := []string{}
+	for _, signer := range signers {
+		// TODO: gotron-sdk only supports base58 addresses as input for address or address[], update it so that
+		// we can pass common.Address directly
+		signerAddresses = append(signerAddresses, utils.EthereumToTronAddressBase58(ethcommon.BytesToAddress(signer)))
+	}
+
 	// TODO: should we set onchainConfig as offchainConfig?
 	err = txmgr.Enqueue(genesisAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
-		/* signers= */ "address[]", chainlinkClient.GetNodeAddresses(),
+		/* signers= */ "address[]", signerAddresses,
 		/* trasmitters= */ "address[]", chainlinkClient.GetNodeAddresses(),
 		/* f= */ "uint8", fmt.Sprintf("%d", f),
 		/* onchainConfig= */ "bytes", onchainConfigBytes,
