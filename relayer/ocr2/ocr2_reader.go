@@ -10,6 +10,7 @@ import (
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -215,20 +216,25 @@ func (c *OCR2ReaderClient) ConfigFromEventAt(ctx context.Context, address tronad
 		return cc, fmt.Errorf("expected offchainConfig %+v to be of type []byte, got %T", cfg["offchainConfig"], cfg["offchainConfig"])
 	}
 
+	// EVM format hex addresses, so that the OCR2 key in the DON can match against it, and because ecrecover returns this value
+	// and can then look it up in the signers map in the aggregator contract
 	var parsedSigners []types.OnchainPublicKey
 	for _, s := range signers {
 		parsedSigners = append(parsedSigners, types.OnchainPublicKey(s.Bytes()))
 	}
+
+	// TRON format addresses, must match the FromAccount value in ContractTransmitter
 	var parsedTransmitters []types.Account
 	for _, t := range transmitters {
-		parsedTransmitters = append(parsedTransmitters, types.Account(t.Hex()))
+		parsedTransmitters = append(parsedTransmitters, types.Account(relayer.EVMToTronAddress(t).String()))
 	}
+
 	cc = ContractConfig{
 		Config: types.ContractConfig{
 			ConfigDigest:          types.ConfigDigest(configDigest),
 			ConfigCount:           configCount,
-			Signers:               parsedSigners,      // note: these are in EVM format, need to convert to Tron format for use elsewhere
-			Transmitters:          parsedTransmitters, // note: these are in EVM format, need to convert to Tron format for use elsewhere
+			Signers:               parsedSigners,
+			Transmitters:          parsedTransmitters,
 			F:                     f,
 			OnchainConfig:         onchainConfig,
 			OffchainConfigVersion: offchainConfigVersion,
