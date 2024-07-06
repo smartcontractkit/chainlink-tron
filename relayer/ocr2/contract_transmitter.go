@@ -49,11 +49,7 @@ func NewOCRContractTransmitter(
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
 func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
-	var reportCtxStr string
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
-	for _, r := range rawReportCtx {
-		reportCtxStr = reportCtxStr + hex.EncodeToString(r[:])
-	}
 
 	var rs [][]byte
 	var ss [][]byte
@@ -74,18 +70,19 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress)
 
 	// build params
-	reportStr := "0x" + reportCtxStr + hex.EncodeToString(report)
+	reportStr := "0x" + hex.EncodeToString(report)
 	rsStr := relayer.ByteArrayToStr(rs)
 	ssStr := relayer.ByteArrayToStr(ss)
 	vsStr := "0x" + hex.EncodeToString(vs[:])
 	params := []any{
+		"bytes32[3]", rawReportCtx,
 		"bytes", reportStr,
 		"bytes32[]", rsStr,
 		"bytes32[]", ssStr,
 		"bytes32", vsStr,
 	}
 
-	return oc.txm.Enqueue(oc.senderAddress.String(), oc.contractAddress.String(), "transmit", params...)
+	return oc.txm.Enqueue(oc.senderAddress.String(), oc.contractAddress.String(), "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
 }
 
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
