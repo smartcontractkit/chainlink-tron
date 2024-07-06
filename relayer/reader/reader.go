@@ -146,7 +146,7 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	}
 
 	// iterate over transactions
-	var eventLogs []*core.TransactionInfo_Log
+	eventLogs := []*core.TransactionInfo_Log{}
 	for _, tx := range block.Transactions {
 		contract := tx.Transaction.RawData.Contract
 		// This should be exactly 1 for any contract transaction.
