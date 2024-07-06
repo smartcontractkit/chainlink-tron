@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
@@ -25,8 +26,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/utils"
 )
 
 type ChainlinkClient struct {
@@ -119,10 +118,19 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 			return
 		}
 
+		// this is the OCR2 report signing public key, but in ethereum address format already.
+		// ref: https://github.com/smartcontractkit/chainlink/blob/286b02739a8638be0d8d5cd8673da18fb207a1ed/core/services/keystore/keys/ocr2key/evm_keyring.go#L31
+		onchainPubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(key.OCR2Key.Data.Attributes.OnChainPublicKey, "ocr2on_tron_"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(onchainPubKeyBytes) != common.AddressLength {
+			t.Fatal(fmt.Sprintf("Invalid offchain public key length. Expected %d bytes, got %d bytes", common.AddressLength, len(onchainPubKeyBytes)))
+			return
+		}
+
 		var offchainPubKey [ed25519.PublicKeySize]byte
 		copy(offchainPubKey[:], offchainPubKeyBytes)
-
-		ethAddress := utils.MustConvertToEthAddress(t, key.TXKey.Data.ID)
 
 		configPubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(key.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_tron_"))
 		if len(configPubKeyBytes) != curve25519.PointSize {
@@ -135,11 +143,10 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 
 		oracleIdentity := confighelper.OracleIdentity{
 			OffchainPublicKey: offchainPubKey,
-			// this is an address for EVM
-			// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/offchainreporting2plus/confighelper/confighelper.go#L23
-			OnchainPublicKey: ethAddress.Bytes(),
-			PeerID:           key.PeerID,
-			TransmitAccount:  types.Account(key.TXKey.Data.ID),
+			OnchainPublicKey:  onchainPubKeyBytes,
+			PeerID:            key.PeerID,
+			// Already in TRON base58 address format as per TRON keystore ID()
+			TransmitAccount: types.Account(key.TXKey.Data.ID),
 		}
 
 		oracleIdentityExtra := confighelper.OracleIdentityExtra{
