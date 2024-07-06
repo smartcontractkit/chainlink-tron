@@ -50,6 +50,8 @@ type pluginRelayer struct {
 	loop.Plugin
 }
 
+var _ loop.PluginRelayer = &pluginRelayer{}
+
 func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore loop.Keystore, capRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
 	d := toml.NewDecoder(strings.NewReader(config))
 	d.DisallowUnknownFields()
