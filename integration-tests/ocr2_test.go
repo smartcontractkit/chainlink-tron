@@ -86,7 +86,21 @@ func TestOCRBasic(t *testing.T) {
 	require.NoError(t, err)
 
 	blockId := blockInfo.Blockid
-	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+
+	// TODO: check the config on mainnet
+	//
+	// previously, we did:
+	//
+	// chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+	//
+	// .. which is what the compat eth_chainId returns - however the config digest is calculated using block.chainid onchain, see
+	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L273
+	//
+	// depending on if this config is enabled, this is either the entire genesis block id, or the last 4 bytes. on devnet,
+	// this is currently the full block id.
+	//
+	// ref: https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
+	chainId := "0x" + hex.EncodeToString(blockId)
 
 	logger.Info().Str("chain id", chainId).Msg("Read first block")
 
