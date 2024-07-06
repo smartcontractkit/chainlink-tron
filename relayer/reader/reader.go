@@ -173,10 +173,11 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 		}
 
 		for _, log := range transactionInfo.Log {
-			// TODO: do we need this check since we already checked contract aaddress above?
-			if !bytes.Equal(log.Address, address.Bytes()) {
-				continue
-			}
+			// TODO: this check no longer works as expected, understand why the addresses are different
+			// if !bytes.Equal(log.Address, address.Bytes()) {
+			//   continue
+			// }
+
 			// check first topic in log against event topic hash
 			if len(log.Topics) == 0 || !bytes.Equal(log.Topics[0], eventTopicHash) {
 				continue
