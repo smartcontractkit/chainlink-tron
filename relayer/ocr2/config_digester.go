@@ -6,11 +6,14 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 )
 
 const functionABI = `[{
@@ -32,8 +35,8 @@ const functionABI = `[{
 
 // TRON offchain config digester.
 //
-// This is different from the EVM config digester because EVM expects the chain id to fit in a
-// uint64:
+// This is different from the EVM config digester because we store TRON format addresses as transmitters,
+// and because EVM expects the chain id to fit in a uint64:
 // https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/offchainreporting2plus/chains/evmutil/config_digest.go#L28
 //
 // although the calculation onchain using `block.chainid` is a uint256:
@@ -44,13 +47,13 @@ const functionABI = `[{
 type TRONOffchainConfigDigester struct {
 	lggr             logger.Logger
 	chainID          *big.Int
-	contractAddress  common.Address
+	contractAddress  ethcommon.Address
 	configDigestArgs abi.Arguments
 }
 
 var _ types.OffchainConfigDigester = &TRONOffchainConfigDigester{}
 
-func NewOffchainConfigDigester(lggr logger.Logger, chainID *big.Int, contractAddress common.Address) (*TRONOffchainConfigDigester, error) {
+func NewOffchainConfigDigester(lggr logger.Logger, chainID *big.Int, contractAddress ethcommon.Address) (*TRONOffchainConfigDigester, error) {
 	parsedAbi, err := abi.JSON(strings.NewReader(functionABI))
 	if err != nil {
 		return nil, err
@@ -67,20 +70,22 @@ func NewOffchainConfigDigester(lggr logger.Logger, chainID *big.Int, contractAdd
 func (d *TRONOffchainConfigDigester) ConfigDigest(cc types.ContractConfig) (types.ConfigDigest, error) {
 	d.lggr.Error("DEBUG: called ConfigDigest")
 
-	signers := []common.Address{}
+	signers := []ethcommon.Address{}
 	for i, signer := range cc.Signers {
-		if len(signer) != 20 {
-			return types.ConfigDigest{}, fmt.Errorf("%v-th evm signer should be a 20 byte address, but got %x", i, signer)
+		if len(signer) != ethcommon.AddressLength {
+			return types.ConfigDigest{}, fmt.Errorf("%v-th signer should be a 20 byte hex address, but got %x", i, signer)
 		}
-		a := common.BytesToAddress(signer)
+		a := ethcommon.BytesToAddress(signer)
 		signers = append(signers, a)
 	}
-	transmitters := []common.Address{}
+	transmitters := []ethcommon.Address{}
+	// These are saved as TRON base58 addresses on-chain.
 	for i, transmitter := range cc.Transmitters {
-		if !strings.HasPrefix(string(transmitter), "0x") || len(transmitter) != 42 || !common.IsHexAddress(string(transmitter)) {
-			return types.ConfigDigest{}, fmt.Errorf("%v-th evm transmitter should be a 42 character Ethereum address string, but got '%v'", i, transmitter)
+		base58Address, err := address.Base58ToAddress(string(transmitter))
+		if err != nil {
+			return types.ConfigDigest{}, fmt.Errorf("%v-th transmitter should be a TRON base58 address string, but got '%v'", i, transmitter)
 		}
-		a := common.HexToAddress(string(transmitter))
+		a := relayer.TronToEVMAddress(base58Address)
 		transmitters = append(transmitters, a)
 	}
 
@@ -109,10 +114,10 @@ func (d *TRONOffchainConfigDigester) ConfigDigestPrefix() (types.ConfigDigestPre
 
 func (d *TRONOffchainConfigDigester) configDigestFromConfigData(
 	chainId *big.Int,
-	contractAddress common.Address,
+	contractAddress ethcommon.Address,
 	configCount uint64,
-	signers []common.Address,
-	transmitters []common.Address,
+	signers []ethcommon.Address,
+	transmitters []ethcommon.Address,
 	f uint8,
 	onchainConfig []byte,
 	offchainConfigVersion uint64,
