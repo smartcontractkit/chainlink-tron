@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/stretchr/testify/require"
 
 	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -22,11 +24,17 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/contract"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/utils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 	// "github.com/smartcontractkit/chainlink/integration-tests/actions"
 	// "go.uber.org/zap/zapcore"
+)
+
+const (
+	defaultInternalGrpcUrl = "grpc://host.docker.internal:16669/?insecure=true"
 )
 
 func TestOCRBasic(t *testing.T) {
@@ -47,20 +55,46 @@ func TestOCRBasic(t *testing.T) {
 		genesisAddress = address.PubkeyToAddress(privateKey.PublicKey).String()
 		genesisPrivateKey = privateKey
 	}
+	logger.Info().Str("genesis address", genesisAddress).Msg("Using genesis account")
 
-	logger.Debug().Str("genesis address", genesisAddress).Msg("Using genesis account")
-	commonConfig := common.NewCommon(t)
+	grpcUrl := os.Getenv("GRPC_URL")
+	if grpcUrl == "" {
+		grpcUrl = fmt.Sprintf("grpc://%s:16669/?insecure=true", testutils.GetTronNodeIpAddress())
+	}
+	httpUrl := os.Getenv("HTTP_URL")
+	if httpUrl == "" {
+		httpUrl = fmt.Sprintf("http://%s:16667", testutils.GetTronNodeIpAddress())
+	}
+	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
+	if internalGrpcUrl == "" {
+		internalGrpcUrl = defaultInternalGrpcUrl
+	}
+
+	logger.Info().Msg("Starting java-tron container...")
+	err := testutils.StartTronNode(genesisAddress)
+	require.NoError(t, err, "Could not start java-tron container")
+
+	logger.Info().Str("grpc url", grpcUrl).Str("http url", httpUrl).Msg("TRON node config")
+
+	grpcUrlObj, err := url.Parse(grpcUrl)
+	require.NoError(t, err)
+
+	grpcClient, err := sdk.CreateGrpcClient(grpcUrlObj)
+	require.NoError(t, err)
+
+	blockInfo, err := grpcClient.GetBlockByNum(0)
+	require.NoError(t, err)
+
+	blockId := blockInfo.Blockid
+	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+
+	logger.Info().Str("chain id", chainId).Msg("Read first block")
+
+	commonConfig := common.NewCommon(t, chainId, internalGrpcUrl)
 	commonConfig.SetLocalEnvironment(t, genesisAddress)
 
 	clientLogger, err := relaylogger.New()
 	require.NoError(t, err, "Could not create relay logger")
-
-	logger.Debug().Str("grpc url", commonConfig.GrpcUrl).Str("http url", commonConfig.HttpUrl).Msg("Node config")
-	grpcUrl, err := url.Parse(commonConfig.GrpcUrl)
-	require.NoError(t, err)
-
-	grpcClient, err := sdk.CreateGrpcClient(grpcUrl)
-	require.NoError(t, err)
 
 	testKeystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
 	txmgr := txm.New(clientLogger, testKeystore, grpcClient, txm.TronTxmConfig{
@@ -104,7 +138,7 @@ func TestOCRBasic(t *testing.T) {
 	}
 
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
-		txHash := testutils.DeployContractByJson(t, commonConfig.HttpUrl, testKeystore, genesisAddress, contractName, artifact.AbiJson, artifact.Bytecode, params)
+		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, genesisAddress, contractName, artifact.AbiJson, artifact.Bytecode, params)
 		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, 30)
 		contractAddress := address.Address(txInfo.ContractAddress).String()
 		return contractAddress
@@ -193,6 +227,16 @@ func TestOCRBasic(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, configCount, big.NewInt(1))
 	logger.Info().Msg("successfully set config")
+
+	p2pPort := "50200"
+	err = chainlinkClient.CreateJobsForContract(
+		commonConfig.ChainId,
+		nodeName,
+		p2pPort,
+		commonConfig.MockUrl,
+		commonConfig.JuelsPerFeeCoinSource,
+		ocr2AggregatorAddress)
+	require.NoError(t, err, "Could not create jobs for contract")
 
 	//gauntletWorkingDir := fmt.Sprintf("%s/", utils.ProjectRoot)
 	//logger.Info().Str("working dir", gauntletWorkingDir).Msg("Initializing gauntlet")
@@ -296,11 +340,15 @@ func TestOCRBasic(t *testing.T) {
 	//ocrAddress)
 	//require.NoError(t, err, "Could not create jobs for contract")
 
-	//err = validateRounds(t, cosmosClient, types.MustAccAddressFromBech32(ocrAddress), types.MustAccAddressFromBech32(ocrProxyAddress), commonConfig.IsSoak, commonConfig.TestDuration)
-	//require.NoError(t, err, "Validating round should not fail")
+	err = validateRounds(t, grpcClient, mustConvertAddress(t, ocr2AggregatorAddress), mustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, commonConfig.TestDuration)
+	require.NoError(t, err, "Validating round should not fail")
 
 	// Tear down local stack
 	commonConfig.TearDownLocalEnvironment(t)
+
+	logger.Info().Msg("Tearing down java-tron container...")
+	err = testutils.StopTronNode()
+	require.NoError(t, err, "Could not tear down java-tron container")
 
 	// t.Cleanup(func() {
 	// 	err = actions.TeardownSuite(t, commonConfig.Env, "./", nil, nil, zapcore.DPanicLevel, nil)
@@ -309,154 +357,129 @@ func TestOCRBasic(t *testing.T) {
 	// })
 }
 
-//func validateRounds(t *testing.T, cosmosClient *client.Client, ocrAddress types.AccAddress, ocrProxyAddress types.AccAddress, isSoak bool, testDuration time.Duration) error {
-//var rounds int
-//if isSoak {
-//rounds = 99999999
-//} else {
-//rounds = 10
-//}
+func mustConvertAddress(t *testing.T, tronAddress string) address.Address {
+	a, err := address.Base58ToAddress(tronAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
 
-//// TODO(BCI-1746): dynamic mock-adapter values
-//mockAdapterValue := 5
+func validateRounds(t *testing.T, grpcClient *client.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, testDuration time.Duration) error {
+	var rounds int
+	if isSoak {
+		rounds = 99999999
+	} else {
+		rounds = 10
+	}
 
-//logger := common.GetTestLogger(t)
-//ctx := context.Background() // context background used because timeout handled by requestTimeout param
-//// assert new rounds are occurring
-//increasing := 0 // track number of increasing rounds
-//var stuck bool
-//stuckCount := 0
-//var positive bool
-//resp, err := cosmosClient.ContractState(
-//ocrAddress,
-//[]byte(`{"link_available_for_payment":{}}`),
-//)
-//if err != nil {
-//return err
-//}
+	logger := common.GetTestLogger(t)
+	ctx := context.Background() // context background used because timeout handled by requestTimeout param
+	// assert new rounds are occurring
+	increasing := 0 // track number of increasing rounds
+	var stuck bool
+	stuckCount := 0
+	var positive bool
 
-//linkResponse := struct {
-//Amount string `json:"amount"`
-//}{}
-//if err = json.Unmarshal(resp, &linkResponse); err != nil {
-//return err
-//}
-//logger.Info().Str("amount", linkResponse.Amount).Msg("Queried link available for payment")
+	ocrLogger, err := relaylogger.New()
+	require.NoError(t, err, "Failed to create OCR relay logger")
 
-//availableLink, success := new(big.Int).SetString(linkResponse.Amount, 10)
-//require.True(t, success, "Could not convert link_available_for_payment response")
-//require.True(t, availableLink.Cmp(big.NewInt(0)) > 0, "Aggregator should have non-zero balance")
+	readerClient := reader.NewReader(grpcClient, ocrLogger)
+	ocrReader := ocr2.NewOCR2Reader(readerClient, ocrLogger)
 
-//// TODO(BCI-1767): this needs to be able to support different readers
-//ocrLogger, err := relaylogger.New()
-//require.NoError(t, err, "Failed to create OCR relay logger")
-//ocrReader := cosmwasm.NewOCR2Reader(ocrAddress, cosmosClient, ocrLogger)
+	previous := ocr2.TransmissionDetails{}
 
-//type TransmissionDetails struct {
-//ConfigDigest    ocrtypes.ConfigDigest
-//Epoch           uint32
-//Round           uint8
-//LatestAnswer    *big.Int
-//LatestTimestamp time.Time
-//}
+	for start := time.Now(); time.Since(start) < testDuration; {
+		logger.Info().Msg(fmt.Sprintf("Elapsed time: %s, Round wait: %s ", time.Since(start), testDuration))
+		current, err2 := ocrReader.LatestTransmissionDetails(ctx, ocrAddress)
+		require.NoError(t, err2, "Failed to get latest transmission details")
+		// end condition: enough rounds have occurred
+		if !isSoak && increasing >= rounds && positive {
+			break
+		}
 
-//previous := TransmissionDetails{}
+		// end condition: rounds have been stuck
+		if stuck && stuckCount > 50 {
+			logger.Debug().Msg("failing to fetch transmissions means blockchain may have stopped")
+			break
+		}
 
-//for start := time.Now(); time.Since(start) < testDuration; {
-//logger.Info().Msg(fmt.Sprintf("Elapsed time: %s, Round wait: %s ", time.Since(start), testDuration))
-//configDigest, epoch, round, latestAnswer, latestTimestamp, err2 := ocrReader.LatestTransmissionDetails(ctx)
-//require.NoError(t, err2, "Failed to get latest transmission details")
-//// end condition: enough rounds have occurred
-//if !isSoak && increasing >= rounds && positive {
-//break
-//}
+		// try to fetch rounds
+		time.Sleep(5 * time.Second)
 
-//// end condition: rounds have been stuck
-//if stuck && stuckCount > 50 {
-//logger.Debug().Msg("failing to fetch transmissions means blockchain may have stopped")
-//break
-//}
+		if err2 != nil {
+			logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err2))
+			continue
+		}
+		logger.Info().Msg(fmt.Sprintf("Transmission Details: %+v", current))
 
-//// try to fetch rounds
-//time.Sleep(5 * time.Second)
+		// continue if no changes
+		if current.Epoch == 0 && current.Round == 0 {
+			continue
+		}
 
-//if err2 != nil {
-//logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err2))
-//continue
-//}
-//logger.Info().Msg(fmt.Sprintf("Transmission Details: configDigest: %+v, epoch: %+v, round: %+v, latestAnswer: %+v, latestTimestamp: %+v", configDigest, epoch, round, latestAnswer, latestTimestamp))
+		ansCmp := current.LatestAnswer.Cmp(big.NewInt(0))
+		positive = ansCmp == 1 || positive
 
-//// continue if no changes
-//if epoch == 0 && round == 0 {
-//continue
-//}
+		// if changes from zero values set (should only initially)
+		if current.Epoch > 0 && previous.Epoch == 0 {
+			if !isSoak {
+				require.Greater(t, current.Epoch, previous.Epoch)
+				require.GreaterOrEqual(t, current.Round, previous.Round)
+				require.NotEqual(t, ansCmp, 0) // require changed from 0
+				require.NotEqual(t, current.Digest, previous.Digest)
+				require.Equal(t, previous.LatestTimestamp.Before(current.LatestTimestamp), true)
+			}
+			previous = current
+			continue
+		}
+		// check increasing rounds
+		if !isSoak {
+			require.Equal(t, current.Digest, previous.Digest, "Config digest should not change")
+		} else {
+			if current.Digest != previous.Digest {
+				logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.Digest, current.Digest))
+			}
+		}
+		if (current.Epoch > previous.Epoch || (current.Epoch == previous.Epoch && current.Round > previous.Round)) && previous.LatestTimestamp.Before(current.LatestTimestamp) {
+			increasing++
+			stuck = false
+			stuckCount = 0 // reset counter
+			continue
+		}
 
-//ansCmp := latestAnswer.Cmp(big.NewInt(0))
-//positive = ansCmp == 1 || positive
+		// reach this point, answer has not changed
+		stuckCount++
+		if stuckCount > 30 {
+			stuck = true
+			increasing = 0
+		}
+	}
+	if !isSoak {
+		require.GreaterOrEqual(t, increasing, rounds, "Round + epochs should be increasing")
+		require.Equal(t, positive, true, "Positive value should have been submitted")
+		require.Equal(t, stuck, false, "Round + epochs should not be stuck")
+	}
 
-//// if changes from zero values set (should only initially)
-//if epoch > 0 && previous.Epoch == 0 {
-//if !isSoak {
-//require.Greater(t, epoch, previous.Epoch)
-//require.GreaterOrEqual(t, round, previous.Round)
-//require.NotEqual(t, ansCmp, 0) // require changed from 0
-//require.NotEqual(t, configDigest, previous.ConfigDigest)
-//require.Equal(t, previous.LatestTimestamp.Before(latestTimestamp), true)
-//}
-//previous = TransmissionDetails{
-//ConfigDigest:    configDigest,
-//Epoch:           epoch,
-//Round:           round,
-//LatestAnswer:    latestAnswer,
-//LatestTimestamp: latestTimestamp,
-//}
-//continue
-//}
-//// check increasing rounds
-//if !isSoak {
-//require.Equal(t, configDigest, previous.ConfigDigest, "Config digest should not change")
-//} else {
-//if configDigest != previous.ConfigDigest {
-//logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.ConfigDigest, configDigest))
-//}
-//}
-//if (epoch > previous.Epoch || (epoch == previous.Epoch && round > previous.Round)) && previous.LatestTimestamp.Before(latestTimestamp) {
-//increasing++
-//stuck = false
-//stuckCount = 0 // reset counter
-//continue
-//}
+	//// Test proxy reading
+	// TODO(BCI-1746): dynamic mock-adapter values
+	//mockAdapterValue := 5
+	//// TODO: would be good to test proxy switching underlying feeds
+	//resp, err = cosmosClient.ContractState(ocrProxyAddress, []byte(`{"latest_round_data":{}}`))
+	//if !isSoak {
+	//require.NoError(t, err, "Reading round data from proxy should not fail")
+	//// assert.Equal(t, len(roundDataRaw), 5, "Round data from proxy should match expected size")
+	//}
+	//roundData := struct {
+	//Answer string `json:"answer"`
+	//}{}
+	//err = json.Unmarshal(resp, &roundData)
+	//require.NoError(t, err, "Failed to unmarshal round data")
 
-//// reach this point, answer has not changed
-//stuckCount++
-//if stuckCount > 30 {
-//stuck = true
-//increasing = 0
-//}
-//}
-//if !isSoak {
-//require.GreaterOrEqual(t, increasing, rounds, "Round + epochs should be increasing")
-//require.Equal(t, positive, true, "Positive value should have been submitted")
-//require.Equal(t, stuck, false, "Round + epochs should not be stuck")
-//}
+	//valueBig, success := new(big.Int).SetString(roundData.Answer, 10)
+	//require.True(t, success, "Failed to parse round data")
+	//value := valueBig.Int64()
+	//require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
 
-//// Test proxy reading
-//// TODO: would be good to test proxy switching underlying feeds
-//resp, err = cosmosClient.ContractState(ocrProxyAddress, []byte(`{"latest_round_data":{}}`))
-//if !isSoak {
-//require.NoError(t, err, "Reading round data from proxy should not fail")
-////assert.Equal(t, len(roundDataRaw), 5, "Round data from proxy should match expected size")
-//}
-//roundData := struct {
-//Answer string `json:"answer"`
-//}{}
-//err = json.Unmarshal(resp, &roundData)
-//require.NoError(t, err, "Failed to unmarshal round data")
-
-//valueBig, success := new(big.Int).SetString(roundData.Answer, 10)
-//require.True(t, success, "Failed to parse round data")
-//value := valueBig.Int64()
-//require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
-
-//return nil
-//}
+	return nil
+}

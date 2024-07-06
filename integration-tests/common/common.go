@@ -13,21 +13,16 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/alias"
-
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
 // TODO: those should be moved as a common part of chainlink-testing-framework
 
 const (
-	chainName              = "tron"
-	chainID                = "testing"
-	ChainBlockTime         = "200ms"
-	ChainBlockTimeSoak     = "2s"
-	defaultInternalGrpcUrl = "grpc://172.255.0.101:16667/?insecure=true"
-	defaultInternalHttpUrl = "http://172.255.0.101:16667"
-	defaultTTLValue        = "1m"
-	defaultNodeCountValue  = "4"
+	chainName             = "tron"
+	ChainBlockTime        = "200ms"
+	ChainBlockTimeSoak    = "2s"
+	defaultTTLValue       = "1m"
+	defaultNodeCountValue = "4"
 )
 
 var (
@@ -51,8 +46,6 @@ type Common struct {
 	NodeCount             int
 	TTL                   time.Duration
 	TestDuration          time.Duration
-	GrpcUrl               string
-	HttpUrl               string
 	MockUrl               string
 	Mnemonic              string
 	ObservationSource     string
@@ -115,19 +108,7 @@ func getTestDuration() time.Duration {
 	return t
 }
 
-func NewCommon(t *testing.T) *Common {
-	grpcUrl := getEnv("GRPC_URL")
-	if grpcUrl == "" {
-		grpcUrl = fmt.Sprintf("grpc://%s:16669/?insecure=true", testutils.GetTronNodeIpAddress())
-	}
-	httpUrl := getEnv("HTTP_URL")
-	if httpUrl == "" {
-		httpUrl = fmt.Sprintf("http://%s:16667", testutils.GetTronNodeIpAddress())
-	}
-	internalGrpcUrl := getEnv("INTERNAL_GRPC_URL")
-	if internalGrpcUrl == "" {
-		internalGrpcUrl = defaultInternalGrpcUrl
-	}
+func NewCommon(t *testing.T, chainID, internalGrpcUrl string) *Common {
 	chainlinkConfig := fmt.Sprintf(`
 [[Tron]]
 Enabled = true
@@ -168,8 +149,6 @@ HTTPSPort = 0
 		NodeCount:             getNodeCount(),
 		TTL:                   getTTL(),
 		TestDuration:          getTestDuration(),
-		GrpcUrl:               grpcUrl,
-		HttpUrl:               httpUrl,
 		MockUrl:               "http://host.docker.internal:6060",
 		Mnemonic:              getEnv("MNEMONIC"),
 		ObservationSource:     observationSource,
@@ -182,11 +161,8 @@ HTTPSPort = 0
 
 func (c *Common) SetLocalEnvironment(t *testing.T, genesisAddress string) {
 	// Run scripts to set up local test environment
-	log.Info().Msg("Starting java-tron container...")
-	err := testutils.StartTronNode(genesisAddress)
-	require.NoError(t, err, "Could not start java-tron container")
 	log.Info().Msg("Starting postgres container...")
-	err = exec.Command("../scripts/postgres.sh").Run()
+	err := exec.Command("../scripts/postgres.sh").Run()
 	require.NoError(t, err, "Could not start postgres container")
 	log.Info().Msg("Starting mock adapter...")
 	err = exec.Command("../scripts/mock-adapter.sh").Run()
@@ -224,8 +200,5 @@ func (c *Common) TearDownLocalEnvironment(t *testing.T) {
 	log.Info().Msg("Tearing down postgres container...")
 	err = exec.Command("../scripts/postgres.down.sh").Run()
 	require.NoError(t, err, "Could not tear down postgres container")
-	log.Info().Msg("Tearing down wasmd container...")
-	err = testutils.StopTronNode()
-	require.NoError(t, err, "Could not tear down java-tron container")
 	log.Info().Msg("Tear down local stack complete.")
 }

@@ -57,16 +57,7 @@ func NewChainlinkClient(env *environment.Environment, nodeName string, chainId s
 func (cc *ChainlinkClient) GetNodeAddresses() []string {
 	var addresses []string
 	for _, nodeKey := range cc.NodeKeys {
-		publicKeyBytes, err := hex.DecodeString(nodeKey.TXKey.Data.Attributes.PublicKey)
-		if err != nil {
-			panic(err)
-		}
-		publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-		if err != nil {
-			panic(err)
-		}
-		a := address.PubkeyToAddress(*publicKey)
-		addresses = append(addresses, a.String())
+		addresses = append(addresses, nodeKey.TXKey.Data.ID)
 	}
 	return addresses
 }
@@ -119,7 +110,7 @@ func (cc *ChainlinkClient) CreateJobsForContract(chainId, nodeName, p2pPort, moc
 	}
 	// Setting up bootstrap node
 	jobSpec := &client.OCR2TaskJobSpec{
-		Name:           fmt.Sprintf("cosmos-OCRv2-%s-%s", "bootstrap", uuid.NewString()),
+		Name:           fmt.Sprintf("tron-OCRv2-%s-%s", "bootstrap", uuid.NewString()),
 		JobType:        "bootstrap",
 		OCR2OracleSpec: oracleSpec,
 	}
@@ -161,7 +152,7 @@ func (cc *ChainlinkClient) CreateJobsForContract(chainId, nodeName, p2pPort, moc
 			RelayConfig:                 relayConfig,
 			PluginType:                  "median",
 			OCRKeyBundleID:              null.StringFrom(cc.NodeKeys[nIdx].OCR2Key.Data.ID),
-			TransmitterID:               null.StringFrom(cc.NodeKeys[nIdx].TXKey.Data.Attributes.PublicKey),
+			TransmitterID:               null.StringFrom(cc.NodeKeys[nIdx].TXKey.Data.ID),
 			P2PV2Bootstrappers:          pq.StringArray{strings.Join(p2pBootstrappers, ",")},
 			ContractConfigConfirmations: 1, // don't wait for confirmation on devnet
 			PluginConfig: job.JSONConfig{
@@ -170,7 +161,7 @@ func (cc *ChainlinkClient) CreateJobsForContract(chainId, nodeName, p2pPort, moc
 		}
 
 		jobSpec = &client.OCR2TaskJobSpec{
-			Name:              fmt.Sprintf("cosmos-OCRv2-%d-%s", nIdx, uuid.NewString()),
+			Name:              fmt.Sprintf("tron-OCRv2-%d-%s", nIdx, uuid.NewString()),
 			JobType:           "offchainreporting2",
 			OCR2OracleSpec:    oracleSpec,
 			ObservationSource: client.ObservationSourceSpecBridge(sourceValueBridge),
@@ -186,7 +177,6 @@ func (cc *ChainlinkClient) CreateJobsForContract(chainId, nodeName, p2pPort, moc
 
 // connectChainlinkNodes creates a chainlink client for each node in the environment
 // This is a non k8s version of the function in chainlink_k8s.go
-// https://github.com/smartcontractkit/chainlink/blob/cosmos-test-keys/integration-tests/client/chainlink_k8s.go#L77
 func connectChainlinkNodes(e *environment.Environment) ([]*client.ChainlinkClient, error) {
 	var clients []*client.ChainlinkClient
 	for _, nodeDetails := range e.ChainlinkNodeDetails {
@@ -213,4 +203,16 @@ func connectChainlinkNodes(e *environment.Environment) ([]*client.ChainlinkClien
 func parseHostname(s string) string {
 	r := regexp.MustCompile(`://(?P<Host>.*):`)
 	return r.FindStringSubmatch(s)[1]
+}
+
+func createNodeAddress(publicKeyHex string) string {
+	publicKeyBytes, err := hex.DecodeString(publicKeyHex)
+	if err != nil {
+		panic(err)
+	}
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		panic(err)
+	}
+	return address.PubkeyToAddress(*publicKey).String()
 }
