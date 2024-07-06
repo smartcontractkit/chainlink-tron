@@ -210,7 +210,9 @@ func TestOCRBasic(t *testing.T) {
 	require.Equal(t, balanceValue, mintAmount)
 	logger.Info().Str("amount", mintAmount.String()).Msg("Minted LINK token")
 
-	// Define the values
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig := chainlinkClient.GetSetConfigArgs(t)
+
+	//// Define the values
 	onchainConfigBytes := []byte{}
 	// version (uint8)
 	onchainConfigBytes = append(onchainConfigBytes, byte(1))
@@ -219,14 +221,21 @@ func TestOCRBasic(t *testing.T) {
 	// maxAnswer (int192)
 	onchainConfigBytes = append(onchainConfigBytes, ethcommon.LeftPadBytes(maxAnswer.Bytes(), 24)...)
 
+	//// version 2 (OCR2OffchainConfigVersion)
+	//offchainConfigVersion := "2"
+
+	fmt.Printf("TEST SIGNERS: %+v - TRANSMITTERS: %+v\n", signers, transmitters)
+	fmt.Printf("ONCHAIN CONFIG: %T %+v\n", onchainConfig, onchainConfig)
+	fmt.Printf("OFFCHAIN CONFIG: %T %+v\n", offchainConfig, offchainConfig)
+
 	// TODO: should we set onchainConfig as offchainConfig?
 	err = txmgr.Enqueue(genesisAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
 		/* signers= */ "address[]", chainlinkClient.GetNodeAddresses(),
 		/* trasmitters= */ "address[]", chainlinkClient.GetNodeAddresses(),
-		/* f= */ "uint8", "1",
+		/* f= */ "uint8", fmt.Sprintf("%d", f),
 		/* onchainConfig= */ "bytes", onchainConfigBytes,
-		/* offchainConfigVersion= */ "uint64", "1",
-		/* offchainConfig= */ "bytes", onchainConfigBytes)
+		/* offchainConfigVersion= */ "uint64", fmt.Sprintf("%d", offchainConfigVersion),
+		/* offchainConfig= */ "bytes", offchainConfig)
 	require.NoError(t, err)
 
 	// TODO: we need to fix the txmgr from returning 0 inflight count when it's processing a single transaction with nothing queued.

@@ -1,23 +1,32 @@
 package common
 
 import (
+	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
+	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/utils"
 )
 
 type ChainlinkClient struct {
@@ -83,6 +92,95 @@ func (cc *ChainlinkClient) LoadOCR2Config(proposalId string) (*OCR2Config, error
 	payload.OffchainConfig.PeerIds = peerIds
 	payload.OffchainConfig.ConfigPublicKeys = cfgKeys
 	return &payload, nil
+}
+
+func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
+	signers []types.OnchainPublicKey,
+	transmitters []types.Account,
+	f uint8,
+	onchainConfig []byte,
+	offchainConfigVersion uint64,
+	offchainConfig []byte,
+) {
+	oracleIdentities := []confighelper.OracleIdentityExtra{}
+	S := []int{}
+
+	for _, key := range cc.NodeKeys {
+		S = append(S, 1)
+
+		offchainPubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(key.OCR2Key.Data.Attributes.OffChainPublicKey, "ocr2off_tron_"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check if the decoded bytes have the correct length for an Ed25519 public key
+		if len(offchainPubKeyBytes) != ed25519.PublicKeySize {
+			t.Fatal(fmt.Sprintf("Invalid offchain public key length. Expected %d bytes, got %d bytes", ed25519.PublicKeySize, len(offchainPubKeyBytes)))
+			return
+		}
+
+		var offchainPubKey [ed25519.PublicKeySize]byte
+		copy(offchainPubKey[:], offchainPubKeyBytes)
+
+		ethAddress := utils.MustConvertToEthAddress(t, key.TXKey.Data.ID)
+
+		configPubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(key.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_tron_"))
+		if len(configPubKeyBytes) != curve25519.PointSize {
+			t.Fatal(fmt.Sprintf("Invalid config public key length. Expected %d bytes, got %d bytes", curve25519.PointSize, len(configPubKeyBytes)))
+			return
+		}
+
+		var configPubKey [curve25519.PointSize]byte
+		copy(configPubKey[:], configPubKeyBytes)
+
+		oracleIdentity := confighelper.OracleIdentity{
+			OffchainPublicKey: offchainPubKey,
+			// this is an address for EVM
+			// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/offchainreporting2plus/confighelper/confighelper.go#L23
+			OnchainPublicKey: ethAddress.Bytes(),
+			PeerID:           key.PeerID,
+			TransmitAccount:  types.Account(key.TXKey.Data.ID),
+		}
+
+		oracleIdentityExtra := confighelper.OracleIdentityExtra{
+			OracleIdentity:            oracleIdentity,
+			ConfigEncryptionPublicKey: configPubKey,
+		}
+
+		oracleIdentities = append(oracleIdentities, oracleIdentityExtra)
+	}
+
+	var err error
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = confighelper.ContractSetConfigArgsForTests(
+		30*time.Second,   // deltaProgress time.Duration,
+		30*time.Second,   // deltaResend time.Duration,
+		10*time.Second,   // deltaRound time.Duration,
+		20*time.Second,   // deltaGrace time.Duration,
+		20*time.Second,   // deltaStage time.Duration,
+		3,                // rMax uint8,
+		S,                // s []int,
+		oracleIdentities, // oracles []OracleIdentityExtra,
+		median.OffchainConfig{
+			AlphaReportInfinite: false,
+			AlphaReportPPB:      1,
+			AlphaAcceptInfinite: false,
+			AlphaAcceptPPB:      1,
+			DeltaC:              time.Minute * 30,
+		}.Encode(), // reportingPluginConfig []byte,
+		5*time.Second, // maxDurationQuery time.Duration,
+		5*time.Second, // maxDurationObservation time.Duration,
+		5*time.Second, // maxDurationReport time.Duration,
+		5*time.Second, // maxDurationShouldAcceptFinalizedReport time.Duration,
+		5*time.Second, // maxDurationShouldTransmitAcceptedReport time.Duration,
+		1,             // f int,
+		nil,           // The median reporting plugin has an empty onchain config
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return
 }
 
 // CreateJobsForContract Creates and sets up the boostrap jobs as well as OCR jobs
