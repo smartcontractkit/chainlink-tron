@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
@@ -27,7 +28,9 @@ import (
 type TronRelayer struct {
 	services.StateMachine
 
-	id   string
+	chainId    string
+	chainIdNum uint64
+
 	cfg  *TOMLConfig
 	lggr logger.Logger
 
@@ -39,6 +42,21 @@ var _ loop.Relayer = &TronRelayer{}
 
 func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
 	id := *cfg.ChainID
+
+	var idNum uint64
+	if strings.HasPrefix(id, "0x") {
+		i, err := strconv.ParseUint(id[2:], 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse hex chain id %s as uint64: %w", id, err)
+		}
+		idNum = i
+	} else {
+		i, err := strconv.ParseUint(id, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", id, err)
+		}
+		idNum = i
+	}
 
 	nodeConfig, err := cfg.ListNodes().SelectRandom()
 	if err != nil {
@@ -56,11 +74,12 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	})
 
 	return &TronRelayer{
-		id:     id,
-		cfg:    cfg,
-		lggr:   logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
-		client: client,
-		txm:    txmgr,
+		chainId:    id,
+		chainIdNum: idNum,
+		cfg:        cfg,
+		lggr:       logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
+		client:     client,
+		txm:        txmgr,
 	}, nil
 }
 
@@ -106,7 +125,7 @@ func (t *TronRelayer) GetChainStatus(ctx context.Context) (types.ChainStatus, er
 		return types.ChainStatus{}, err
 	}
 	return types.ChainStatus{
-		ID:      t.id,
+		ID:      t.chainId,
 		Enabled: t.cfg.IsEnabled(),
 		Config:  toml,
 	}, nil
@@ -131,7 +150,7 @@ func (t *TronRelayer) listNodeStatuses(start, end int) ([]types.NodeStatus, int,
 	}
 	nodes := t.cfg.Nodes[start:end]
 	for _, node := range nodes {
-		stat, err := nodeStatus(node, t.id)
+		stat, err := nodeStatus(node, t.chainId)
 		if err != nil {
 			return stats, total, err
 		}
@@ -161,16 +180,12 @@ func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfi
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
 	// todo: unmarshal args.RelayConfig into a struct if required
 	reader := reader.NewReader(t.client, t.lggr)
-	chainID, err := strconv.ParseUint(t.id, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)
-	}
 	contractAddress, err := address.Base58ToAddress(args.ContractID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", args.ContractID, err)
 	}
 
-	configProvider, err := ocr2.NewConfigProvider(chainID, contractAddress, reader, t.cfg, t.lggr)
+	configProvider, err := ocr2.NewConfigProvider(t.chainIdNum, contractAddress, reader, t.cfg, t.lggr)
 	if err != nil {
 		return nil, fmt.Errorf("coudln't initialize ConfigProvider: %w", err)
 	}
@@ -183,15 +198,11 @@ func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.Rel
 	// todo: unmarshal args.RelayConfig if required
 
 	reader := reader.NewReader(t.client, t.lggr)
-	chainID, err := strconv.ParseUint(t.id, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse chain id %s as uint64: %w", t.id, err)
-	}
 	contractAddress, err := address.Base58ToAddress(relayargs.ContractID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", relayargs.ContractID, err)
 	}
-	configProvider, err := ocr2.NewConfigProvider(chainID, contractAddress, reader, t.cfg, t.lggr)
+	configProvider, err := ocr2.NewConfigProvider(t.chainIdNum, contractAddress, reader, t.cfg, t.lggr)
 	if err != nil {
 		return nil, fmt.Errorf("coudln't initialize ConfigProvider: %w", err)
 	}
