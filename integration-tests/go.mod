@@ -9,7 +9,6 @@ require (
 	github.com/fbsobreira/gotron-sdk v0.0.0-20230907131216-1e824406fe8c
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
-	github.com/pborman/uuid v1.2.1
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240702120320-563bf07487fe
 	github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer v1.0.0
@@ -18,7 +17,7 @@ require (
 	github.com/smartcontractkit/chainlink/v2 v2.13.0
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/grpc v1.59.0
+	golang.org/x/crypto v0.22.0
 	gopkg.in/guregu/null.v4 v4.0.0
 )
 
@@ -231,6 +230,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc5 // indirect
+	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
@@ -307,7 +307,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
@@ -324,6 +323,7 @@ require (
 	google.golang.org/genproto v0.0.0-20231030173426-d783a09b4405 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231106174013-bbf56f31fb17 // indirect
+	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
@@ -352,7 +352,7 @@ require (
 
 replace (
 	// original author is not maintaining the repo anymore
-	github.com/fbsobreira/gotron-sdk => github.com/yongkangchia/gotron-sdk v0.0.0-20240517030646-947f210686f7
+	github.com/fbsobreira/gotron-sdk => github.com/cfal/gotron-sdk v0.0.0-20240707013539-ba2ce85cff06
 
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
