@@ -102,7 +102,7 @@ func TestReader(t *testing.T) {
 			"GetContractABI",
 			mock.Anything, // address
 		).Return(&mockAbi, nil).Once()
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{{"uint64": "123"}, {"uint64": "456"}})
+		constContractRes, _ := abi.GetPaddedParam([]any{"uint64", "123", "uint64", "456"})
 		mockTxExtention.ConstantResult = [][]byte{constContractRes}
 		grpcClient.On(
 			"TriggerConstantContract",
@@ -113,7 +113,7 @@ func TestReader(t *testing.T) {
 		).Return(&mockTxExtention, nil).Once()
 		reader := reader.NewReader(grpcClient, testLogger)
 
-		res, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		res, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
 		require.NoError(t, err)
 		require.Equal(t, uint64(123), res["a"])
 		require.Equal(t, uint64(456), res["b"])
@@ -124,7 +124,7 @@ func TestReader(t *testing.T) {
 			"GetContractABI",
 			mock.Anything, // address
 		).Return(&mockAbi, nil).Once()
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{{"uint64": "123"}, {"uint64": "456"}})
+		constContractRes, _ := abi.GetPaddedParam([]any{"uint64", "123", "uint64", "456"})
 		mockTxExtention.ConstantResult = [][]byte{constContractRes}
 		grpcClient.On(
 			"TriggerConstantContract",
@@ -135,11 +135,11 @@ func TestReader(t *testing.T) {
 		).Return(&mockTxExtention, nil).Twice()
 		reader := reader.NewReader(grpcClient, testLogger)
 
-		_, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		_, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
 		require.NoError(t, err)
 
 		// should not call GetContractABI again
-		_, err = reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", []map[string]string{})
+		_, err = reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
 		require.NoError(t, err)
 	})
 
@@ -165,10 +165,10 @@ func TestReader(t *testing.T) {
 			"GetContractABI",
 			mock.Anything, // address
 		).Return(&mockAbi, nil).Once()
-		encodedData, _ := abi.GetPaddedParam([]abi.Param{
-			{"uint64": "123"},
-			{"uint64": "456"},
-			{"uint32": "789"},
+		encodedData, _ := abi.GetPaddedParam([]any{
+			"uint64", "123",
+			"uint64", "456",
+			"uint32", "789",
 		})
 		mockTxExtention.Logs = []*core.TransactionInfo_Log{
 			{

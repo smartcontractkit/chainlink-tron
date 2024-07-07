@@ -39,11 +39,12 @@ func TestOCR2Reader(t *testing.T) {
 		configCount := 1
 		blockNumber := 12345
 		configDigest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{
-			{"uint32": strconv.FormatUint(uint64(configCount), 10)},
-			{"uint32": strconv.FormatUint(uint64(blockNumber), 10)},
-			{"bytes32": configDigest},
+		constContractRes, err := abi.GetPaddedParam([]any{
+			"uint32", strconv.FormatUint(uint64(configCount), 10),
+			"uint32", strconv.FormatUint(uint64(blockNumber), 10),
+			"bytes32", configDigest,
 		})
+		require.NoError(t, err)
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&api.TransactionExtention{
 			Result:         &api.Return{Result: true},
@@ -62,13 +63,14 @@ func TestOCR2Reader(t *testing.T) {
 		round := 4
 		latestAnswer := "123456789"
 		latestTimestamp := 87654
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{
-			{"bytes32": configDigest},                                   // configDigest
-			{"uint32": strconv.FormatUint(uint64(epoch), 10)},           // epoch
-			{"uint8": strconv.FormatUint(uint64(round), 10)},            // round
-			{"int192": latestAnswer},                                    // latestAnswer
-			{"uint64": strconv.FormatUint(uint64(latestTimestamp), 10)}, // latestTimestamp
+		constContractRes, err := abi.GetPaddedParam([]any{
+			"bytes32", configDigest, // configDigest
+			"uint32", strconv.FormatUint(uint64(epoch), 10), // epoch
+			"uint8", strconv.FormatUint(uint64(round), 10), // round
+			"int192", latestAnswer, // latestAnswer
+			"uint64", strconv.FormatUint(uint64(latestTimestamp), 10), // latestTimestamp
 		})
+		require.NoError(t, err)
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&api.TransactionExtention{
 			Result:         &api.Return{Result: true},
@@ -90,13 +92,14 @@ func TestOCR2Reader(t *testing.T) {
 		startedAt := 87654
 		updatedAt := 87666
 		answeredInRound := 1
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{
-			{"uint80": strconv.FormatUint(uint64(roundId), 10)},
-			{"int256": answer},
-			{"uint256": strconv.FormatUint(uint64(startedAt), 10)},
-			{"uint256": strconv.FormatUint(uint64(updatedAt), 10)},
-			{"uint80": strconv.FormatUint(uint64(answeredInRound), 10)},
+		constContractRes, err := abi.GetPaddedParam([]any{
+			"uint80", strconv.FormatUint(uint64(roundId), 10),
+			"int256", answer,
+			"uint256", strconv.FormatUint(uint64(startedAt), 10),
+			"uint256", strconv.FormatUint(uint64(updatedAt), 10),
+			"uint80", strconv.FormatUint(uint64(answeredInRound), 10),
 		})
+		require.NoError(t, err)
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&api.TransactionExtention{
 			Result:         &api.Return{Result: true},
@@ -113,9 +116,10 @@ func TestOCR2Reader(t *testing.T) {
 
 	t.Run("LinkAvailableForPayment", func(t *testing.T) {
 		availableBalance := "123456789"
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{
-			{"int256": availableBalance},
+		constContractRes, err := abi.GetPaddedParam([]any{
+			"int256", availableBalance,
 		})
+		require.NoError(t, err)
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&api.TransactionExtention{
 			Result:         &api.Return{Result: true},
@@ -133,13 +137,14 @@ func TestOCR2Reader(t *testing.T) {
 		observationPaymentGjuels := 567
 		transmissionPaymentGjuels := 789
 		accountingGas := 111
-		constContractRes, _ := abi.GetPaddedParam([]abi.Param{
-			{"uint32": strconv.FormatUint(uint64(maximumGasPriceGwei), 10)},
-			{"uint32": strconv.FormatUint(uint64(reasonableGasPriceGwei), 10)},
-			{"uint32": strconv.FormatUint(uint64(observationPaymentGjuels), 10)},
-			{"uint32": strconv.FormatUint(uint64(transmissionPaymentGjuels), 10)},
-			{"uint32": strconv.FormatUint(uint64(accountingGas), 10)},
+		constContractRes, err := abi.GetPaddedParam([]any{
+			"uint32", strconv.FormatUint(uint64(maximumGasPriceGwei), 10),
+			"uint32", strconv.FormatUint(uint64(reasonableGasPriceGwei), 10),
+			"uint32", strconv.FormatUint(uint64(observationPaymentGjuels), 10),
+			"uint32", strconv.FormatUint(uint64(transmissionPaymentGjuels), 10),
+			"uint32", strconv.FormatUint(uint64(accountingGas), 10),
 		})
+		require.NoError(t, err)
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
 		grpcClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&api.TransactionExtention{
 			Result:         &api.Return{Result: true},
@@ -162,17 +167,18 @@ func TestOCR2Reader(t *testing.T) {
 		onchainConfig := []byte{8, 9, 10, 11}
 		offchainConfigVersion := 2
 		offchainConfig := []byte{12, 13, 14, 15}
-		encodedData, _ := abi.GetPaddedParam([]abi.Param{
-			{"uint32": strconv.FormatUint(uint64(prevConfigBlockNumber), 10)},
-			{"bytes32": configDigest},
-			{"uint64": strconv.FormatUint(uint64(configCount), 10)},
-			{"address[]": signers},
-			{"address[]": transmitters},
-			{"uint8": strconv.FormatUint(uint64(f), 10)},
-			{"bytes": onchainConfig},
-			{"uint64": strconv.FormatUint(uint64(offchainConfigVersion), 10)},
-			{"bytes": offchainConfig},
+		encodedData, err := abi.GetPaddedParam([]any{
+			"uint32", strconv.FormatUint(uint64(prevConfigBlockNumber), 10),
+			"bytes32", configDigest,
+			"uint64", strconv.FormatUint(uint64(configCount), 10),
+			"address[]", signers,
+			"address[]", transmitters,
+			"uint8", strconv.FormatUint(uint64(f), 10),
+			"bytes", onchainConfig,
+			"uint64", strconv.FormatUint(uint64(offchainConfigVersion), 10),
+			"bytes", offchainConfig,
 		})
+		require.NoError(t, err)
 		grpcClient.On("GetBlockByNum", mock.Anything).Return(&api.BlockExtention{
 			BlockHeader: &core.BlockHeader{
 				RawData: &core.BlockHeaderRaw{
