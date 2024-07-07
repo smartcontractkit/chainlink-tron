@@ -87,20 +87,14 @@ func TestOCRBasic(t *testing.T) {
 
 	blockId := blockInfo.Blockid
 
-	// TODO: check the config on mainnet
+	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
+	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
 	//
-	// previously, we did:
-	//
-	// chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
-	//
-	// .. which is what the compat eth_chainId returns - however the config digest is calculated using block.chainid onchain, see
-	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L273
-	//
-	// depending on if this config is enabled, this is either the entire genesis block id, or the last 4 bytes. on devnet,
-	// this is currently the full block id.
-	//
-	// ref: https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
-	chainId := "0x" + hex.EncodeToString(blockId)
+	// however on both mainnet, testnets committee.allowOptimizedReturnValueOfChainId is enabled, so we've done the same for devnet
+	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
+	// is important for the config digest calculation:
+	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
+	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
 
 	logger.Info().Str("chain id", chainId).Msg("Read first block")
 
