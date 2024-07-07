@@ -50,8 +50,8 @@ func NewOCRContractTransmitter(
 func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.ReportContext, report ocrtypes.Report, signatures []ocrtypes.AttributedOnchainSignature) error {
 	rawReportCtx := evmutil.RawReportContext(reportCtx)
 
-	var rs [][]byte
-	var ss [][]byte
+	var rs [][32]byte
+	var ss [][32]byte
 	var vs [32]byte
 	if len(signatures) > 32 {
 		return errors.New("too many signatures, maximum is 32")
@@ -61,8 +61,8 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		if err != nil {
 			panic("eventTransmit(ev): error in SplitSignature")
 		}
-		rs = append(rs, r[:])
-		ss = append(ss, s[:])
+		rs = append(rs, r)
+		ss = append(ss, s)
 		vs[i] = v
 	}
 
