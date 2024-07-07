@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -70,16 +69,12 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress)
 
 	// build params
-	reportStr := "0x" + hex.EncodeToString(report)
-	rsStr := relayer.ByteArrayToStr(rs)
-	ssStr := relayer.ByteArrayToStr(ss)
-	vsStr := "0x" + hex.EncodeToString(vs[:])
 	params := []any{
 		"bytes32[3]", rawReportCtx,
-		"bytes", reportStr,
-		"bytes32[]", rsStr,
-		"bytes32[]", ssStr,
-		"bytes32", vsStr,
+		"bytes", []byte(report),
+		"bytes32[]", rs,
+		"bytes32[]", ss,
+		"bytes32", vs,
 	}
 
 	return oc.txm.Enqueue(oc.senderAddress.String(), oc.contractAddress.String(), "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
