@@ -3,7 +3,6 @@ package reader
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 
 	tronabi "github.com/fbsobreira/gotron-sdk/pkg/abi"
@@ -18,7 +17,7 @@ import (
 
 //go:generate mockery --name Reader --output ../mocks/
 type Reader interface {
-	CallContract(tronaddress.Address, string, []map[string]string) (map[string]interface{}, error)
+	CallContract(address tronaddress.Address, method string, params []any) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
 	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
@@ -62,18 +61,7 @@ func (c *ReaderClient) getContractABI(address tronaddress.Address) (abi *core.Sm
 	return
 }
 
-func (c *ReaderClient) CallContract(address tronaddress.Address, method string, params []map[string]string) (result map[string]interface{}, err error) {
-	// parse params if defined
-	paramsJsonStr := ""
-	if len(params) > 0 {
-		paramsJsonBytes, err := json.Marshal(params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal params: %+w", err)
-		}
-
-		paramsJsonStr = string(paramsJsonBytes)
-	}
-
+func (c *ReaderClient) CallContract(address tronaddress.Address, method string, params []any) (result map[string]interface{}, err error) {
 	// get contract abi
 	abi, err := c.getContractABI(address)
 	if err != nil {
@@ -91,7 +79,7 @@ func (c *ReaderClient) CallContract(address tronaddress.Address, method string, 
 		/* from= */ sdk.TRON_ZERO_ADDR_B58,
 		/* contractAddress= */ address.String(),
 		/* method= */ methodSignature,
-		/* jsonString= */ paramsJsonStr,
+		/* params= */ params,
 	)
 	if err != nil {
 		return result, fmt.Errorf("failed to call triggerconstantcontract: %w", err)

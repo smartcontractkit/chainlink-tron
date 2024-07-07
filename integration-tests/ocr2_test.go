@@ -204,7 +204,7 @@ func TestOCRBasic(t *testing.T) {
 	require.NoError(t, err)
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*30)
 
-	balanceResponse, err := grpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", utils.MustMarshalParams(t, "address", ocr2AggregatorAddress))
+	balanceResponse, err := grpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
 	require.NoError(t, err)
 	balanceValue := new(big.Int).SetBytes(balanceResponse.ConstantResult[0])
 	require.Equal(t, balanceValue, mintAmount)
@@ -250,7 +250,7 @@ func TestOCRBasic(t *testing.T) {
 
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*30)
 
-	configDetailsResponse, err := grpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", "")
+	configDetailsResponse, err := grpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", nil)
 	require.NoError(t, err)
 
 	configCount := new(big.Int).SetBytes(configDetailsResponse.ConstantResult[0][0:32])

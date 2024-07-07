@@ -68,25 +68,25 @@ func (_m *GrpcClient) DeployContract(from string, contractName string, abi *core
 	return r0, r1
 }
 
-// EstimateEnergy provides a mock function with given fields: from, contractAddress, method, jsonString, tAmount, tTokenID, tTokenAmount
-func (_m *GrpcClient) EstimateEnergy(from string, contractAddress string, method string, jsonString string, tAmount int64, tTokenID string, tTokenAmount int64) (*api.EstimateEnergyMessage, error) {
-	ret := _m.Called(from, contractAddress, method, jsonString, tAmount, tTokenID, tTokenAmount)
+// EstimateEnergy provides a mock function with given fields: from, contractAddress, method, params, tAmount, tTokenID, tTokenAmount
+func (_m *GrpcClient) EstimateEnergy(from string, contractAddress string, method string, params []interface{}, tAmount int64, tTokenID string, tTokenAmount int64) (*api.EstimateEnergyMessage, error) {
+	ret := _m.Called(from, contractAddress, method, params, tAmount, tTokenID, tTokenAmount)
 
 	var r0 *api.EstimateEnergyMessage
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, string, int64) (*api.EstimateEnergyMessage, error)); ok {
-		return rf(from, contractAddress, method, jsonString, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}, int64, string, int64) (*api.EstimateEnergyMessage, error)); ok {
+		return rf(from, contractAddress, method, params, tAmount, tTokenID, tTokenAmount)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, string, int64) *api.EstimateEnergyMessage); ok {
-		r0 = rf(from, contractAddress, method, jsonString, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}, int64, string, int64) *api.EstimateEnergyMessage); ok {
+		r0 = rf(from, contractAddress, method, params, tAmount, tTokenID, tTokenAmount)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*api.EstimateEnergyMessage)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string, int64, string, int64) error); ok {
-		r1 = rf(from, contractAddress, method, jsonString, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(1).(func(string, string, string, []interface{}, int64, string, int64) error); ok {
+		r1 = rf(from, contractAddress, method, params, tAmount, tTokenID, tTokenAmount)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -249,25 +249,25 @@ func (_m *GrpcClient) Stop() {
 	_m.Called()
 }
 
-// TriggerConstantContract provides a mock function with given fields: from, contractAddress, method, jsonString
-func (_m *GrpcClient) TriggerConstantContract(from string, contractAddress string, method string, jsonString string) (*api.TransactionExtention, error) {
-	ret := _m.Called(from, contractAddress, method, jsonString)
+// TriggerConstantContract provides a mock function with given fields: from, contractAddress, method, params
+func (_m *GrpcClient) TriggerConstantContract(from string, contractAddress string, method string, params []interface{}) (*api.TransactionExtention, error) {
+	ret := _m.Called(from, contractAddress, method, params)
 
 	var r0 *api.TransactionExtention
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) (*api.TransactionExtention, error)); ok {
-		return rf(from, contractAddress, method, jsonString)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}) (*api.TransactionExtention, error)); ok {
+		return rf(from, contractAddress, method, params)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string) *api.TransactionExtention); ok {
-		r0 = rf(from, contractAddress, method, jsonString)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}) *api.TransactionExtention); ok {
+		r0 = rf(from, contractAddress, method, params)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*api.TransactionExtention)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string) error); ok {
-		r1 = rf(from, contractAddress, method, jsonString)
+	if rf, ok := ret.Get(1).(func(string, string, string, []interface{}) error); ok {
+		r1 = rf(from, contractAddress, method, params)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -275,25 +275,25 @@ func (_m *GrpcClient) TriggerConstantContract(from string, contractAddress strin
 	return r0, r1
 }
 
-// TriggerContract provides a mock function with given fields: from, contractAddress, method, jsonString, feeLimit, tAmount, tTokenID, tTokenAmount
-func (_m *GrpcClient) TriggerContract(from string, contractAddress string, method string, jsonString string, feeLimit int64, tAmount int64, tTokenID string, tTokenAmount int64) (*api.TransactionExtention, error) {
-	ret := _m.Called(from, contractAddress, method, jsonString, feeLimit, tAmount, tTokenID, tTokenAmount)
+// TriggerContract provides a mock function with given fields: from, contractAddress, method, params, feeLimit, tAmount, tTokenID, tTokenAmount
+func (_m *GrpcClient) TriggerContract(from string, contractAddress string, method string, params []interface{}, feeLimit int64, tAmount int64, tTokenID string, tTokenAmount int64) (*api.TransactionExtention, error) {
+	ret := _m.Called(from, contractAddress, method, params, feeLimit, tAmount, tTokenID, tTokenAmount)
 
 	var r0 *api.TransactionExtention
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, int64, string, int64) (*api.TransactionExtention, error)); ok {
-		return rf(from, contractAddress, method, jsonString, feeLimit, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}, int64, int64, string, int64) (*api.TransactionExtention, error)); ok {
+		return rf(from, contractAddress, method, params, feeLimit, tAmount, tTokenID, tTokenAmount)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, int64, int64, string, int64) *api.TransactionExtention); ok {
-		r0 = rf(from, contractAddress, method, jsonString, feeLimit, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(0).(func(string, string, string, []interface{}, int64, int64, string, int64) *api.TransactionExtention); ok {
+		r0 = rf(from, contractAddress, method, params, feeLimit, tAmount, tTokenID, tTokenAmount)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*api.TransactionExtention)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string, int64, int64, string, int64) error); ok {
-		r1 = rf(from, contractAddress, method, jsonString, feeLimit, tAmount, tTokenID, tTokenAmount)
+	if rf, ok := ret.Get(1).(func(string, string, string, []interface{}, int64, int64, string, int64) error); ok {
+		r1 = rf(from, contractAddress, method, params, feeLimit, tAmount, tTokenID, tTokenAmount)
 	} else {
 		r1 = ret.Error(1)
 	}

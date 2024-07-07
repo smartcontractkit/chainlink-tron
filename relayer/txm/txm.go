@@ -3,7 +3,6 @@ package txm
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -100,20 +99,18 @@ func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ..
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	encodedParams := make([]map[string]any, 0)
 	if len(params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
 	for i := 0; i < len(params); i += 2 {
 		paramType := params[i]
-		paramTypeStr, ok := paramType.(string)
+		_, ok := paramType.(string)
 		if !ok {
 			return fmt.Errorf("non-string param type")
 		}
-		encodedParams = append(encodedParams, map[string]any{paramTypeStr: params[i+1]})
 	}
 
-	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: encodedParams, Attempt: 1}
+	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: params, Attempt: 1}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -165,16 +162,7 @@ func (t *TronTxm) broadcastLoop() {
 }
 
 func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.TransactionExtention, error) {
-	// TODO: consider calling GrpcClient.Client.TriggerContract directly to avoid
-	// the extra marshal/unmarshal steps.
-	paramsJsonBytes, err := json.Marshal(tx.Params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal params: %+w", err)
-	}
-
-	paramsJsonStr := string(paramsJsonBytes)
-
-	energyUsed, err := t.estimateEnergy(tx, paramsJsonStr)
+	energyUsed, err := t.estimateEnergy(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate energy: %+w", err)
 	}
@@ -200,7 +188,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 		tx.FromAddress,
 		tx.ContractAddress,
 		tx.Method,
-		paramsJsonStr,
+		tx.Params,
 		paddedFeeLimit,
 		/* tAmount= (TRX amount) */ 0,
 		/* tTokenID= (TRC10 token id) */ "",
@@ -380,14 +368,14 @@ func (t *TronTxm) InflightCount() (int, int) {
 	return len(t.BroadcastChan), t.AccountStore.GetTotalInflightCount()
 }
 
-func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error) {
+func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 
 	if t.EstimateEnergyEnabled {
 		estimateEnergyMessage, err := t.GetClient().EstimateEnergy(
 			tx.FromAddress,
 			tx.ContractAddress,
 			tx.Method,
-			paramsJsonStr,
+			tx.Params,
 			/* tAmount= */ 0,
 			/* tTokenID= */ "",
 			/* tTokenAmount= */ 0,
@@ -407,7 +395,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx, paramsJsonStr string) (int64, error
 	}
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
-	estimateTxExtention, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, paramsJsonStr)
+	estimateTxExtention, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)

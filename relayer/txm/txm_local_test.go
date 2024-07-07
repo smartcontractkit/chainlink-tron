@@ -97,7 +97,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address
 	// prefix.
 	zeroAddress := "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
-	txExtention, err := txmgr.GetClient().TriggerConstantContract(zeroAddress, contractAddress, "count()", "")
+	txExtention, err := txmgr.GetClient().TriggerConstantContract(zeroAddress, contractAddress, "count()", nil)
 	require.NoError(t, err)
 
 	constantResult := txExtention.ConstantResult

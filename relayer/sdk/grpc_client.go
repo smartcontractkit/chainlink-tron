@@ -25,11 +25,11 @@ type GrpcClient interface {
 		feeLimit, curPercent, oeLimit int64,
 	) (*api.TransactionExtention, error)
 	Broadcast(tx *core.Transaction) (*api.Return, error)
-	EstimateEnergy(from, contractAddress, method, jsonString string,
+	EstimateEnergy(from, contractAddress, method string, params []any,
 		tAmount int64, tTokenID string, tTokenAmount int64) (*api.EstimateEnergyMessage, error)
-	TriggerContract(from, contractAddress, method, jsonString string,
+	TriggerContract(from, contractAddress, method string, params []any,
 		feeLimit, tAmount int64, tTokenID string, tTokenAmount int64) (*api.TransactionExtention, error)
-	TriggerConstantContract(from, contractAddress, method, jsonString string) (*api.TransactionExtention, error)
+	TriggerConstantContract(from, contractAddress, method string, params []any) (*api.TransactionExtention, error)
 	GetNowBlock() (*api.BlockExtention, error)
 	GetContractABI(address string) (*core.SmartContract_ABI, error)
 	GetBlockByNum(num int64) (*api.BlockExtention, error)

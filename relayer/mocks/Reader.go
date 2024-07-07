@@ -30,25 +30,25 @@ func (_m *Reader) BaseClient() sdk.GrpcClient {
 	return r0
 }
 
-// CallContract provides a mock function with given fields: _a0, _a1, _a2
-func (_m *Reader) CallContract(_a0 address.Address, _a1 string, _a2 []map[string]string) (map[string]interface{}, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// CallContract provides a mock function with given fields: _a0, method, params
+func (_m *Reader) CallContract(_a0 address.Address, method string, params []interface{}) (map[string]interface{}, error) {
+	ret := _m.Called(_a0, method, params)
 
 	var r0 map[string]interface{}
 	var r1 error
-	if rf, ok := ret.Get(0).(func(address.Address, string, []map[string]string) (map[string]interface{}, error)); ok {
-		return rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(address.Address, string, []interface{}) (map[string]interface{}, error)); ok {
+		return rf(_a0, method, params)
 	}
-	if rf, ok := ret.Get(0).(func(address.Address, string, []map[string]string) map[string]interface{}); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(address.Address, string, []interface{}) map[string]interface{}); ok {
+		r0 = rf(_a0, method, params)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]interface{})
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(address.Address, string, []map[string]string) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(address.Address, string, []interface{}) error); ok {
+		r1 = rf(_a0, method, params)
 	} else {
 		r1 = ret.Error(1)
 	}
