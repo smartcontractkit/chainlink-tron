@@ -3,6 +3,7 @@ package ocr2_test
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"strconv"
 	"testing"
 
@@ -38,7 +39,10 @@ func TestOCR2Reader(t *testing.T) {
 	t.Run("LatestConfigDetails", func(t *testing.T) {
 		configCount := 1
 		blockNumber := 12345
-		configDigest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+		configDigestBytes, err := hex.DecodeString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+		require.NoError(t, err)
+		configDigest := [32]byte{}
+		copy(configDigest[:], configDigestBytes)
 		constContractRes, err := abi.GetPaddedParam([]any{
 			"uint32", strconv.FormatUint(uint64(configCount), 10),
 			"uint32", strconv.FormatUint(uint64(blockNumber), 10),
@@ -54,11 +58,14 @@ func TestOCR2Reader(t *testing.T) {
 		res, err := ocr2Reader.LatestConfigDetails(context.TODO(), nil)
 		require.NoError(t, err)
 		require.Equal(t, uint64(blockNumber), res.Block)
-		require.Equal(t, configDigest, res.Digest.String())
+		require.Equal(t, types.ConfigDigest(configDigest), res.Digest)
 	})
 
 	t.Run("LatestTransmissionDetails", func(t *testing.T) {
-		configDigest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+		configDigestBytes, err := hex.DecodeString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+		require.NoError(t, err)
+		configDigest := [32]byte{}
+		copy(configDigest[:], configDigestBytes)
 		epoch := 1
 		round := 4
 		latestAnswer := "123456789"
@@ -79,7 +86,7 @@ func TestOCR2Reader(t *testing.T) {
 
 		res, err := ocr2Reader.LatestTransmissionDetails(context.TODO(), nil)
 		require.NoError(t, err)
-		require.Equal(t, configDigest, res.Digest.String())
+		require.Equal(t, types.ConfigDigest(configDigest), res.Digest)
 		require.Equal(t, uint32(epoch), res.Epoch)
 		require.Equal(t, uint8(round), res.Round)
 		require.Equal(t, latestAnswer, res.LatestAnswer.String())
@@ -159,10 +166,13 @@ func TestOCR2Reader(t *testing.T) {
 
 	t.Run("ConfigFromEventAt", func(t *testing.T) {
 		prevConfigBlockNumber := 12344
-		configDigest := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+		configDigestBytes, err := hex.DecodeString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+		require.NoError(t, err)
+		configDigest := [32]byte{}
+		copy(configDigest[:], configDigestBytes)
 		configCount := 1
-		signers := []interface{}{sdk.TRON_ZERO_ADDR_B58}
-		transmitters := []interface{}{sdk.TRON_ZERO_ADDR_B58}
+		signers := []string{sdk.TRON_ZERO_ADDR_B58}
+		transmitters := []string{sdk.TRON_ZERO_ADDR_B58}
 		f := 3
 		onchainConfig := []byte{8, 9, 10, 11}
 		offchainConfigVersion := 2
