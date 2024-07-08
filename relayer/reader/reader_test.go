@@ -10,9 +10,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
@@ -140,5 +142,60 @@ func TestReader(t *testing.T) {
 		// should not call GetContractABI again
 		_, err = reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
 		require.NoError(t, err)
+	})
+
+	t.Run("GetEventLogsFromBlock", func(t *testing.T) {
+		mockAbi.Entrys = append(mockAbi.Entrys, &core.SmartContract_ABI_Entry{
+			Name: "event",
+			Inputs: []*core.SmartContract_ABI_Entry_Param{
+				{
+					Name: "a",
+					Type: "uint64",
+				},
+				{
+					Name: "b",
+					Type: "uint64",
+				},
+				{
+					Name: "c",
+					Type: "uint32",
+				},
+			},
+		})
+		grpcClient.On(
+			"GetContractABI",
+			mock.Anything, // address
+		).Return(&mockAbi, nil).Once()
+		triggerSmartContractParam, _ := anypb.New(&core.TriggerSmartContract{ContractAddress: []byte{0, 1, 2, 3}})
+		triggerSmartContractParam.TypeUrl = "type.googleapis.com/protocol.TriggerSmartContract"
+		mockBlockExtention.Transactions[0].Transaction.RawData.Contract = []*core.Transaction_Contract{
+			{Parameter: triggerSmartContractParam},
+		}
+		grpcClient.On(
+			"GetBlockByNum",
+			mock.Anything, // ctx
+		).Return(&mockBlockExtention, nil).Once()
+		encodedData, _ := abi.GetPaddedParam([]any{
+			"uint64", "123",
+			"uint64", "456",
+			"uint32", "789",
+		})
+		grpcClient.On("GetTransactionInfoByID", mock.Anything).Return(&core.TransactionInfo{
+			Log: []*core.TransactionInfo_Log{
+				{
+					Address: []byte{0, 1, 2, 3},
+					Topics:  [][]byte{relayer.GetEventTopicHash("event(uint64,uint64,uint32)")},
+					Data:    encodedData,
+				},
+			},
+		}, nil)
+		reader := reader.NewReader(grpcClient, testLogger)
+
+		events, err := reader.GetEventsFromBlock(address.Address{0, 1, 2, 3}, "event", 1)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		require.Equal(t, uint64(123), events[0]["a"])
+		require.Equal(t, uint64(456), events[0]["b"])
+		require.Equal(t, uint32(789), events[0]["c"])
 	})
 }

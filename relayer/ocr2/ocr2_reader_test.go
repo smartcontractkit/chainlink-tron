@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -166,7 +167,8 @@ func TestOCR2Reader(t *testing.T) {
 
 	t.Run("ConfigFromEventAt", func(t *testing.T) {
 		prevConfigBlockNumber := 12344
-		configDigestBytes, err := hex.DecodeString("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+		configDigestHex := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+		configDigestBytes, err := hex.DecodeString(configDigestHex)
 		require.NoError(t, err)
 		configDigest := [32]byte{}
 		copy(configDigest[:], configDigestBytes)
@@ -189,6 +191,9 @@ func TestOCR2Reader(t *testing.T) {
 			"bytes", offchainConfig,
 		})
 		require.NoError(t, err)
+		param := &core.TriggerSmartContract{ContractAddress: []byte{0, 1, 2, 3}}
+		anyParam, _ := anypb.New(param)
+		anyParam.TypeUrl = "type.googleapis.com/protocol.TriggerSmartContract"
 		grpcClient.On("GetBlockByNum", mock.Anything).Return(&api.BlockExtention{
 			BlockHeader: &core.BlockHeader{
 				RawData: &core.BlockHeaderRaw{
@@ -196,14 +201,19 @@ func TestOCR2Reader(t *testing.T) {
 				},
 			},
 			Transactions: []*api.TransactionExtention{
-				{
-					Logs: []*core.TransactionInfo_Log{
-						{
-							Address: []byte{0, 1, 2, 3},
-							Topics:  [][]byte{relayer.GetEventTopicHash("ConfigSet(uint32,bytes32,uint64,address[],address[],uint8,bytes,uint64,bytes)")},
-							Data:    encodedData,
-						},
+				{Transaction: &core.Transaction{
+					RawData: &core.TransactionRaw{
+						Contract: []*core.Transaction_Contract{{Parameter: anyParam}},
 					},
+				}},
+			},
+		}, nil)
+		grpcClient.On("GetTransactionInfoByID", mock.Anything).Return(&core.TransactionInfo{
+			Log: []*core.TransactionInfo_Log{
+				{
+					Address: []byte{0, 1, 2, 3},
+					Topics:  [][]byte{relayer.GetEventTopicHash("ConfigSet(uint32,bytes32,uint64,address[],address[],uint8,bytes,uint64,bytes)")},
+					Data:    encodedData,
 				},
 			},
 		}, nil)
@@ -211,10 +221,10 @@ func TestOCR2Reader(t *testing.T) {
 		res, err := ocr2Reader.ConfigFromEventAt(context.TODO(), []byte{0, 1, 2, 3}, 12345)
 		require.NoError(t, err)
 		require.Equal(t, uint64(12345), res.ConfigBlock)
-		require.Equal(t, configDigest, res.Config.ConfigDigest.Hex())
+		require.Equal(t, configDigestHex, res.Config.ConfigDigest.Hex())
 		require.Equal(t, uint64(configCount), res.Config.ConfigCount)
 		require.Equal(t, []types.OnchainPublicKey{bytes.Repeat([]byte{0}, 20)}, res.Config.Signers)
-		require.Equal(t, []types.Account{"0x0000000000000000000000000000000000000000"}, res.Config.Transmitters)
+		require.Equal(t, []types.Account{sdk.TRON_ZERO_ADDR_B58}, res.Config.Transmitters)
 		require.Equal(t, uint8(f), res.Config.F)
 		require.Equal(t, onchainConfig, res.Config.OnchainConfig)
 		require.Equal(t, uint64(offchainConfigVersion), res.Config.OffchainConfigVersion)
