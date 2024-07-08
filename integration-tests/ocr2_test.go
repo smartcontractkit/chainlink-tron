@@ -167,7 +167,7 @@ func TestOCRBasic(t *testing.T) {
 	linkTokenAddress := deployContract("LinkToken", linkTokenArtifact, nil)
 	logger.Info().Str("address", linkTokenAddress).Msg("Link token contract deployed")
 
-	readAccessControllerArtifact := contract.MustLoadArtifact(t, "datafeeds-v0.6/SimpleReadAccessController.json")
+	readAccessControllerArtifact := contract.MustLoadArtifact(t, "ocr2-v0.8/SimpleReadAccessController.json")
 	billingAccessControllerAddress := deployContract("SimpleReadAccessController", readAccessControllerArtifact, nil)
 	logger.Info().Str("address", billingAccessControllerAddress).Msg("Billing access controller deployed")
 	requesterAccessControllerAddress := deployContract("SimpleReadAccessController", readAccessControllerArtifact, nil)
@@ -180,7 +180,7 @@ func TestOCRBasic(t *testing.T) {
 	// TODO: check default for decimals
 	decimals := uint8(9)
 	description := "Test OCR2 Aggregator"
-	ocr2AggregatorArtifact := contract.MustLoadArtifact(t, "datafeeds-v0.6/OCR2Aggregator.json")
+	ocr2AggregatorArtifact := contract.MustLoadArtifact(t, "ocr2-v0.8/OCR2Aggregator.json")
 	ocr2AggregatorAddress := deployContract("OCR2Aggregator", ocr2AggregatorArtifact, []interface{}{
 		utils.MustConvertToEthAddress(t, linkTokenAddress),
 		minAnswer,
@@ -192,7 +192,7 @@ func TestOCRBasic(t *testing.T) {
 	})
 	logger.Info().Str("address", ocr2AggregatorAddress).Msg("OCR2 aggregator deployed")
 
-	eacAggregatorProxyArtifact := contract.MustLoadArtifact(t, "datafeeds-v0.6/EACAggregatorProxy.json")
+	eacAggregatorProxyArtifact := contract.MustLoadArtifact(t, "ocr2-v0.6/EACAggregatorProxy.json")
 	// TODO: check constructor args
 	eacAggregatorProxyAddress := deployContract("EACAggregatorProxy", eacAggregatorProxyArtifact, []interface{}{
 		utils.MustConvertToEthAddress(t, ocr2AggregatorAddress),
