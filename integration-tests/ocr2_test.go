@@ -130,13 +130,24 @@ func TestOCRBasic(t *testing.T) {
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
 		for {
 			accountInfo, err := grpcClient.GetAccount(nodeAddr)
-			require.NoError(t, err)
+			if err != nil {
+				// do not error on 'account not found' - this occurs when there is no account info (transfer hasnt executed yet)
+				if err.Error() == "account not found" {
+					time.Sleep(time.Second)
+					continue
+				}
+				logger.Error().Str("address", nodeAddr).Err(err)
+				t.Fatal("failed to get account info")
+			}
 
 			if accountInfo.Balance != transferAmount {
-				if time.Since(startTime).Seconds() > 30 {
-					t.Fatal("failed to fund nodes in time")
-				}
 				time.Sleep(time.Second)
+				continue
+			}
+
+			// timeout
+			if time.Since(startTime).Seconds() > 30 {
+				t.Fatal("failed to fund nodes in time")
 			}
 			break
 		}
