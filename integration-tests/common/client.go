@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
@@ -68,29 +66,6 @@ func (cc *ChainlinkClient) GetNodeAddresses() []string {
 		addresses = append(addresses, nodeKey.TXKey.Data.ID)
 	}
 	return addresses
-}
-
-func (cc *ChainlinkClient) LoadOCR2Config(proposalId string) (*OCR2Config, error) {
-	var offChainKeys []string
-	var onChainKeys []string
-	var peerIds []string
-	var cfgKeys []string
-	for _, key := range cc.NodeKeys {
-		offChainKeys = append(offChainKeys, key.OCR2Key.Data.Attributes.OffChainPublicKey)
-		peerIds = append(peerIds, key.PeerID)
-		onChainKeys = append(onChainKeys, key.OCR2Key.Data.Attributes.OnChainPublicKey)
-		cfgKeys = append(cfgKeys, key.OCR2Key.Data.Attributes.ConfigPublicKey)
-	}
-	var payload = TestOCR2Config
-	payload.ProposalId = proposalId
-	payload.Signers = onChainKeys
-	addresses := cc.GetNodeAddresses()
-	payload.Transmitters = addresses
-	payload.Payees = addresses // Set payees to same addresses as transmitters
-	payload.OffchainConfig.OffchainPublicKeys = offChainKeys
-	payload.OffchainConfig.PeerIds = peerIds
-	payload.OffchainConfig.ConfigPublicKeys = cfgKeys
-	return &payload, nil
 }
 
 func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
@@ -308,16 +283,4 @@ func connectChainlinkNodes(e *environment.Environment) ([]*client.ChainlinkClien
 func parseHostname(s string) string {
 	r := regexp.MustCompile(`://(?P<Host>.*):`)
 	return r.FindStringSubmatch(s)[1]
-}
-
-func createNodeAddress(publicKeyHex string) string {
-	publicKeyBytes, err := hex.DecodeString(publicKeyHex)
-	if err != nil {
-		panic(err)
-	}
-	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		panic(err)
-	}
-	return address.PubkeyToAddress(*publicKey).String()
 }
