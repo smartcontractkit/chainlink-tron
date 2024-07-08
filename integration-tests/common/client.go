@@ -37,7 +37,7 @@ type ChainlinkClient struct {
 
 var _ ChainlinkClient = ChainlinkClient{bTypeAttr: nil} // fix "field `bTypeAttr` is unused" lint
 
-// CreateKeys Creates node keys and defines chain and nodes for each node
+// NewChainlinkClient creates node keys and defines chain and nodes for each node
 func NewChainlinkClient(env *environment.Environment, nodeName string, chainId string) (*ChainlinkClient, error) {
 	nodes, err := connectChainlinkNodes(env)
 	if err != nil {

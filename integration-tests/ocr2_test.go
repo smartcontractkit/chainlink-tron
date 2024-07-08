@@ -121,12 +121,14 @@ func TestOCRBasic(t *testing.T) {
 	var transferAmount int64 = 1000000 * 1000
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
 		transferTx, err := grpcClient.Transfer(genesisAddress, nodeAddr, transferAmount)
-		require.NoError(t, err)
+		require.NoError(t, err, "Creation of Transfer Txn from genesis account to node failed")
 		_, err = txmgr.SignAndBroadcast(context.Background(), genesisAddress, transferTx)
-		require.NoError(t, err)
+		require.NoError(t, err, "Broadcast of Transfer Txn from genesis account to node failed")
 	}
 
 	startTime := time.Now()
+
+	// Check that the nodes have been funded
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
 		for {
 			accountInfo, err := grpcClient.GetAccount(nodeAddr)
