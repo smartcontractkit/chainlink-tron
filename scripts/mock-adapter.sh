@@ -2,7 +2,9 @@
 
 set -euo pipefail
 
-cache_path="$(cd "$(dirname -- "$0")/../.local-mock-server" && pwd)"
+local_mock_server_path="$(cd "$(dirname -- "$0")/../" && pwd)/.local-mock-server"
+mkdir -p "$local_mock_server_path"
+cache_path="$(cd "$local_mock_server_path" && pwd)"
 binary_name="dummy-external-adapter"
 binary_path="${cache_path}/bin/${binary_name}"
 
