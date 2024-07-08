@@ -15,7 +15,7 @@ import (
 func GetTestLogger(t *testing.T) zerolog.Logger {
 	lvlStr := os.Getenv(envConf.EnvVarLogLevel)
 	if lvlStr == "" {
-		lvlStr = "info"
+		lvlStr = "debug"
 	}
 	lvl, err := zerolog.ParseLevel(lvlStr)
 	require.NoError(t, err, "error parsing log level")
