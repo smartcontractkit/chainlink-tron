@@ -118,6 +118,9 @@ ChainID = '%s'
 Name = 'primary'
 URL = '%s'
 
+[Log]
+Level = 'debug'
+
 [OCR2]
 Enabled = true
 
