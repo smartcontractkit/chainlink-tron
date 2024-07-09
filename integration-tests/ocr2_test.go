@@ -386,37 +386,34 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 		logger.Info().Msg(fmt.Sprintf("Transmission Details: %+v", current))
 
 		// validate epoch/round/timestamp increasing
+		if current.Epoch < previous.Epoch || (current.Epoch == previous.Epoch && current.Round < previous.Round) {
+			logger.Error().Msg(fmt.Sprintf("Epoch/Round should be increasing - previous epoch %d round %d, current epoch %d round %d", previous.Epoch, previous.Round, current.Epoch, current.Round))
+		}
+		if current.LatestTimestamp.Before(previous.LatestTimestamp) {
+			logger.Error().Msg(fmt.Sprintf("LatestTimestamp should be increasing - previous: %s, current: %s", previous.LatestTimestamp, current.LatestTimestamp))
+		}
 		if !isSoak {
 			require.True(t, current.Epoch > previous.Epoch || (current.Epoch == previous.Epoch && current.Round > previous.Round), "Epoch/Round should be increasing")
 			require.GreaterOrEqual(t, current.LatestTimestamp, previous.LatestTimestamp, "Latest timestamp should be increasing")
-		} else {
-			if current.Epoch < previous.Epoch || (current.Epoch == previous.Epoch && current.Round < previous.Round) {
-				logger.Error().Msg(fmt.Sprintf("Epoch/Round should be increasing - previous epoch %d round %d, current epoch %d round %d", previous.Epoch, previous.Round, current.Epoch, current.Round))
-			}
-			if current.LatestTimestamp.Before(previous.LatestTimestamp) {
-				logger.Error().Msg(fmt.Sprintf("LatestTimestamp should be increasing - previous: %s, current: %s", previous.LatestTimestamp, current.LatestTimestamp))
-			}
 		}
 
 		// check latest answer is positive
 		ansCmp := current.LatestAnswer.Cmp(big.NewInt(0))
+		if ansCmp != 1 {
+			logger.Error().Msg(fmt.Sprintf("LatestAnswer should be greater than zero, got %s", current.LatestAnswer.String()))
+		}
 		if !isSoak {
-			require.Equal(t, ansCmp == 1, true, "Answer should be greater than zero")
-		} else {
-			if ansCmp != 1 {
-				logger.Error().Msg(fmt.Sprintf("Answer should be greater than zero, got %s", current.LatestAnswer.String()))
-			}
+			require.Equal(t, ansCmp == 1, true, "LatestAnswer should be greater than zero")
 		}
 
 		// check no changes to config digest
 		emptyDigest := types.ConfigDigest{}
 		if previous.Digest != emptyDigest {
+			if current.Digest != previous.Digest {
+				logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.Digest, current.Digest))
+			}
 			if !isSoak {
 				require.Equal(t, current.Digest, previous.Digest, "Config digest should not change")
-			} else {
-				if current.Digest != previous.Digest {
-					logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.Digest, current.Digest))
-				}
 			}
 		}
 
