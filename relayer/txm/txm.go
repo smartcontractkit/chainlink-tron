@@ -2,7 +2,6 @@ package txm
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,7 +10,6 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -204,17 +202,11 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (*api.Return, error) {
 	coreTx := txExtention.Transaction
 
+	// Previously we marshalled the raw protobuf data to figure out the hash, but we
+	// can just sign the transaction id.
 	// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/keystore.go#L273
-	rawData, err := proto.Marshal(coreTx.GetRawData())
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshall transaction data: %+w", err)
-	}
-
-	h256h := sha256.New()
-	h256h.Write(rawData)
-	hash := h256h.Sum(nil)
-
-	signature, err := t.Keystore.Sign(ctx, fromAddress, hash)
+	// ref: https://github.com/tronprotocol/tronweb/blob/847008b1afd70a272f042e197d9a5fd5eba895fd/src/utils/crypto.ts#L61
+	signature, err := t.Keystore.Sign(ctx, fromAddress, txExtention.Txid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign transaction: %+w", err)
 	}
