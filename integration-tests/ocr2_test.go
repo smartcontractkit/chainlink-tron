@@ -340,7 +340,6 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 	increasing := 0 // track number of increasing rounds
 	var stuck bool
 	stuckCount := 0
-	var positive bool
 
 	ocrLogger, err := relaylogger.New()
 	require.NoError(t, err, "Failed to create OCR relay logger")
@@ -354,7 +353,7 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 		logger.Info().Msg(fmt.Sprintf("Elapsed time: %s, Round wait: %s ", time.Since(start), testDuration))
 
 		// end condition: enough rounds have occurred
-		if !isSoak && increasing >= rounds && positive {
+		if !isSoak && increasing >= rounds {
 			break
 		}
 
@@ -408,7 +407,6 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 				logger.Error().Msg(fmt.Sprintf("Answer should be greater than zero, got %s", current.LatestAnswer.String()))
 			}
 		}
-		positive = true || positive
 
 		// check no changes to config digest
 		emptyDigest := types.ConfigDigest{}
@@ -431,7 +429,6 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 
 	if !isSoak {
 		require.GreaterOrEqual(t, increasing, rounds, "Round + epochs should be increasing")
-		require.Equal(t, positive, true, "Positive value should have been submitted")
 		require.Equal(t, stuck, false, "Round + epochs should not be stuck")
 	}
 
