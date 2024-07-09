@@ -1,12 +1,17 @@
 package sdk
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/fbsobreira/gotron-sdk/pkg/abi"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
+	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"google.golang.org/grpc"
@@ -18,6 +23,8 @@ import (
 type GrpcClient interface {
 	Start(opts ...grpc.DialOption) error
 	Stop()
+	Transfer(from, toAddress string, amount int64) (*api.TransactionExtention, error)
+	GetAccount(addr string) (*core.Account, error)
 	GetEnergyPrices() (*api.PricesResponseMessage, error)
 	GetTransactionInfoByID(id string) (*core.TransactionInfo, error)
 	DeployContract(from, contractName string,
@@ -35,13 +42,19 @@ type GrpcClient interface {
 	GetBlockByNum(num int64) (*api.BlockExtention, error)
 }
 
-var _ GrpcClient = &client.GrpcClient{}
+var _ GrpcClient = &grpcClient{}
 
-func CreateGrpcClient(grpcUrl *url.URL) (*client.GrpcClient, error) {
-	return CreateGrpcClientWithTimeout(grpcUrl, 15*time.Second)
+type grpcClient struct {
+	*client.GrpcClient
+	SolidityClient api.WalletSolidityClient
+	grpcTimeout    time.Duration
 }
 
-func CreateGrpcClientWithTimeout(grpcUrl *url.URL, timeout time.Duration) (*client.GrpcClient, error) {
+func CreateGrpcClient(grpcUrl, solidityGrpcUrl *url.URL) (GrpcClient, error) {
+	return CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl, 15*time.Second)
+}
+
+func CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl *url.URL, timeout time.Duration) (GrpcClient, error) {
 	// TODO: check scheme
 	hostname := grpcUrl.Hostname()
 	port := grpcUrl.Port()
@@ -66,11 +79,155 @@ func CreateGrpcClientWithTimeout(grpcUrl *url.URL, timeout time.Duration) (*clie
 		transportCredentials = credentials.NewTLS(nil)
 	}
 
-	grpcClient := client.NewGrpcClientWithTimeout(hostname+":"+port, timeout)
-	err := grpcClient.Start(grpc.WithTransportCredentials(transportCredentials))
+	fullClient := client.NewGrpcClientWithTimeout(hostname+":"+port, timeout)
+	err := fullClient.Start(grpc.WithTransportCredentials(transportCredentials))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start GrpcClient: %+w", err)
 	}
 
-	return grpcClient, nil
+	// build solidity wallet client
+	solidityHostname := solidityGrpcUrl.Hostname()
+	solidityPort := solidityGrpcUrl.Port()
+	solidityConn, err := grpc.Dial(solidityHostname+":"+solidityPort, grpc.WithTransportCredentials(transportCredentials))
+	if err != nil {
+		return nil, fmt.Errorf("failed to init solidity wallet connection: %v", err)
+	}
+	solidityClient := api.NewWalletSolidityClient(solidityConn)
+
+	return &grpcClient{
+		GrpcClient:     fullClient,
+		SolidityClient: solidityClient,
+		grpcTimeout:    timeout,
+	}, nil
+}
+
+// TODO: We manually override methods that we want to use the solidity client for (all read methods).
+// These are largely a copy paste from gotron-sdk so we may want to move these over in the future.
+
+func (g *grpcClient) getContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), g.grpcTimeout)
+	return ctx, cancel
+}
+
+// GetAccount from BASE58 address
+func (g *grpcClient) GetAccount(addr string) (*core.Account, error) {
+	account := new(core.Account)
+	var err error
+
+	account.Address, err = common.DecodeCheck(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	acc, err := g.SolidityClient.GetAccount(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(acc.Address, account.Address) {
+		return nil, fmt.Errorf("account not found")
+	}
+	return acc, nil
+}
+
+// GetEnergyPrices retrieves energy prices
+func (g *grpcClient) GetEnergyPrices() (*api.PricesResponseMessage, error) {
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	result, err := g.SolidityClient.GetEnergyPrices(ctx, new(api.EmptyMessage))
+	if err != nil {
+		return nil, fmt.Errorf("get energy prices: %v", err)
+	}
+
+	return result, nil
+}
+
+// GetTransactionInfoByID returns transaction receipt by ID
+func (g *grpcClient) GetTransactionInfoByID(id string) (*core.TransactionInfo, error) {
+	transactionID := new(api.BytesMessage)
+	var err error
+
+	transactionID.Value, err = common.FromHex(id)
+	if err != nil {
+		return nil, fmt.Errorf("get transaction by id error: %v", err)
+	}
+
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	txi, err := g.SolidityClient.GetTransactionInfoById(ctx, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Equal(txi.Id, transactionID.Value) {
+		return txi, nil
+	}
+	return nil, fmt.Errorf("transaction info not found")
+}
+
+// TriggerConstantContract and return tx result
+func (g *grpcClient) TriggerConstantContract(from, contractAddress, method string, params []any) (*api.TransactionExtention, error) {
+	var err error
+	fromDesc := address.HexToAddress("410000000000000000000000000000000000000000")
+	if len(from) > 0 {
+		fromDesc, err = address.Base58ToAddress(from)
+		if err != nil {
+			return nil, err
+		}
+	}
+	contractDesc, err := address.Base58ToAddress(contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := abi.Pack(method, params)
+	if err != nil {
+		return nil, err
+	}
+
+	ct := &core.TriggerSmartContract{
+		OwnerAddress:    fromDesc.Bytes(),
+		ContractAddress: contractDesc.Bytes(),
+		Data:            dataBytes,
+	}
+
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	return g.SolidityClient.TriggerConstantContract(ctx, ct)
+}
+
+// GetNowBlock return TIP block
+func (g *grpcClient) GetNowBlock() (*api.BlockExtention, error) {
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	result, err := g.SolidityClient.GetNowBlock2(ctx, new(api.EmptyMessage))
+
+	if err != nil {
+		return nil, fmt.Errorf("Get block now: %v", err)
+	}
+
+	return result, nil
+}
+
+// GetBlockByNum block from number
+func (g *grpcClient) GetBlockByNum(num int64) (*api.BlockExtention, error) {
+	numMessage := new(api.NumberMessage)
+	numMessage.Num = num
+
+	ctx, cancel := g.getContext()
+	defer cancel()
+
+	maxSizeOption := grpc.MaxCallRecvMsgSize(32 * 10e6)
+	result, err := g.SolidityClient.GetBlockByNum2(ctx, numMessage, maxSizeOption)
+
+	if err != nil {
+		return nil, fmt.Errorf("Get block by num: %v", err)
+
+	}
+	return result, nil
 }

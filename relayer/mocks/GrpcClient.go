@@ -94,6 +94,32 @@ func (_m *GrpcClient) EstimateEnergy(from string, contractAddress string, method
 	return r0, r1
 }
 
+// GetAccount provides a mock function with given fields: addr
+func (_m *GrpcClient) GetAccount(addr string) (*core.Account, error) {
+	ret := _m.Called(addr)
+
+	var r0 *core.Account
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (*core.Account, error)); ok {
+		return rf(addr)
+	}
+	if rf, ok := ret.Get(0).(func(string) *core.Account); ok {
+		r0 = rf(addr)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*core.Account)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(addr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBlockByNum provides a mock function with given fields: num
 func (_m *GrpcClient) GetBlockByNum(num int64) (*api.BlockExtention, error) {
 	ret := _m.Called(num)
@@ -247,6 +273,32 @@ func (_m *GrpcClient) Start(opts ...grpc.DialOption) error {
 // Stop provides a mock function with given fields:
 func (_m *GrpcClient) Stop() {
 	_m.Called()
+}
+
+// Transfer provides a mock function with given fields: from, toAddress, amount
+func (_m *GrpcClient) Transfer(from string, toAddress string, amount int64) (*api.TransactionExtention, error) {
+	ret := _m.Called(from, toAddress, amount)
+
+	var r0 *api.TransactionExtention
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, int64) (*api.TransactionExtention, error)); ok {
+		return rf(from, toAddress, amount)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, int64) *api.TransactionExtention); ok {
+		r0 = rf(from, toAddress, amount)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*api.TransactionExtention)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, int64) error); ok {
+		r1 = rf(from, toAddress, amount)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // TriggerConstantContract provides a mock function with given fields: from, contractAddress, method, params

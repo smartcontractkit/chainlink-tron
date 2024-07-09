@@ -162,6 +162,10 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 	if len(c.Nodes) == 0 {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	}
+
+	for _, node := range c.Nodes {
+		err = errors.Join(err, node.ValidateConfig())
+	}
 	return
 }
 

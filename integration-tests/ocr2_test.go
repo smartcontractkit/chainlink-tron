@@ -16,10 +16,11 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/client"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/contract"
@@ -32,7 +33,13 @@ import (
 )
 
 const (
-	defaultInternalGrpcUrl = "grpc://host.docker.internal:16669/?insecure=true"
+	defaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
+	defaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
+	defaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
+	HTTP_PORT                  = "16667"
+	GRPC_PORT                  = "16669"
+	GRPC_SOLIDITY_PORT         = "16670"
+	CL_NODE_NAME               = "primary"
 )
 
 func TestOCRBasic(t *testing.T) {
@@ -55,49 +62,8 @@ func TestOCRBasic(t *testing.T) {
 	}
 	logger.Info().Str("genesis address", genesisAddress).Msg("Using genesis account")
 
-	grpcUrl := os.Getenv("GRPC_URL")
-	if grpcUrl == "" {
-		grpcUrl = fmt.Sprintf("grpc://%s:16669/?insecure=true", testutils.GetTronNodeIpAddress())
-	}
-	httpUrl := os.Getenv("HTTP_URL")
-	if httpUrl == "" {
-		httpUrl = fmt.Sprintf("http://%s:16667", testutils.GetTronNodeIpAddress())
-	}
-	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
-	if internalGrpcUrl == "" {
-		internalGrpcUrl = defaultInternalGrpcUrl
-	}
-
-	logger.Info().Msg("Starting java-tron container...")
-	err := testutils.StartTronNode(genesisAddress)
-	require.NoError(t, err, "Could not start java-tron container")
-
-	logger.Info().Str("grpc url", grpcUrl).Str("http url", httpUrl).Msg("TRON node config")
-
-	grpcUrlObj, err := url.Parse(grpcUrl)
-	require.NoError(t, err)
-
-	grpcClient, err := sdk.CreateGrpcClient(grpcUrlObj)
-	require.NoError(t, err)
-
-	blockInfo, err := grpcClient.GetBlockByNum(0)
-	require.NoError(t, err)
-
-	blockId := blockInfo.Blockid
-
-	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
-	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
-	//
-	// however on both mainnet, testnets committee.allowOptimizedReturnValueOfChainId is enabled, so we've done the same for devnet
-	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
-	// is important for the config digest calculation:
-	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
-	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
-
-	logger.Info().Str("chain id", chainId).Msg("Read first block")
-
-	commonConfig := common.NewCommon(t, chainId, internalGrpcUrl)
-	commonConfig.SetLocalEnvironment(t, genesisAddress)
+	grpcClient, chainlinkClient, commonConfig := setupLocalStack(t, logger, genesisAddress)
+	defer teardownLocalStack(t, logger, commonConfig)
 
 	clientLogger, err := relaylogger.New()
 	require.NoError(t, err, "Could not create relay logger")
@@ -110,12 +76,6 @@ func TestOCRBasic(t *testing.T) {
 	err = txmgr.Start(context.Background())
 	require.NoError(t, err)
 
-	nodeName := "primary"
-	chainlinkClient, err := common.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, nodeName)
-	require.NoError(t, err, "Could not create chainlink client")
-
-	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
-	require.NoError(t, err, "Could not create private key from mnemonic")
 	logger.Info().Str("from", genesisAddress).Msg("Funding nodes")
 
 	var transferAmount int64 = 1000000 * 1000
@@ -156,6 +116,11 @@ func TestOCRBasic(t *testing.T) {
 		logger.Info().Str("address", nodeAddr).Msg("successfully funded")
 	}
 
+	httpUrl := os.Getenv("HTTP_URL")
+	if httpUrl == "" {
+		httpUrl = fmt.Sprintf("http://%s:%s", testutils.GetTronNodeIpAddress(), HTTP_PORT)
+	}
+	logger.Info().Str("http url", httpUrl).Msg("TRON json client config")
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
 		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, genesisAddress, contractName, artifact.AbiJson, artifact.Bytecode, params)
 		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, 30)
@@ -266,7 +231,7 @@ func TestOCRBasic(t *testing.T) {
 	p2pPort := "50200"
 	err = chainlinkClient.CreateJobsForContract(
 		commonConfig.ChainId,
-		nodeName,
+		CL_NODE_NAME,
 		p2pPort,
 		commonConfig.MockUrl,
 		commonConfig.JuelsPerFeeCoinSource,
@@ -275,13 +240,6 @@ func TestOCRBasic(t *testing.T) {
 
 	err = validateRounds(t, grpcClient, mustConvertAddress(t, ocr2AggregatorAddress), mustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, commonConfig.TestDuration)
 	require.NoError(t, err, "Validating round should not fail")
-
-	// Tear down local stack
-	commonConfig.TearDownLocalEnvironment(t)
-
-	logger.Info().Msg("Tearing down java-tron container...")
-	err = testutils.StopTronNode()
-	require.NoError(t, err, "Could not tear down java-tron container")
 
 	// TODO: does this need to be reenabled?
 	//
@@ -292,6 +250,74 @@ func TestOCRBasic(t *testing.T) {
 	// })
 }
 
+func setupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.GrpcClient, *common.ChainlinkClient, *common.Common) {
+	grpcUrl := os.Getenv("GRPC_URL")
+	if grpcUrl == "" {
+		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), GRPC_PORT)
+	}
+	solidityGrpcUrl := os.Getenv("SOLIDITY_GRPC_URL")
+	if solidityGrpcUrl == "" {
+		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), GRPC_SOLIDITY_PORT)
+	}
+	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
+	if internalGrpcUrl == "" {
+		internalGrpcUrl = defaultInternalGrpcUrl
+	}
+	internalSolidityUrl := os.Getenv("INTERNAL_SOLIDITY_URL")
+	if internalSolidityUrl == "" {
+		internalSolidityUrl = defaultInternalSolidityUrl
+	}
+	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
+	if internalJsonRpcUrl == "" {
+		internalJsonRpcUrl = defaultInternalJsonRpcUrl
+	}
+
+	logger.Info().Msg("Starting java-tron container...")
+	err := testutils.StartTronNode(genesisAddress)
+	require.NoError(t, err, "Could not start java-tron container")
+
+	logger.Info().Str("grpc url", grpcUrl).Msg("TRON node config")
+
+	grpcUrlObj, err := url.Parse(grpcUrl)
+	require.NoError(t, err)
+	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
+	require.NoError(t, err)
+
+	grpcClient, err := sdk.CreateGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
+	require.NoError(t, err)
+
+	blockInfo, err := grpcClient.GetBlockByNum(0)
+	require.NoError(t, err)
+
+	blockId := blockInfo.Blockid
+
+	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
+	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
+	//
+	// however on both mainnet, testnets committee.allowOptimizedReturnValueOfChainId is enabled, so we've done the same for devnet
+	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
+	// is important for the config digest calculation:
+	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
+	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+
+	logger.Info().Str("chain id", chainId).Msg("Read first block")
+
+	commonConfig := common.NewCommon(t, chainId, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl)
+	commonConfig.SetLocalEnvironment(t, genesisAddress)
+
+	chainlinkClient, err := common.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CL_NODE_NAME)
+	require.NoError(t, err, "Could not create chainlink client")
+	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
+	return grpcClient, chainlinkClient, commonConfig
+}
+
+func teardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *common.Common) {
+	commonConfig.TearDownLocalEnvironment(t)
+	logger.Info().Msg("Tearing down java-tron container...")
+	err := testutils.StopTronNode()
+	require.NoError(t, err, "Could not tear down java-tron container")
+}
+
 func mustConvertAddress(t *testing.T, tronAddress string) address.Address {
 	a, err := address.Base58ToAddress(tronAddress)
 	if err != nil {
@@ -300,7 +326,7 @@ func mustConvertAddress(t *testing.T, tronAddress string) address.Address {
 	return a
 }
 
-func validateRounds(t *testing.T, grpcClient *client.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, testDuration time.Duration) error {
+func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, testDuration time.Duration) error {
 	var rounds int
 	if isSoak {
 		rounds = 99999999
@@ -326,8 +352,7 @@ func validateRounds(t *testing.T, grpcClient *client.GrpcClient, ocrAddress addr
 
 	for start := time.Now(); time.Since(start) < testDuration; {
 		logger.Info().Msg(fmt.Sprintf("Elapsed time: %s, Round wait: %s ", time.Since(start), testDuration))
-		current, err2 := ocrReader.LatestTransmissionDetails(ctx, ocrAddress)
-		require.NoError(t, err2, "Failed to get latest transmission details")
+
 		// end condition: enough rounds have occurred
 		if !isSoak && increasing >= rounds && positive {
 			break
@@ -341,55 +366,69 @@ func validateRounds(t *testing.T, grpcClient *client.GrpcClient, ocrAddress addr
 
 		// try to fetch rounds
 		time.Sleep(5 * time.Second)
-
-		if err2 != nil {
-			logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err2))
+		current, err := ocrReader.LatestTransmissionDetails(ctx, ocrAddress)
+		if err != nil {
+			logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err))
+			t.Fatal("Failed to get latest transmission details", err)
 			continue
 		}
+
+		// if no changes, increment stuck counter and continue
+		if current.Epoch == previous.Epoch && current.Round == previous.Round {
+			stuckCount++
+			if stuckCount > 30 {
+				stuck = true
+				increasing = 0
+			}
+			continue
+		}
+
+		// epoch or round has changed, log transmission details
 		logger.Info().Msg(fmt.Sprintf("Transmission Details: %+v", current))
 
-		// continue if no changes
-		if current.Epoch == 0 && current.Round == 0 {
-			continue
-		}
-
-		ansCmp := current.LatestAnswer.Cmp(big.NewInt(0))
-		positive = ansCmp == 1 || positive
-
-		// if changes from zero values set (should only initially)
-		if current.Epoch > 0 && previous.Epoch == 0 {
-			if !isSoak {
-				require.Greater(t, current.Epoch, previous.Epoch)
-				require.GreaterOrEqual(t, current.Round, previous.Round)
-				require.NotEqual(t, ansCmp, 0) // require changed from 0
-				require.NotEqual(t, current.Digest, previous.Digest)
-				require.Equal(t, previous.LatestTimestamp.Before(current.LatestTimestamp), true)
-			}
-			previous = current
-			continue
-		}
-		// check increasing rounds
+		// validate epoch/round/timestamp increasing
 		if !isSoak {
-			require.Equal(t, current.Digest, previous.Digest, "Config digest should not change")
+			require.True(t, current.Epoch > previous.Epoch || (current.Epoch == previous.Epoch && current.Round > previous.Round), "Epoch/Round should be increasing")
+			require.GreaterOrEqual(t, current.LatestTimestamp, previous.LatestTimestamp, "Latest timestamp should be increasing")
 		} else {
-			if current.Digest != previous.Digest {
-				logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.Digest, current.Digest))
+			if current.Epoch < previous.Epoch || (current.Epoch == previous.Epoch && current.Round < previous.Round) {
+				logger.Error().Msg(fmt.Sprintf("Epoch/Round should be increasing - previous epoch %d round %d, current epoch %d round %d", previous.Epoch, previous.Round, current.Epoch, current.Round))
+			}
+			if current.LatestTimestamp.Before(previous.LatestTimestamp) {
+				logger.Error().Msg(fmt.Sprintf("LatestTimestamp should be increasing - previous: %s, current: %s", previous.LatestTimestamp, current.LatestTimestamp))
 			}
 		}
-		if (current.Epoch > previous.Epoch || (current.Epoch == previous.Epoch && current.Round > previous.Round)) && previous.LatestTimestamp.Before(current.LatestTimestamp) {
-			increasing++
-			stuck = false
-			stuckCount = 0 // reset counter
-			continue
+
+		// check latest answer is positive
+		ansCmp := current.LatestAnswer.Cmp(big.NewInt(0))
+		if !isSoak {
+			require.Equal(t, ansCmp == 1, true, "Answer should be greater than zero")
+		} else {
+			if ansCmp != 1 {
+				logger.Error().Msg(fmt.Sprintf("Answer should be greater than zero, got %s", current.LatestAnswer.String()))
+			}
+		}
+		positive = true || positive
+
+		// check no changes to config digest
+		emptyDigest := types.ConfigDigest{}
+		if previous.Digest != emptyDigest {
+			if !isSoak {
+				require.Equal(t, current.Digest, previous.Digest, "Config digest should not change")
+			} else {
+				if current.Digest != previous.Digest {
+					logger.Error().Msg(fmt.Sprintf("Config digest should not change, expected %s got %s", previous.Digest, current.Digest))
+				}
+			}
 		}
 
-		// reach this point, answer has not changed
-		stuckCount++
-		if stuckCount > 30 {
-			stuck = true
-			increasing = 0
-		}
+		// transmission updated, reset stuck trackers and increment increasing rounds
+		increasing++
+		stuck = false
+		stuckCount = 0
+		previous = current
 	}
+
 	if !isSoak {
 		require.GreaterOrEqual(t, increasing, rounds, "Round + epochs should be increasing")
 		require.Equal(t, positive, true, "Positive value should have been submitted")

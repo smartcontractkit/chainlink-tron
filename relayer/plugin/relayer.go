@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
@@ -34,7 +33,7 @@ type TronRelayer struct {
 	cfg  *TOMLConfig
 	lggr logger.Logger
 
-	client *client.GrpcClient
+	client sdk.GrpcClient
 	txm    *txm.TronTxm
 }
 
@@ -63,7 +62,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
-	client, err := sdk.CreateGrpcClient(nodeConfig.URL.URL())
+	client, err := sdk.CreateGrpcClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
 	}
