@@ -42,19 +42,20 @@ type GrpcClient interface {
 	GetBlockByNum(num int64) (*api.BlockExtention, error)
 }
 
-var _ GrpcClient = &grpcClient{}
+var _ GrpcClient = &client.GrpcClient{}
+var _ GrpcClient = &combinedGrpcClient{}
 
-type grpcClient struct {
+type combinedGrpcClient struct {
 	*client.GrpcClient
 	SolidityClient api.WalletSolidityClient
 	grpcTimeout    time.Duration
 }
 
-func CreateGrpcClient(grpcUrl, solidityGrpcUrl *url.URL) (GrpcClient, error) {
-	return CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl, 15*time.Second)
+func CreateGrpcClient(grpcUrl *url.URL) (*client.GrpcClient, error) {
+	return CreateGrpcClientWithTimeout(grpcUrl, 15*time.Second)
 }
 
-func CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl *url.URL, timeout time.Duration) (GrpcClient, error) {
+func CreateGrpcClientWithTimeout(grpcUrl *url.URL, timeout time.Duration) (*client.GrpcClient, error) {
 	// TODO: check scheme
 	hostname := grpcUrl.Hostname()
 	port := grpcUrl.Port()
@@ -79,22 +80,52 @@ func CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl *url.URL, timeout time
 		transportCredentials = credentials.NewTLS(nil)
 	}
 
-	fullClient := client.NewGrpcClientWithTimeout(hostname+":"+port, timeout)
-	err := fullClient.Start(grpc.WithTransportCredentials(transportCredentials))
+	grpcClient := client.NewGrpcClientWithTimeout(hostname+":"+port, timeout)
+	err := grpcClient.Start(grpc.WithTransportCredentials(transportCredentials))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start GrpcClient: %+w", err)
 	}
 
+	return grpcClient, nil
+}
+
+func CreateCombinedGrpcClient(grpcUrl, solidityGrpcUrl *url.URL) (*combinedGrpcClient, error) {
+	return CreateCombinedGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl, 15*time.Second)
+}
+
+func CreateCombinedGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl *url.URL, timeout time.Duration) (*combinedGrpcClient, error) {
+	fullClient, err := CreateGrpcClientWithTimeout(grpcUrl, timeout)
+	if err != nil {
+		return nil, err
+	}
 	// build solidity wallet client
 	solidityHostname := solidityGrpcUrl.Hostname()
 	solidityPort := solidityGrpcUrl.Port()
+
+	insecureTransport := false
+	values := solidityGrpcUrl.Query()
+	insecureValues, ok := values["insecure"]
+	if ok {
+		if len(insecureValues) > 0 {
+			insecureValue := strings.ToLower(insecureValues[0])
+			insecureTransport = insecureValue == "true" || insecureValue == "1"
+		}
+	}
+
+	var transportCredentials credentials.TransportCredentials
+	if insecureTransport {
+		transportCredentials = insecure.NewCredentials()
+	} else {
+		transportCredentials = credentials.NewTLS(nil)
+	}
+
 	solidityConn, err := grpc.Dial(solidityHostname+":"+solidityPort, grpc.WithTransportCredentials(transportCredentials))
 	if err != nil {
 		return nil, fmt.Errorf("failed to init solidity wallet connection: %v", err)
 	}
 	solidityClient := api.NewWalletSolidityClient(solidityConn)
 
-	return &grpcClient{
+	return &combinedGrpcClient{
 		GrpcClient:     fullClient,
 		SolidityClient: solidityClient,
 		grpcTimeout:    timeout,
@@ -104,13 +135,13 @@ func CreateGrpcClientWithTimeout(grpcUrl, solidityGrpcUrl *url.URL, timeout time
 // TODO: We manually override methods that we want to use the solidity client for (all read methods).
 // These are largely a copy paste from gotron-sdk so we may want to move these over in the future.
 
-func (g *grpcClient) getContext() (context.Context, context.CancelFunc) {
+func (g *combinedGrpcClient) getContext() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), g.grpcTimeout)
 	return ctx, cancel
 }
 
 // GetAccount from BASE58 address
-func (g *grpcClient) GetAccount(addr string) (*core.Account, error) {
+func (g *combinedGrpcClient) GetAccount(addr string) (*core.Account, error) {
 	account := new(core.Account)
 	var err error
 
@@ -133,7 +164,7 @@ func (g *grpcClient) GetAccount(addr string) (*core.Account, error) {
 }
 
 // GetEnergyPrices retrieves energy prices
-func (g *grpcClient) GetEnergyPrices() (*api.PricesResponseMessage, error) {
+func (g *combinedGrpcClient) GetEnergyPrices() (*api.PricesResponseMessage, error) {
 	ctx, cancel := g.getContext()
 	defer cancel()
 
@@ -146,7 +177,7 @@ func (g *grpcClient) GetEnergyPrices() (*api.PricesResponseMessage, error) {
 }
 
 // GetTransactionInfoByID returns transaction receipt by ID
-func (g *grpcClient) GetTransactionInfoByID(id string) (*core.TransactionInfo, error) {
+func (g *combinedGrpcClient) GetTransactionInfoByID(id string) (*core.TransactionInfo, error) {
 	transactionID := new(api.BytesMessage)
 	var err error
 
@@ -169,7 +200,7 @@ func (g *grpcClient) GetTransactionInfoByID(id string) (*core.TransactionInfo, e
 }
 
 // TriggerConstantContract and return tx result
-func (g *grpcClient) TriggerConstantContract(from, contractAddress, method string, params []any) (*api.TransactionExtention, error) {
+func (g *combinedGrpcClient) TriggerConstantContract(from, contractAddress, method string, params []any) (*api.TransactionExtention, error) {
 	var err error
 	fromDesc := address.HexToAddress("410000000000000000000000000000000000000000")
 	if len(from) > 0 {
@@ -201,7 +232,7 @@ func (g *grpcClient) TriggerConstantContract(from, contractAddress, method strin
 }
 
 // GetNowBlock return TIP block
-func (g *grpcClient) GetNowBlock() (*api.BlockExtention, error) {
+func (g *combinedGrpcClient) GetNowBlock() (*api.BlockExtention, error) {
 	ctx, cancel := g.getContext()
 	defer cancel()
 
@@ -215,7 +246,7 @@ func (g *grpcClient) GetNowBlock() (*api.BlockExtention, error) {
 }
 
 // GetBlockByNum block from number
-func (g *grpcClient) GetBlockByNum(num int64) (*api.BlockExtention, error) {
+func (g *combinedGrpcClient) GetBlockByNum(num int64) (*api.BlockExtention, error) {
 	numMessage := new(api.NumberMessage)
 	numMessage.Num = num
 

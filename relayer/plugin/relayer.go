@@ -62,7 +62,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
-	client, err := sdk.CreateGrpcClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
+	client, err := sdk.CreateCombinedGrpcClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
 	}

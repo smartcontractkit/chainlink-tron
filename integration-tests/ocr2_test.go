@@ -273,7 +273,7 @@ func setupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string)
 	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
 	require.NoError(t, err)
 
-	grpcClient, err := sdk.CreateGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
+	grpcClient, err := sdk.CreateCombinedGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
 	require.NoError(t, err)
 
 	blockInfo, err := grpcClient.GetBlockByNum(0)
