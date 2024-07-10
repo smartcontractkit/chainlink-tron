@@ -32,16 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
-const (
-	defaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
-	defaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
-	defaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
-	HTTP_PORT                  = "16667"
-	GRPC_PORT                  = "16669"
-	GRPC_SOLIDITY_PORT         = "16670"
-	CL_NODE_NAME               = "primary"
-)
-
 func TestOCRBasic(t *testing.T) {
 	// Set up test environment
 	logger := common.GetTestLogger(t)
@@ -118,7 +108,7 @@ func TestOCRBasic(t *testing.T) {
 
 	httpUrl := os.Getenv("HTTP_URL")
 	if httpUrl == "" {
-		httpUrl = fmt.Sprintf("http://%s:%s", testutils.GetTronNodeIpAddress(), HTTP_PORT)
+		httpUrl = fmt.Sprintf("http://%s:%s", testutils.GetTronNodeIpAddress(), utils.HttpPort)
 	}
 	logger.Info().Str("http url", httpUrl).Msg("TRON json client config")
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
@@ -231,7 +221,7 @@ func TestOCRBasic(t *testing.T) {
 	p2pPort := "50200"
 	err = chainlinkClient.CreateJobsForContract(
 		commonConfig.ChainId,
-		CL_NODE_NAME,
+		utils.CLNodeName,
 		p2pPort,
 		commonConfig.MockUrl,
 		commonConfig.JuelsPerFeeCoinSource,
@@ -253,23 +243,23 @@ func TestOCRBasic(t *testing.T) {
 func setupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.GrpcClient, *common.ChainlinkClient, *common.Common) {
 	grpcUrl := os.Getenv("GRPC_URL")
 	if grpcUrl == "" {
-		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), GRPC_PORT)
+		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), utils.GrpcPort)
 	}
 	solidityGrpcUrl := os.Getenv("SOLIDITY_GRPC_URL")
 	if solidityGrpcUrl == "" {
-		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), GRPC_SOLIDITY_PORT)
+		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), utils.GrpcSolidityPort)
 	}
 	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
 	if internalGrpcUrl == "" {
-		internalGrpcUrl = defaultInternalGrpcUrl
+		internalGrpcUrl = utils.DefaultInternalGrpcUrl
 	}
 	internalSolidityUrl := os.Getenv("INTERNAL_SOLIDITY_URL")
 	if internalSolidityUrl == "" {
-		internalSolidityUrl = defaultInternalSolidityUrl
+		internalSolidityUrl = utils.DefaultInternalSolidityUrl
 	}
 	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
 	if internalJsonRpcUrl == "" {
-		internalJsonRpcUrl = defaultInternalJsonRpcUrl
+		internalJsonRpcUrl = utils.DefaultInternalJsonRpcUrl
 	}
 
 	logger.Info().Msg("Starting java-tron container...")
@@ -305,7 +295,7 @@ func setupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string)
 	commonConfig := common.NewCommon(t, chainId, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl)
 	commonConfig.SetLocalEnvironment(t, genesisAddress)
 
-	chainlinkClient, err := common.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CL_NODE_NAME)
+	chainlinkClient, err := common.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, utils.CLNodeName)
 	require.NoError(t, err, "Could not create chainlink client")
 	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
 	return grpcClient, chainlinkClient, commonConfig
