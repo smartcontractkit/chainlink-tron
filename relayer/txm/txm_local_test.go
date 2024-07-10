@@ -53,7 +53,7 @@ func TestTxmLocal(t *testing.T) {
 	keystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
 
 	ipAddress := testutils.GetTronNodeIpAddress()
-	rpcAddress := ipAddress + ":16669"
+	rpcAddress := ipAddress + ":" + testutils.GrpcPort
 
 	grpcClient := client.NewGrpcClientWithTimeout(rpcAddress, 15*time.Second)
 	err = grpcClient.Start(grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -157,7 +157,7 @@ func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) st
 
 func deployTestContractByJson(t *testing.T, txmgr *txm.TronTxm, fromAddress string, keystore loop.Keystore) string {
 	abiJson, codeHex := getTestCounterContract()
-	httpUrl := "http://" + testutils.GetTronNodeIpAddress() + ":16667"
+	httpUrl := "http://" + testutils.GetTronNodeIpAddress() + ":" + testutils.HttpPort
 	txHash := testutils.DeployContractByJson(t, httpUrl, keystore, fromAddress, "Counter", abiJson, codeHex, nil)
 	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
 	contractAddress := address.Address(txInfo.ContractAddress).String()

@@ -17,16 +17,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median/evmreportcodec"
 )
 
-const (
-	DefaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
-	DefaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
-	DefaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
-	HttpPort                   = "16667"
-	GrpcPort                   = "16669"
-	GrpcSolidityPort           = "16670"
-	CLNodeName                 = "primary"
-)
-
 // GetRSVFromSignature extracts r, s, and v values from the given signature.
 // r = first 32 bytes of signature
 // s = second 32 bytes of signature

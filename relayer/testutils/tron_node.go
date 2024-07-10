@@ -7,6 +7,16 @@ import (
 	"runtime"
 )
 
+const (
+	DefaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
+	DefaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
+	DefaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
+	HttpPort                   = "16667"
+	SolidityPort               = "16668"
+	GrpcPort                   = "16669"
+	GrpcSolidityPort           = "16670"
+)
+
 func StartTronNode(genesisAddress string) error {
 	gitRoot, err := FindGitRoot()
 	if err != nil {
