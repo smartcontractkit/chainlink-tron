@@ -1,3 +1,5 @@
+//go:build integration
+
 package ocr2_test
 
 import (
