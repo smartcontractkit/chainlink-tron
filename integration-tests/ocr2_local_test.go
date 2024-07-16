@@ -1,17 +1,12 @@
-//go:build integration
-
 package ocr2_test
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"net/url"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -34,12 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
-const (
-	CLNodeName = "primary"
-)
-
-func TestOCRBasic(t *testing.T) {
-	// Set up test environment
+func TestOCRLocal(t *testing.T) {
 	logger := common.GetTestLogger(t)
 
 	var genesisAddress string
@@ -58,13 +48,62 @@ func TestOCRBasic(t *testing.T) {
 	}
 	logger.Info().Str("genesis address", genesisAddress).Msg("Using genesis account")
 
-	grpcClient, chainlinkClient, commonConfig := setupLocalStack(t, logger, genesisAddress)
-	defer teardownLocalStack(t, logger, commonConfig)
+	runOCR2Test(t, logger, genesisPrivateKey, genesisAddress, testutils.Devnet)
+}
+
+func runOCR2Test(
+	t *testing.T, logger zerolog.Logger,
+	privateKey *ecdsa.PrivateKey,
+	pubAddress string, network string,
+) {
+	var httpUrl string
+	var grpcClient sdk.GrpcClient
+	var chainlinkClient *common.ChainlinkClient
+	var commonConfig *common.Common
+	var feeLimit int
+	var txnWaitTime int
+	var pollFrequency int
+	var ocrTransmissionFrequency time.Duration
+
+	switch network {
+	case testutils.Devnet:
+		grpcClient, chainlinkClient, commonConfig = utils.SetupLocalStack(t, logger, pubAddress)
+		defer utils.TeardownLocalStack(t, logger, commonConfig)
+		httpUrl = os.Getenv("HTTP_URL")
+		if httpUrl == "" {
+			httpUrl = fmt.Sprintf("http://%s:%s", testutils.GetTronNodeIpAddress(), testutils.HttpPort)
+		}
+		feeLimit = testutils.DevnetFeeLimit
+		txnWaitTime = testutils.DevnetMaxWaitTime
+		pollFrequency = testutils.DevnetPollFrequency
+		ocrTransmissionFrequency = testutils.DevnetOcrTransmissionFrequency
+
+	case testutils.Shasta:
+		httpUrl = testutils.ShastaHttpUrl
+		grpcClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
+		defer utils.TeardownTestnetStack(t, logger, commonConfig)
+		feeLimit = testutils.TestnetFeeLimit
+		txnWaitTime = testutils.TestnetMaxWaitTime
+		pollFrequency = testutils.TestnetPollFrequency
+		ocrTransmissionFrequency = testutils.TestnetOcrTransmissionFrequency
+
+	case testutils.Nile:
+		httpUrl = testutils.NileHttpUrl
+		grpcClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
+		defer utils.TeardownTestnetStack(t, logger, commonConfig)
+		feeLimit = testutils.TestnetFeeLimit
+		txnWaitTime = testutils.TestnetMaxWaitTime
+		pollFrequency = testutils.TestnetPollFrequency
+		ocrTransmissionFrequency = testutils.TestnetOcrTransmissionFrequency
+
+	default:
+		t.Fatal("Unsupported network")
+	}
 
 	clientLogger, err := relaylogger.New()
 	require.NoError(t, err, "Could not create relay logger")
 
-	testKeystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
+	testKeystore := testutils.NewTestKeystore(pubAddress, privateKey)
 	txmgr := txm.New(clientLogger, testKeystore, grpcClient, txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
@@ -72,13 +111,13 @@ func TestOCRBasic(t *testing.T) {
 	err = txmgr.Start(context.Background())
 	require.NoError(t, err)
 
-	logger.Info().Str("from", genesisAddress).Msg("Funding nodes")
+	logger.Info().Str("from", pubAddress).Msg("Funding nodes")
 
-	var transferAmount int64 = 1000000 * 1000
+	var transferAmount int64 = utils.SunPerTrx * 500 // 500 TRX
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
-		transferTx, err := grpcClient.Transfer(genesisAddress, nodeAddr, transferAmount)
+		transferTx, err := grpcClient.Transfer(pubAddress, nodeAddr, transferAmount)
 		require.NoError(t, err, "Creation of Transfer Txn from genesis account to node failed")
-		_, err = txmgr.SignAndBroadcast(context.Background(), genesisAddress, transferTx)
+		_, err = txmgr.SignAndBroadcast(context.Background(), pubAddress, transferTx)
 		require.NoError(t, err, "Broadcast of Transfer Txn from genesis account to node failed")
 	}
 
@@ -91,7 +130,7 @@ func TestOCRBasic(t *testing.T) {
 			if err != nil {
 				// do not error on 'account not found' - this occurs when there is no account info (transfer hasnt executed yet)
 				if err.Error() == "account not found" {
-					time.Sleep(time.Second)
+					time.Sleep(time.Second * time.Duration(pollFrequency))
 					continue
 				}
 				logger.Error().Str("address", nodeAddr).Err(err)
@@ -99,12 +138,12 @@ func TestOCRBasic(t *testing.T) {
 			}
 
 			if accountInfo.Balance != transferAmount {
-				time.Sleep(time.Second)
+				time.Sleep(time.Second * time.Duration(pollFrequency))
 				continue
 			}
 
 			// timeout
-			if time.Since(startTime).Seconds() > 30 {
+			if time.Since(startTime).Seconds() > float64(txnWaitTime) {
 				t.Fatal("failed to fund nodes in time")
 			}
 			break
@@ -112,14 +151,9 @@ func TestOCRBasic(t *testing.T) {
 		logger.Info().Str("address", nodeAddr).Msg("successfully funded")
 	}
 
-	httpUrl := os.Getenv("HTTP_URL")
-	if httpUrl == "" {
-		httpUrl = fmt.Sprintf("http://%s:%s", testutils.GetTronNodeIpAddress(), testutils.HttpPort)
-	}
-	logger.Info().Str("http url", httpUrl).Msg("TRON json client config")
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
-		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, genesisAddress, contractName, artifact.AbiJson, artifact.Bytecode, params)
-		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, 30)
+		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
+		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, txnWaitTime)
 		contractAddress := address.Address(txInfo.ContractAddress).String()
 		return contractAddress
 	}
@@ -164,16 +198,18 @@ func TestOCRBasic(t *testing.T) {
 	mintAmount := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
 	mintAmount = mintAmount.Mul(mintAmount, big.NewInt(50000))
 
-	err = txmgr.Enqueue(genesisAddress, linkTokenAddress, "grantMintAndBurnRoles(address)", "address", genesisAddress)
+	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "grantMintAndBurnRoles(address)", "address", pubAddress)
 	require.NoError(t, err)
-	err = txmgr.Enqueue(genesisAddress, linkTokenAddress, "mint(address,uint256)", "address", ocr2AggregatorAddress, "uint256", mintAmount.String())
+	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "mint(address,uint256)", "address", ocr2AggregatorAddress, "uint256", mintAmount.String())
 	require.NoError(t, err)
-	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*30)
+	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
 	balanceResponse, err := grpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
 	require.NoError(t, err)
 	balanceValue := new(big.Int).SetBytes(balanceResponse.ConstantResult[0])
-	require.Equal(t, balanceValue, mintAmount)
+
+	time.Sleep(time.Second * time.Duration(pollFrequency))
+	require.Equal(t, mintAmount, balanceValue)
 	logger.Info().Str("amount", mintAmount.String()).Msg("Minted LINK token")
 
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig := chainlinkClient.GetSetConfigArgs(t)
@@ -202,7 +238,7 @@ func TestOCRBasic(t *testing.T) {
 	}
 
 	// TODO: should we set onchainConfig as offchainConfig?
-	err = txmgr.Enqueue(genesisAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
+	err = txmgr.Enqueue(pubAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
 		/* signers= */ "address[]", signerAddresses,
 		/* trasmitters= */ "address[]", chainlinkClient.GetNodeAddresses(),
 		/* f= */ "uint8", fmt.Sprintf("%d", f),
@@ -212,29 +248,29 @@ func TestOCRBasic(t *testing.T) {
 	require.NoError(t, err)
 
 	// TODO: we need to fix the txmgr from returning 0 inflight count when it's processing a single transaction with nothing queued.
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * time.Duration(pollFrequency))
 
-	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*30)
+	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
 	configDetailsResponse, err := grpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", nil)
 	require.NoError(t, err)
 
 	configCount := new(big.Int).SetBytes(configDetailsResponse.ConstantResult[0][0:32])
 	require.NoError(t, err)
-	require.Equal(t, configCount, big.NewInt(1))
+	require.Equal(t, big.NewInt(1), configCount)
 	logger.Info().Msg("successfully set config")
 
 	p2pPort := "50200"
 	err = chainlinkClient.CreateJobsForContract(
 		commonConfig.ChainId,
-		CLNodeName,
+		utils.CLNodeName,
 		p2pPort,
 		commonConfig.MockUrl,
 		commonConfig.JuelsPerFeeCoinSource,
 		ocr2AggregatorAddress)
 	require.NoError(t, err, "Could not create jobs for contract")
 
-	err = validateRounds(t, grpcClient, mustConvertAddress(t, ocr2AggregatorAddress), mustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, commonConfig.TestDuration)
+	err = validateRounds(t, grpcClient, utils.MustConvertAddress(t, ocr2AggregatorAddress), utils.MustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
 	require.NoError(t, err, "Validating round should not fail")
 
 	// TODO: does this need to be reenabled?
@@ -246,83 +282,7 @@ func TestOCRBasic(t *testing.T) {
 	// })
 }
 
-func setupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.GrpcClient, *common.ChainlinkClient, *common.Common) {
-	grpcUrl := os.Getenv("GRPC_URL")
-	if grpcUrl == "" {
-		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcPort)
-	}
-	solidityGrpcUrl := os.Getenv("SOLIDITY_GRPC_URL")
-	if solidityGrpcUrl == "" {
-		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcSolidityPort)
-	}
-	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
-	if internalGrpcUrl == "" {
-		internalGrpcUrl = testutils.DefaultInternalGrpcUrl
-	}
-	internalSolidityUrl := os.Getenv("INTERNAL_SOLIDITY_URL")
-	if internalSolidityUrl == "" {
-		internalSolidityUrl = testutils.DefaultInternalSolidityUrl
-	}
-	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
-	if internalJsonRpcUrl == "" {
-		internalJsonRpcUrl = testutils.DefaultInternalJsonRpcUrl
-	}
-
-	logger.Info().Msg("Starting java-tron container...")
-	err := testutils.StartTronNode(genesisAddress)
-	require.NoError(t, err, "Could not start java-tron container")
-
-	logger.Info().Str("grpc url", grpcUrl).Msg("TRON node config")
-
-	grpcUrlObj, err := url.Parse(grpcUrl)
-	require.NoError(t, err)
-	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
-	require.NoError(t, err)
-
-	grpcClient, err := sdk.CreateCombinedGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
-	require.NoError(t, err)
-
-	blockInfo, err := grpcClient.GetBlockByNum(0)
-	require.NoError(t, err)
-
-	blockId := blockInfo.Blockid
-
-	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
-	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
-	//
-	// however on both mainnet, testnets committee.allowOptimizedReturnValueOfChainId is enabled, so we've done the same for devnet
-	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
-	// is important for the config digest calculation:
-	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
-	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
-
-	logger.Info().Str("chain id", chainId).Msg("Read first block")
-
-	commonConfig := common.NewCommon(t, chainId, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl)
-	commonConfig.SetLocalEnvironment(t, genesisAddress)
-
-	chainlinkClient, err := common.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CLNodeName)
-	require.NoError(t, err, "Could not create chainlink client")
-	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
-	return grpcClient, chainlinkClient, commonConfig
-}
-
-func teardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *common.Common) {
-	commonConfig.TearDownLocalEnvironment(t)
-	logger.Info().Msg("Tearing down java-tron container...")
-	err := testutils.StopTronNode()
-	require.NoError(t, err, "Could not tear down java-tron container")
-}
-
-func mustConvertAddress(t *testing.T, tronAddress string) address.Address {
-	a, err := address.Base58ToAddress(tronAddress)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return a
-}
-
-func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, testDuration time.Duration) error {
+func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
 	var rounds int
 	if isSoak {
 		rounds = 99999999
@@ -360,7 +320,7 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 		}
 
 		// try to fetch rounds
-		time.Sleep(5 * time.Second)
+		time.Sleep(ocrTransmissionFrequency)
 		current, err := ocrReader.LatestTransmissionDetails(ctx, ocrAddress)
 		if err != nil {
 			logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err))

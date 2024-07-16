@@ -5,9 +5,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 const (
+	// Local RPCs
 	DefaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
 	DefaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
 	DefaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
@@ -15,6 +17,32 @@ const (
 	SolidityPort               = "16668"
 	GrpcPort                   = "16669"
 	GrpcSolidityPort           = "16670"
+
+	// Testnet RPCs
+	// Urls can be found at https://developers.tron.network/reference/background
+	ShastaHttpUrl         = "https://api.shasta.trongrid.io"
+	ShastaGrpcUrl         = "grpc://grpc.shasta.trongrid.io:50051?insecure=true"
+	ShastaGrpcSolidityUrl = "grpc://grpc.shasta.trongrid.io:50052?insecure=true"
+	ShastaJsonRpcUrl      = "https://api.shasta.trongrid.io/jsonrpc"
+	NileHttpUrl           = "https://nile.trongrid.io"
+	NileGrpcUrl           = "grpc://grpc.nile.trongrid.io:50051?insecure=true"
+	NileGrpcSolidityUrl   = "grpc://grpc.nile.trongrid.io:50061?insecure=true"
+	NileJsonRpcUrl        = "https://nile.trongrid.io/jsonrpc"
+
+	// Configs for TXM
+	DevnetFeeLimit                  = 1_000_000_000
+	DevnetMaxWaitTime               = 30 //seconds
+	DevnetPollFrequency             = 1  //seconds
+	DevnetOcrTransmissionFrequency  = 5 * time.Second
+	TestnetFeeLimit                 = 10_000_000_000
+	TestnetMaxWaitTime              = 90 //seconds
+	TestnetPollFrequency            = 5  //seconds
+	TestnetOcrTransmissionFrequency = 10 * time.Second
+
+	// Testing network names
+	Shasta = "shasta"
+	Nile   = "nile"
+	Devnet = "devnet"
 )
 
 func StartTronNode(genesisAddress string) error {

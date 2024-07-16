@@ -7,14 +7,30 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/url"
+	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median/evmreportcodec"
+
+	testcommon "github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+)
+
+// Constants for e2e tests
+const (
+	CLNodeName = "primary"
+	SunPerTrx  = 1_000_000
 )
 
 // GetRSVFromSignature extracts r, s, and v values from the given signature.
@@ -232,4 +248,112 @@ func MustMarshalParams(t *testing.T, params ...any) string {
 	}
 
 	return string(paramsJsonBytes)
+}
+
+func MustConvertAddress(t *testing.T, tronAddress string) address.Address {
+	a, err := address.Base58ToAddress(tronAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
+
+// SetupLocalStack sets up chainlink node, client, gRPC client and config for the local tests
+func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.GrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+	grpcUrl := os.Getenv("GRPC_URL")
+	if grpcUrl == "" {
+		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcPort)
+	}
+	solidityGrpcUrl := os.Getenv("SOLIDITY_GRPC_URL")
+	if solidityGrpcUrl == "" {
+		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcSolidityPort)
+	}
+	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
+	if internalGrpcUrl == "" {
+		internalGrpcUrl = testutils.DefaultInternalGrpcUrl
+	}
+	internalSolidityUrl := os.Getenv("INTERNAL_SOLIDITY_URL")
+	if internalSolidityUrl == "" {
+		internalSolidityUrl = testutils.DefaultInternalSolidityUrl
+	}
+	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
+	if internalJsonRpcUrl == "" {
+		internalJsonRpcUrl = testutils.DefaultInternalJsonRpcUrl
+	}
+
+	logger.Info().Msg("Starting java-tron container...")
+	err := testutils.StartTronNode(genesisAddress)
+	require.NoError(t, err, "Could not start java-tron container")
+	logger.Info().Str("grpc url", grpcUrl).Msg("TRON node config")
+
+	return setUpTronEnvironment(t, logger, grpcUrl, solidityGrpcUrl, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl, genesisAddress)
+}
+
+func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
+	logger.Info().Msg("Stopping chainlink-nodes container...")
+	commonConfig.TearDownLocalEnvironment(t)
+	logger.Info().Msg("Tearing down java-tron container...")
+	err := testutils.StopTronNode()
+	require.NoError(t, err, "Could not tear down java-tron container")
+}
+
+// SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
+func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient sdk.GrpcClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
+	var grpcUrl, solidityUrl, jsonRpcUrl string
+	switch network {
+	case testutils.Shasta:
+		grpcUrl = testutils.ShastaGrpcUrl
+		solidityUrl = testutils.ShastaGrpcSolidityUrl
+		jsonRpcUrl = testutils.ShastaJsonRpcUrl
+	case testutils.Nile:
+		grpcUrl = testutils.NileGrpcUrl
+		solidityUrl = testutils.NileGrpcSolidityUrl
+		jsonRpcUrl = testutils.NileJsonRpcUrl
+	default:
+		t.Fatalf("Unknown network: %s", network)
+	}
+	return setUpTronEnvironment(t, logger, grpcUrl, solidityUrl, grpcUrl, solidityUrl, jsonRpcUrl, pubAddress)
+}
+
+func TeardownTestnetStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
+	logger.Info().Msg("Stopping chainlink-nodes container...")
+	commonConfig.TearDownLocalEnvironment(t)
+}
+
+// setupTronEnvironment creates chainlink client, gRPC client and chainId for the tests
+func setUpTronEnvironment(
+	t *testing.T, logger zerolog.Logger, grpcUrl,
+	solidityGrpcUrl, internalGrpcUrl, internalSolidityUrl,
+	internalJsonRpcUrl, genesisAddress string,
+) (sdk.GrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+	grpcUrlObj, err := url.Parse(grpcUrl)
+	require.NoError(t, err)
+	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
+	require.NoError(t, err)
+
+	grpcClient, err := sdk.CreateCombinedGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
+	require.NoError(t, err)
+
+	blockInfo, err := grpcClient.GetBlockByNum(0)
+	require.NoError(t, err)
+
+	blockId := blockInfo.Blockid
+	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
+	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
+	//
+	// however on both mainnet, testnets committee.allowOptimizedReturnValueOfChainId is enabled, so we've done the same for devnet
+	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
+	// is important for the config digest calculation:
+	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
+	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+	logger.Info().Str("chain id", chainId).Msg("Read first block")
+
+	commonConfig := testcommon.NewCommon(t, chainId, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl)
+	commonConfig.SetLocalEnvironment(t, genesisAddress)
+
+	chainlinkClient, err := testcommon.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CLNodeName)
+	require.NoError(t, err, "Could not create chainlink client")
+	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
+
+	return grpcClient, chainlinkClient, commonConfig
 }

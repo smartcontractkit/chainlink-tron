@@ -58,7 +58,7 @@ func DeployContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string, contra
 	return txHash
 }
 
-func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress string, contractName string, abiJson string, codeHex string, params []interface{}) string {
+func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress string, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
 	parsedABI, err := abi.JSON(bytes.NewReader([]byte(abiJson)))
 	require.NoError(t, err)
 
@@ -76,7 +76,7 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 		Bytecode:                   codeHex,
 		Parameter:                  hex.EncodeToString(encodedParams),
 		Name:                       contractName,
-		FeeLimit:                   1000000000,
+		FeeLimit:                   feeLimit,
 		ConsumeUserResourcePercent: 0,
 		OriginEnergyLimit:          10000000,
 		Visible:                    true,

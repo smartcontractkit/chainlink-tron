@@ -164,6 +164,7 @@ HTTPSPort = 0
 	return c
 }
 
+// SetupLocalEnvironment creates the environment for chainlink nodes
 func (c *Common) SetLocalEnvironment(t *testing.T, genesisAddress string) {
 	// Run scripts to set up local test environment
 	log.Info().Msg("Starting postgres container...")
