@@ -2,5 +2,5 @@
 
 Documentations:
 
-- [Integration Test](./integration-test/README.md)
-- [Testing Wiki](./GauntletPlusPlus.md)
+- [Integration Test](./integration-tests/README.md)
+- [G++ Testing Wiki](./integration-tests/GauntletPlusPlus.md)

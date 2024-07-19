@@ -92,6 +92,13 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	return broadcastResponse.TxID
 }
 
+func CheckContractDeployed(t *testing.T, httpUrl string, address string) (contractDeployed bool) {
+	jsonClient := jsonclient.NewTronJsonClient(httpUrl)
+	contractDeployed, err := jsonClient.GetContract(address)
+	require.NoError(t, err)
+	return contractDeployed
+}
+
 func WaitForTransactionInfo(t *testing.T, grpcClient sdk.GrpcClient, txHash string, waitSecs int) *core.TransactionInfo {
 	for i := 1; i <= waitSecs; i++ {
 		txInfo, err := grpcClient.GetTransactionInfoByID(txHash)

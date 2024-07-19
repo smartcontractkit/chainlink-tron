@@ -155,6 +155,8 @@ func runOCR2Test(
 		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
 		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, txnWaitTime)
 		contractAddress := address.Address(txInfo.ContractAddress).String()
+		contractDeployed := testutils.CheckContractDeployed(t, httpUrl, contractAddress)
+		require.True(t, contractDeployed, "Contract not deployed")
 		return contractAddress
 	}
 
