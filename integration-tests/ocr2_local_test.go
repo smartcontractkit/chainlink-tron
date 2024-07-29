@@ -387,25 +387,15 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 		require.Equal(t, stuck, false, "Round + epochs should not be stuck")
 	}
 
-	//// Test proxy reading
-	// TODO(BCI-1746): dynamic mock-adapter values
-	//mockAdapterValue := 5
-	//// TODO: would be good to test proxy switching underlying feeds
-	//resp, err = cosmosClient.ContractState(ocrProxyAddress, []byte(`{"latest_round_data":{}}`))
-	//if !isSoak {
-	//require.NoError(t, err, "Reading round data from proxy should not fail")
-	//// assert.Equal(t, len(roundDataRaw), 5, "Round data from proxy should match expected size")
-	//}
-	//roundData := struct {
-	//Answer string `json:"answer"`
-	//}{}
-	//err = json.Unmarshal(resp, &roundData)
-	//require.NoError(t, err, "Failed to unmarshal round data")
-
-	//valueBig, success := new(big.Int).SetString(roundData.Answer, 10)
-	//require.True(t, success, "Failed to parse round data")
-	//value := valueBig.Int64()
-	//require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
+	/// Test proxy reading
+	// TODO: would be good to test proxy switching underlying feeds
+	mockAdapterValue := 5
+	latestRoundData, err := ocrReader.LatestRoundData(ctx, ocrProxyAddress)
+	if !isSoak {
+		require.NoError(t, err, "Reading round data from proxy should not fail")
+	}
+	value := latestRoundData.Answer.Int64()
+	require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
 
 	return nil
 }
