@@ -190,7 +190,6 @@ func runOCR2Test(
 	logger.Info().Str("address", ocr2AggregatorAddress).Msg("OCR2 aggregator deployed")
 
 	eacAggregatorProxyArtifact := contract.MustLoadArtifact(t, "ocr2-v0.6/EACAggregatorProxy.json")
-	// TODO: check constructor args
 	eacAggregatorProxyAddress := deployContract("EACAggregatorProxy", eacAggregatorProxyArtifact, []interface{}{
 		utils.MustConvertToEthAddress(t, ocr2AggregatorAddress),
 		utils.MustConvertToEthAddress(t, requesterAccessControllerAddress),
@@ -275,13 +274,6 @@ func runOCR2Test(
 	err = validateRounds(t, grpcClient, utils.MustConvertAddress(t, ocr2AggregatorAddress), utils.MustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
 	require.NoError(t, err, "Validating round should not fail")
 
-	// TODO: does this need to be reenabled?
-	//
-	// t.Cleanup(func() {
-	// 	err = actions.TeardownSuite(t, commonConfig.Env, "./", nil, nil, zapcore.DPanicLevel, nil)
-	// 	//err = actions.TeardownSuite(t, t.Common.Env, utils.ProjectRoot, t.Cc.ChainlinkNodes, nil, zapcore.ErrorLevel)
-	// 	require.NoError(t, err, "Error tearing down environment")
-	// })
 }
 
 func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
