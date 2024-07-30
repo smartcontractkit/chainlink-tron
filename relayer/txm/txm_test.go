@@ -3,6 +3,7 @@ package txm_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
@@ -62,6 +63,8 @@ func TestTxm(t *testing.T) {
 		EnergyRequired: 1000,
 	}, nil)
 	grpcClient.On("GetEnergyPrices").Maybe().Return(&api.PricesResponseMessage{Prices: "0:420"}, nil)
+	txid, err := hex.DecodeString("2a037789237971c1c1d648f7b90b70c68a9aa6b0a2892f947213286346d0210d")
+	require.NoError(t, err)
 	grpcClient.On("TriggerContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&api.TransactionExtention{
 		Transaction: &core.Transaction{
 			RawData: &core.TransactionRaw{
@@ -71,7 +74,7 @@ func TestTxm(t *testing.T) {
 				FeeLimit:     789,
 			},
 		},
-		Txid:           []byte("txid"),
+		Txid:           txid,
 		ConstantResult: [][]byte{{0x01}},
 		Result:         &api.Return{Result: true},
 		EnergyUsed:     1000,
