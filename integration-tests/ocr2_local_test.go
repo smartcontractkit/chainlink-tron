@@ -57,7 +57,7 @@ func runOCR2Test(
 	pubAddress string, network string,
 ) {
 	var httpUrl string
-	var grpcClient sdk.GrpcClient
+	var combinedClient *sdk.CombinedGrpcClient
 	var chainlinkClient *common.ChainlinkClient
 	var commonConfig *common.Common
 	var feeLimit int
@@ -67,7 +67,7 @@ func runOCR2Test(
 
 	switch network {
 	case testutils.Devnet:
-		grpcClient, chainlinkClient, commonConfig = utils.SetupLocalStack(t, logger, pubAddress)
+		combinedClient, chainlinkClient, commonConfig = utils.SetupLocalStack(t, logger, pubAddress)
 		defer utils.TeardownLocalStack(t, logger, commonConfig)
 		httpUrl = os.Getenv("HTTP_URL")
 		if httpUrl == "" {
@@ -80,7 +80,7 @@ func runOCR2Test(
 
 	case testutils.Shasta:
 		httpUrl = testutils.ShastaHttpUrl
-		grpcClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
+		combinedClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
 		defer utils.TeardownTestnetStack(t, logger, commonConfig)
 		feeLimit = testutils.TestnetFeeLimit
 		txnWaitTime = testutils.TestnetMaxWaitTime
@@ -89,7 +89,7 @@ func runOCR2Test(
 
 	case testutils.Nile:
 		httpUrl = testutils.NileHttpUrl
-		grpcClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
+		combinedClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress, network)
 		defer utils.TeardownTestnetStack(t, logger, commonConfig)
 		feeLimit = testutils.TestnetFeeLimit
 		txnWaitTime = testutils.TestnetMaxWaitTime
@@ -104,7 +104,7 @@ func runOCR2Test(
 	require.NoError(t, err, "Could not create relay logger")
 
 	testKeystore := testutils.NewTestKeystore(pubAddress, privateKey)
-	txmgr := txm.New(clientLogger, testKeystore, grpcClient, txm.TronTxmConfig{
+	txmgr := txm.New(clientLogger, testKeystore, combinedClient, txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	})
@@ -115,7 +115,7 @@ func runOCR2Test(
 
 	var transferAmount int64 = utils.SunPerTrx * 500 // 500 TRX
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
-		transferTx, err := grpcClient.Transfer(pubAddress, nodeAddr, transferAmount)
+		transferTx, err := combinedClient.Transfer(pubAddress, nodeAddr, transferAmount)
 		require.NoError(t, err, "Creation of Transfer Txn from genesis account to node failed")
 		_, err = txmgr.SignAndBroadcast(context.Background(), pubAddress, transferTx)
 		require.NoError(t, err, "Broadcast of Transfer Txn from genesis account to node failed")
@@ -126,7 +126,8 @@ func runOCR2Test(
 	// Check that the nodes have been funded
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
 		for {
-			accountInfo, err := grpcClient.GetAccount(nodeAddr)
+			// use the full node grpc client to check account for quicker feedback.
+			accountInfo, err := combinedClient.GrpcClient.GetAccount(nodeAddr)
 			if err != nil {
 				// do not error on 'account not found' - this occurs when there is no account info (transfer hasnt executed yet)
 				if err.Error() == "account not found" {
@@ -153,7 +154,8 @@ func runOCR2Test(
 
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
 		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
-		txInfo := testutils.WaitForTransactionInfo(t, grpcClient, txHash, txnWaitTime)
+		// use full node client for quicker feedback
+		txInfo := testutils.WaitForTransactionInfo(t, combinedClient.GrpcClient, txHash, txnWaitTime)
 		contractAddress := address.Address(txInfo.ContractAddress).String()
 		contractDeployed := testutils.CheckContractDeployed(t, httpUrl, contractAddress)
 		require.True(t, contractDeployed, "Contract not deployed")
@@ -205,17 +207,23 @@ func runOCR2Test(
 	require.NoError(t, err)
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
-	balanceResponse, err := grpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
+	// Use the full node grpc client to check balance for quicker feedback.
+	balanceResponse, err := combinedClient.GrpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
 	require.NoError(t, err)
 	balanceValue := new(big.Int).SetBytes(balanceResponse.ConstantResult[0])
 
-	time.Sleep(time.Second * time.Duration(pollFrequency))
 	require.Equal(t, mintAmount, balanceValue)
 	logger.Info().Str("amount", mintAmount.String()).Msg("Minted LINK token")
 
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig := chainlinkClient.GetSetConfigArgs(t)
+	signers, transmitters, f, _, offchainConfigVersion, offchainConfig := chainlinkClient.GetSetConfigArgs(t)
 
-	//// Define the values
+	transmittersStr := make([]string, len(transmitters))
+	for i, t := range transmitters {
+		transmittersStr[i] = string(t)
+	}
+	require.Equal(t, chainlinkClient.GetNodeAddresses(), transmittersStr, "Transmitters should match node addresses")
+
+	// Define the values
 	onchainConfigBytes := []byte{}
 	// version (uint8)
 	onchainConfigBytes = append(onchainConfigBytes, byte(1))
@@ -223,13 +231,6 @@ func runOCR2Test(
 	onchainConfigBytes = append(onchainConfigBytes, ethcommon.LeftPadBytes(minAnswer.Bytes(), 24)...)
 	// maxAnswer (int192)
 	onchainConfigBytes = append(onchainConfigBytes, ethcommon.LeftPadBytes(maxAnswer.Bytes(), 24)...)
-
-	//// version 2 (OCR2OffchainConfigVersion)
-	//offchainConfigVersion := "2"
-
-	fmt.Printf("TEST SIGNERS: %+v - TRANSMITTERS: %+v\n", signers, transmitters)
-	fmt.Printf("ONCHAIN CONFIG: %T %+v\n", onchainConfig, onchainConfig)
-	fmt.Printf("OFFCHAIN CONFIG: %T %+v\n", offchainConfig, offchainConfig)
 
 	signerAddresses := []string{}
 	for _, signer := range signers {
@@ -241,7 +242,7 @@ func runOCR2Test(
 	// TODO: should we set onchainConfig as offchainConfig?
 	err = txmgr.Enqueue(pubAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
 		/* signers= */ "address[]", signerAddresses,
-		/* trasmitters= */ "address[]", chainlinkClient.GetNodeAddresses(),
+		/* trasmitters= */ "address[]", transmittersStr,
 		/* f= */ "uint8", fmt.Sprintf("%d", f),
 		/* onchainConfig= */ "bytes", onchainConfigBytes,
 		/* offchainConfigVersion= */ "uint64", fmt.Sprintf("%d", offchainConfigVersion),
@@ -253,7 +254,7 @@ func runOCR2Test(
 
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
-	configDetailsResponse, err := grpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", nil)
+	configDetailsResponse, err := combinedClient.GrpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", nil)
 	require.NoError(t, err)
 
 	configCount := new(big.Int).SetBytes(configDetailsResponse.ConstantResult[0][0:32])
@@ -271,12 +272,12 @@ func runOCR2Test(
 		ocr2AggregatorAddress)
 	require.NoError(t, err, "Could not create jobs for contract")
 
-	err = validateRounds(t, grpcClient, utils.MustConvertAddress(t, ocr2AggregatorAddress), utils.MustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
+	err = validateRounds(t, combinedClient, utils.MustConvertAddress(t, ocr2AggregatorAddress), utils.MustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
 	require.NoError(t, err, "Validating round should not fail")
 
 }
 
-func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
+func validateRounds(t *testing.T, combinedClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
 	var rounds int
 	if isSoak {
 		rounds = 99999999
@@ -294,7 +295,7 @@ func validateRounds(t *testing.T, grpcClient sdk.GrpcClient, ocrAddress address.
 	ocrLogger, err := relaylogger.New()
 	require.NoError(t, err, "Failed to create OCR relay logger")
 
-	readerClient := reader.NewReader(grpcClient, ocrLogger)
+	readerClient := reader.NewReader(combinedClient, ocrLogger)
 	ocrReader := ocr2.NewOCR2Reader(readerClient, ocrLogger)
 
 	previous := ocr2.TransmissionDetails{}

@@ -259,7 +259,7 @@ func MustConvertAddress(t *testing.T, tronAddress string) address.Address {
 }
 
 // SetupLocalStack sets up chainlink node, client, gRPC client and config for the local tests
-func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.GrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (*sdk.CombinedGrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
 	grpcUrl := os.Getenv("GRPC_URL")
 	if grpcUrl == "" {
 		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcPort)
@@ -298,7 +298,7 @@ func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testc
 }
 
 // SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
-func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient sdk.GrpcClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
+func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient *sdk.CombinedGrpcClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
 	var grpcUrl, solidityUrl, jsonRpcUrl string
 	switch network {
 	case testutils.Shasta:
@@ -325,7 +325,7 @@ func setUpTronEnvironment(
 	t *testing.T, logger zerolog.Logger, grpcUrl,
 	solidityGrpcUrl, internalGrpcUrl, internalSolidityUrl,
 	internalJsonRpcUrl, genesisAddress string,
-) (sdk.GrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+) (*sdk.CombinedGrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
 	grpcUrlObj, err := url.Parse(grpcUrl)
 	require.NoError(t, err)
 	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
