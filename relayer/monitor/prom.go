@@ -11,8 +11,9 @@ var promTronBalance = promauto.NewGaugeVec(
 	[]string{"account", "chainID", "chainSet", "denomination"},
 )
 
+// updateProm updates the prometheus metric
 func (b *balanceMonitor) updateProm(acc tronaddress.Address, sun int64) {
-	v := sunToTrx(sun) // convert from SUN to TRX
+	v := sunToTrx(sun)
 	promTronBalance.WithLabelValues(acc.String(), b.chainID, "tron", "TRX").Set(v)
 }
 

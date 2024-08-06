@@ -146,7 +146,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 		b.updateFn(addr, sun)
 	}
 	if !gotSomeBals {
-		// Try a new client next time.
+		// Try a new client next time. // TODO: This is for multinode
 		b.reader = nil
 	}
 }

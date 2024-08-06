@@ -17,7 +17,6 @@ func TestBalanceMonitorUpdateProm(t *testing.T) {
 	testAddr, err := tronaddress.Base58ToAddress("TJRabPrwbZy45sbavfcjinPJC18kjpRTv8")
 	require.NoError(t, err, "Failed to create test address")
 
-	// Test cases
 	testCases := []struct {
 		name     string
 		sun      int64
@@ -34,7 +33,6 @@ func TestBalanceMonitorUpdateProm(t *testing.T) {
 			promTronBalance.Reset()
 			b.updateProm(testAddr, tc.sun)
 
-			// Check if the metric was updated correctly
 			expected := tc.expected
 			actual := testutil.ToFloat64(promTronBalance.WithLabelValues(testAddr.String(), b.chainID, "tron", "TRX"))
 
