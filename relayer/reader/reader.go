@@ -22,6 +22,7 @@ type Reader interface {
 	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
 	BaseClient() sdk.GrpcClient
+	Balance(address tronaddress.Address) (int64, error)
 }
 
 var _ Reader = (*ReaderClient)(nil)
@@ -190,4 +191,13 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	}
 
 	return events, nil
+}
+
+func (c *ReaderClient) Balance(address tronaddress.Address) (int64, error) {
+	account, err := c.rpc.GetAccount(address.String())
+	if err != nil {
+		return 0, fmt.Errorf("failed to get account: %w", err)
+	}
+
+	return account.GetBalance(), nil
 }
