@@ -14,6 +14,34 @@ type Reader struct {
 	mock.Mock
 }
 
+// Balance provides a mock function with given fields: addr
+func (_m *Reader) Balance(addr address.Address) (int64, error) {
+	ret := _m.Called(addr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Balance")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(address.Address) (int64, error)); ok {
+		return rf(addr)
+	}
+	if rf, ok := ret.Get(0).(func(address.Address) int64); ok {
+		r0 = rf(addr)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(address.Address) error); ok {
+		r1 = rf(addr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // BaseClient provides a mock function with given fields:
 func (_m *Reader) BaseClient() sdk.GrpcClient {
 	ret := _m.Called()
