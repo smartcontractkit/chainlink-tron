@@ -7,8 +7,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
-// Global solana defaults.
+// Global tron defaults.
 var defaultConfigSet = chainConfigSet{
+	// poll period for balance monitoring
+	BalancePollPeriod: 5 * time.Second,
 	// transaction broadcast channel size
 	BroadcastChanSize: 4096,
 	// polling period for transaction confirmation
@@ -21,6 +23,7 @@ var defaultConfigSet = chainConfigSet{
 
 // opt: remove
 type chainConfigSet struct {
+	BalancePollPeriod   time.Duration
 	BroadcastChanSize   uint64
 	ConfirmPollPeriod   time.Duration
 	OCR2CachePollPeriod time.Duration
@@ -32,6 +35,7 @@ type ChainConfig struct {
 	ConfirmPollPeriod   *config.Duration
 	OCR2CachePollPeriod *time.Duration
 	OCR2CacheTTL        *time.Duration
+	BalancePollPeriod   *time.Duration
 }
 
 func (c *ChainConfig) SetDefaults() {
@@ -46,6 +50,9 @@ func (c *ChainConfig) SetDefaults() {
 	}
 	if c.OCR2CacheTTL == nil {
 		c.OCR2CacheTTL = &defaultConfigSet.OCR2CacheTTL
+	}
+	if c.BalancePollPeriod == nil {
+		c.BalancePollPeriod = &defaultConfigSet.OCR2CachePollPeriod
 	}
 }
 

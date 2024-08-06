@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/monitor"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
@@ -69,15 +70,16 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 	})
 
-	//TODO: Create balance monitor here
+	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, client)
 
 	return &TronRelayer{
-		chainId:    id,
-		chainIdNum: idNum,
-		cfg:        cfg,
-		lggr:       logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
-		client:     client,
-		txm:        txmgr,
+		chainId:        id,
+		chainIdNum:     idNum,
+		cfg:            cfg,
+		lggr:           logger.Named(logger.With(lggr, "chainID", id, "chain", "tron"), "TronRelayer"),
+		client:         client,
+		txm:            txmgr,
+		balanceMonitor: balanceMonitor,
 	}, nil
 }
 
@@ -90,6 +92,7 @@ func (t *TronRelayer) Start(ctx context.Context) error {
 	return t.StartOnce("TronRelayer", func() error {
 		t.lggr.Debug("Starting")
 		t.lggr.Debug("Starting txm")
+		t.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
 		return ms.Start(ctx, t.txm)
 	})
@@ -99,6 +102,7 @@ func (t *TronRelayer) Close() error {
 	return t.StopOnce("TronRelayer", func() error {
 		t.lggr.Debug("Stopping")
 		t.lggr.Debug("Stopping txm")
+		t.lggr.Debug("Stopping balance monitor")
 		return services.CloseAll(t.txm)
 	})
 }

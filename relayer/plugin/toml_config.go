@@ -138,6 +138,9 @@ func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
 }
 
 func setFromChain(c, f *ChainConfig) {
+	if f.BalancePollPeriod != nil {
+		c.BalancePollPeriod = f.BalancePollPeriod
+	}
 	if f.BroadcastChanSize != nil {
 		c.BroadcastChanSize = f.BroadcastChanSize
 	}
@@ -176,6 +179,10 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func (c *TOMLConfig) BalancePollPeriod() time.Duration {
+	return *c.ChainConfig.BalancePollPeriod
 }
 
 func (c *TOMLConfig) BroadcastChanSize() uint64 {
