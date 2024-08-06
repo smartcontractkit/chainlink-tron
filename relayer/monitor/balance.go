@@ -26,19 +26,19 @@ type BalanceClient interface {
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the TRX balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader BalanceClient) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader BalanceClient) *balanceMonitor {
 	b := balanceMonitor{
-		chainID:   chainID,
-		cfg:       cfg,
-		lggr:      logger.Named(lggr, "BalanceMonitor"),
-		ks:        ks,
-		newReader: newReader,
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
+		chainID: chainID,
+		cfg:     cfg,
+		lggr:    logger.Named(lggr, "BalanceMonitor"),
+		ks:      ks,
+		reader:  reader,
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b

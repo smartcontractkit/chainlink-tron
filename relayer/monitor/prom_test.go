@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBalanceMonitor_UpdateProm(t *testing.T) {
+func TestBalanceMonitorUpdateProm(t *testing.T) {
 	b := &balanceMonitor{
 		chainID: "testChainID",
 	}
