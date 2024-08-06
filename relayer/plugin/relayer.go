@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -33,8 +32,9 @@ type TronRelayer struct {
 	cfg  *TOMLConfig
 	lggr logger.Logger
 
-	client sdk.GrpcClient
-	txm    *txm.TronTxm
+	client         sdk.GrpcClient
+	txm            *txm.TronTxm
+	balanceMonitor services.Service
 }
 
 var _ loop.Relayer = &TronRelayer{}
@@ -43,19 +43,15 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	id := *cfg.ChainID
 
 	var idNum *big.Int
+	var ok bool
 	if strings.HasPrefix(id, "0x") {
-		// TODO: we can just do new(big.Int).SetString(.., 16)
-		idBytes, err := hex.DecodeString(id[2:])
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse hex chain id %s: %w", id, err)
-		}
-		idNum = new(big.Int).SetBytes(idBytes)
+		idNum, ok = new(big.Int).SetString(id[2:], 16)
 	} else {
-		parsedNum, ok := new(big.Int).SetString(id, 10)
-		if !ok {
-			return nil, fmt.Errorf("couldn't parse numeric chain id %s", id)
-		}
-		idNum = parsedNum
+		idNum, ok = new(big.Int).SetString(id, 10)
+	}
+
+	if !ok {
+		return nil, fmt.Errorf("couldn't parse chain id %s", id)
 	}
 
 	nodeConfig, err := cfg.ListNodes().SelectRandom()
@@ -72,6 +68,8 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 	})
+
+	//TODO: Create balance monitor here
 
 	return &TronRelayer{
 		chainId:    id,
