@@ -94,7 +94,7 @@ func (t *TronRelayer) Start(ctx context.Context) error {
 		t.lggr.Debug("Starting txm")
 		t.lggr.Debug("Starting balance monitor")
 		var ms services.MultiStart
-		return ms.Start(ctx, t.txm)
+		return ms.Start(ctx, t.txm, t.balanceMonitor)
 	})
 }
 
@@ -103,7 +103,7 @@ func (t *TronRelayer) Close() error {
 		t.lggr.Debug("Stopping")
 		t.lggr.Debug("Stopping txm")
 		t.lggr.Debug("Stopping balance monitor")
-		return services.CloseAll(t.txm)
+		return services.CloseAll(t.txm, t.balanceMonitor)
 	})
 }
 

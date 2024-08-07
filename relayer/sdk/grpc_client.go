@@ -35,7 +35,6 @@ type GrpcClient interface {
 	GetNowBlock() (*api.BlockExtention, error)
 	GetContractABI(address string) (*core.SmartContract_ABI, error)
 	GetBlockByNum(num int64) (*api.BlockExtention, error)
-	
 }
 
 var _ GrpcClient = &client.GrpcClient{}

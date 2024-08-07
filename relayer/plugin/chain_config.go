@@ -52,7 +52,7 @@ func (c *ChainConfig) SetDefaults() {
 		c.OCR2CacheTTL = &defaultConfigSet.OCR2CacheTTL
 	}
 	if c.BalancePollPeriod == nil {
-		c.BalancePollPeriod = &defaultConfigSet.OCR2CachePollPeriod
+		c.BalancePollPeriod = &defaultConfigSet.BalancePollPeriod
 	}
 }
 
