@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
@@ -32,17 +31,23 @@ func TestBalanceMonitor(t *testing.T) {
 		"1.000000",
 	}
 
-	client := new(mocks.Reader)
-	client.Test(t)
+	mockClient := &MockSolidityGRPCClient{}
 	type update struct{ acc, bal string }
 	var exp []update
 	for i := range bals {
 		acc := ks[i]
-		client.On("Balance", acc).Return(bals[i], nil)
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
+	mockClient.GetAccountBalanceFunc = func(address tronaddress.Address) (int64, error) {
+		for i, addr := range ks {
+			if addr.String() == address.String() {
+				return bals[i], nil
+			}
+		}
+		return 0, fmt.Errorf("address not found")
+	}
 	cfg := &config{balancePollPeriod: time.Second}
-	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, nil)
+	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, mockClient)
 	var got []update
 	done := make(chan struct{})
 	b.updateFn = func(acc tronaddress.Address, sun int64) {
@@ -57,12 +62,11 @@ func TestBalanceMonitor(t *testing.T) {
 			close(done)
 		}
 	}
-	b.reader = client
+	b.reader = mockClient
 
 	require.NoError(t, b.Start(tests.Context(t)))
 	t.Cleanup(func() {
 		assert.NoError(t, b.Close())
-		client.AssertExpectations(t)
 	})
 	select {
 	case <-time.After(tests.WaitTimeout(t)):
@@ -95,6 +99,18 @@ func (k keystore) Accounts(ctx context.Context) (ks []string, err error) {
 	return
 }
 
-type balanceReader interface {
-	Balance(addr string) (int64, error)
+func (k keystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, error) {
+	// No Op
+	return nil, nil
+}
+
+type MockSolidityGRPCClient struct {
+	GetAccountBalanceFunc func(address tronaddress.Address) (int64, error)
+}
+
+func (m *MockSolidityGRPCClient) GetAccountBalance(address tronaddress.Address) (int64, error) {
+	if m.GetAccountBalanceFunc != nil {
+		return m.GetAccountBalanceFunc(address)
+	}
+	return 0, fmt.Errorf("GetAccountBalance not implemented")
 }
