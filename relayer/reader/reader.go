@@ -192,12 +192,3 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 
 	return events, nil
 }
-
-func (c *ReaderClient) Balance(addr tronaddress.Address) (int64, error) {
-	account, err := c.rpc.GetAccount(addr.String())
-	if err != nil {
-		return 0, fmt.Errorf("failed to get account: %w", err)
-	}
-
-	return account.GetBalance(), nil
-}

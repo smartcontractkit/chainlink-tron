@@ -1,11 +1,9 @@
 package sdk
 
 import (
-	"fmt"
 	"net/url"
 	"time"
 
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/client"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
@@ -76,14 +74,4 @@ func (g *CombinedGrpcClient) GetNowBlock() (*api.BlockExtention, error) {
 // GetBlockByNum block from number
 func (g *CombinedGrpcClient) GetBlockByNum(num int64) (*api.BlockExtention, error) {
 	return g.SolidityClient.GetBlockByNum(num)
-}
-
-// Balance returns TRX balance of address
-func (g *CombinedGrpcClient) Balance(address tronaddress.Address) (int64, error) {
-	account, err := g.GetAccount(address.String())
-	if err != nil {
-		return 0, fmt.Errorf("failed to get account: %w", err)
-	}
-
-	return account.GetBalance(), nil
 }

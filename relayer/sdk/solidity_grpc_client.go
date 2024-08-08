@@ -10,6 +10,7 @@ import (
 
 	"github.com/fbsobreira/gotron-sdk/pkg/abi"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
@@ -188,4 +189,14 @@ func (g *SolidityGrpcClient) GetBlockByNum(num int64) (*api.BlockExtention, erro
 
 	}
 	return result, nil
+}
+
+// Balance returns TRX balance of address
+func (g *SolidityGrpcClient) GetAccountBalance(address tronaddress.Address) (int64, error) {
+	account, err := g.GetAccount(address.String())
+	if err != nil {
+		return 0, fmt.Errorf("failed to get account: %w", err)
+	}
+
+	return account.GetBalance(), nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 )
 
@@ -16,21 +17,16 @@ type Config interface {
 	BalancePollPeriod() time.Duration
 }
 
-// Keystore provides the addresses to be monitored.
-type Keystore interface {
-	Accounts(ctx context.Context) ([]string, error)
-}
-
 type BalanceClient interface {
-	Balance(addr tronaddress.Address) (int64, error)
+	GetAccountBalance(addr tronaddress.Address) (int64, error)
 }
 
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the TRX balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader BalanceClient) services.Service {
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, reader BalanceClient) services.Service {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks Keystore, reader BalanceClient) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, reader BalanceClient) *balanceMonitor {
 	b := balanceMonitor{
 		chainID: chainID,
 		cfg:     cfg,
@@ -49,7 +45,7 @@ type balanceMonitor struct {
 	chainID   string
 	cfg       Config
 	lggr      logger.Logger
-	ks        Keystore
+	ks        core.Keystore
 	newReader func() (BalanceClient, error)
 	updateFn  func(acc tronaddress.Address, sun int64) // overridable for testing
 
@@ -137,7 +133,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			b.lggr.Errorw("Failed to parse address", "account", k, "err", err)
 			continue
 		}
-		sun, err := reader.Balance(addr)
+		sun, err := reader.GetAccountBalance(addr)
 		if err != nil {
 			b.lggr.Errorw("Failed to get balance", "account", k, "err", err)
 			continue
