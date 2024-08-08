@@ -20,7 +20,6 @@ type Reader interface {
 	CallContract(address tronaddress.Address, method string, params []any) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
 	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
-	Balance(addr tronaddress.Address) (int64, error)
 
 	BaseClient() sdk.GrpcClient
 }
