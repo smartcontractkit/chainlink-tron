@@ -36,7 +36,6 @@ func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.K
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
 	}
-	b.updateFn = b.updateProm
 	return &b
 }
 
@@ -47,7 +46,6 @@ type balanceMonitor struct {
 	lggr      logger.Logger
 	ks        core.Keystore
 	newReader func() (BalanceClient, error)
-	updateFn  func(acc tronaddress.Address, sun int64) // overridable for testing
 
 	reader BalanceClient
 
@@ -139,7 +137,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			continue
 		}
 		gotSomeBals = true
-		b.updateFn(addr, sun)
+		b.updateProm(addr, sun)
 	}
 	if !gotSomeBals {
 		// Try a new client next time. // TODO: This is for multinode
