@@ -15,6 +15,21 @@ type DeployContractRequest struct {
 	Visible                    bool   `json:"visible"`
 }
 
+type Transaction struct {
+	Visible bool   `json:"visible"`
+	TxID    string `json:"txID"`
+	RawData struct {
+		Contract      []map[string]interface{} `json:"contract,omitempty"`
+		RefBlockBytes string                   `json:"ref_block_bytes,omitempty"`
+		RefBlockHash  string                   `json:"ref_block_hash,omitempty"`
+		Expiration    int64                    `json:"expiration,omitempty"`
+		FeeLimit      int64                    `json:"fee_limit,omitempty"`
+		Timestamp     int64                    `json:"timestamp,omitempty"`
+	} `json:"raw_data"`
+	RawDataHex string   `json:"raw_data_hex"`
+	Signature  []string `json:"signature"`
+}
+
 func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Transaction, error) {
 	transaction := Transaction{}
 	deployEndpoint := "/wallet/deploycontract"
@@ -36,7 +51,7 @@ type GetContractRequest struct {
 type GetContractResponse struct {
 	OriginAddress              string `json:"origin_address"`                // Contract creator address
 	ContractAddress            string `json:"contract_address"`              // Contract address
-	Abi                        string `json:"abi"`                           // ABI
+	ABI                        string `json:"abi"`                           // ABI
 	Bytecode                   string `json:"bytecode"`                      // Bytecode
 	CallValue                  int64  `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
 	ConsumeUserResourcePercent int64  `json:"consume_user_resource_percent"` // Proportion of user energy consumption
@@ -65,6 +80,16 @@ func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, err
 	}
 
 	return &contractInfo, nil
+}
+
+func (tc *TronJsonClient) GetContractABI(address string) (string, error) {
+	contractResponse, err := tc.GetContract(address)
+
+	if err != nil {
+		return "", fmt.Errorf("get contract abi failed: %v", err)
+	}
+
+	return contractResponse.ABI, nil
 }
 
 type TriggerSmartContractRequest struct {
@@ -196,4 +221,50 @@ func (tc *TronJsonClient) TriggerConstantContract(tcRequest *TriggerConstantCont
 	}
 
 	return &contractResponse, nil
+}
+
+type BroadcastResponse struct {
+	Result  bool   `json:"result"`
+	Code    string `json:"code"`
+	TxID    string `json:"txid"`
+	Message string `json:"message"`
+}
+
+func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*BroadcastResponse, error) {
+	response := BroadcastResponse{}
+	broadcastEndpoint := "/wallet/broadcasttransaction"
+
+	// response body bytes and http status ignored for now
+	_, _, err := tc.post(tc.baseURL+broadcastEndpoint, reqBody, &response)
+
+	if err != nil {
+		return nil, fmt.Errorf("broadcast transaction failed: %v", err)
+	}
+
+	return &response, nil
+}
+
+type EnergyEstimateRequest struct {
+	OwnerAddress     string `json:"owner_address"`     // Owner address that triggers the contract. If visible=true, use base58check format, otherwise use hex format
+	ContractAddress  string `json:"contract_address"`  // Smart contract address. If visible=true, use base58check format, otherwise use hex format
+	FunctionSelector string `json:"function_selector"` // Function call, must not be left blank
+	Parameter        string `json:"parameter"`
+	Data             string `json:"data"`             // The bytecode of the contract or the data for interacting with smart contracts, including the contract function and parameters
+	CallValue        int64  `json:"call_value"`       // Amount of TRX transferred with this transaction, measured in SUN
+	CallTokenValue   int64  `json:"call_token_value"` // Amount of TRC10 token transferred with this transaction
+	TokenId          int64  `json:"token_id"`         // TRC10 token id
+	Visible          bool   `json:"visible"`          // Whether the address is in base58check format
+}
+
+func (tc *TronJsonClient) EstimateEnergy(reqBody *EnergyEstimateRequest) (*EnergyEstimateResult, error) {
+	response := EnergyEstimateResult{}
+	energyEstimateEndpoint := "/wallet/estimateenergy"
+
+	_, _, err := tc.post(tc.baseURL+energyEstimateEndpoint, reqBody, &response)
+
+	if err != nil {
+		return nil, fmt.Errorf("energy estimation failed: %v", err)
+	}
+
+	return &response, nil
 }

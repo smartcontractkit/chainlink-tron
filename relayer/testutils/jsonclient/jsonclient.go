@@ -15,34 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 )
 
-const (
-	errFailedToReadResponseBody  = "failed to read response body: %v"
-	errFailedToUnmarshalResponse = "failed to unmarshal response: %v"
-	errFailedToDecodeResponse    = "failed to decode response into %s struct: %v"
-)
-
-type Transaction struct {
-	Visible bool   `json:"visible" mapstructure:"visible"`
-	TxID    string `json:"txID" mapstructure:"txID"`
-	RawData struct {
-		Contract      []map[string]interface{} `json:"contract,omitempty" mapstructure:"contract"`
-		RefBlockBytes string                   `json:"ref_block_bytes,omitempty" mapstructure:"ref_block_bytes"`
-		RefBlockHash  string                   `json:"ref_block_hash,omitempty" mapstructure:"ref_block_hash"`
-		Expiration    int64                    `json:"expiration,omitempty" mapstructure:"expiration"`
-		FeeLimit      int64                    `json:"fee_limit,omitempty" mapstructure:"fee_limit"`
-		Timestamp     int64                    `json:"timestamp,omitempty" mapstructure:"timestamp"`
-	} `json:"raw_data" mapstructure:"raw_data"`
-	RawDataHex string   `json:"raw_data_hex" mapstructure:"raw_data_hex"`
-	Signature  []string `json:"signature" mapstructure:"signature"`
-}
-
-type BroadcastResponse struct {
-	Result  bool   `json:"result"`
-	Code    string `json:"code"`
-	TxID    string `json:"txid"`
-	Message string `json:"message"`
-}
-
 type TronJsonClient struct {
 	baseURL string
 	client  *http.Client
@@ -56,14 +28,26 @@ func NewTronJsonClient(baseURL string) *TronJsonClient {
 }
 
 func (tc *TronJsonClient) request(method string, endpoint string, reqBody interface{}, responseBody interface{}) (int, []byte, error) {
-	jsonbytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return 0, []byte{}, NewMarshalError(err)
-	}
+	var req *http.Request
 
-	req, err := http.NewRequest(method, endpoint, bytes.NewBuffer(jsonbytes))
-	if err != nil {
-		return 0, []byte{}, NewRequestCreationError(endpoint, err)
+	if reqBody != nil {
+		var jsonbytes []byte
+		var err error
+		jsonbytes, err = json.Marshal(reqBody)
+		if err != nil {
+			return 0, []byte{}, NewMarshalError(err)
+		}
+
+		req, err = http.NewRequest(method, endpoint, bytes.NewBuffer(jsonbytes))
+		if err != nil {
+			return 0, []byte{}, NewRequestCreationError(endpoint, err)
+		}
+	} else {
+		var err error
+		req, err = http.NewRequest(method, endpoint, nil)
+		if err != nil {
+			return 0, []byte{}, NewRequestCreationError(endpoint, err)
+		}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -97,18 +81,8 @@ func (tc *TronJsonClient) post(endpoint string, reqBody, responseBody interface{
 	return tc.request("POST", endpoint, reqBody, responseBody)
 }
 
-func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*BroadcastResponse, error) {
-	response := BroadcastResponse{}
-	broadcastEndpoint := "/wallet/broadcasttransaction"
-
-	// response body bytes and http status ignored for now
-	_, _, err := tc.post(tc.baseURL+broadcastEndpoint, reqBody, &response)
-
-	if err != nil {
-		return nil, fmt.Errorf("broadcast transaction failed: %v", err)
-	}
-
-	return &response, nil
+func (tc *TronJsonClient) get(endpoint string, responseBody interface{}) (int, []byte, error) {
+	return tc.request("GET", endpoint, nil, responseBody)
 }
 
 func (t *Transaction) SignWithKey(privateKey *ecdsa.PrivateKey) error {
