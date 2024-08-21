@@ -32,6 +32,7 @@ func TestBalanceMonitor(t *testing.T) {
 	}
 
 	mockClient := &MockSolidityGRPCClient{}
+	type update struct{ acc, bal string }
 	var exp []update
 	for i := range bals {
 		acc := ks[i]
@@ -46,29 +47,34 @@ func TestBalanceMonitor(t *testing.T) {
 		return 0, fmt.Errorf("address not found")
 	}
 	cfg := &config{balancePollPeriod: time.Second}
-
+	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, mockClient)
 	var got []update
-	baseMonitor := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, mockClient)
-	mockMonitor := &mockBalanceMonitor{
-		balanceMonitor: baseMonitor,
-		got:            got,
-		exp:            exp,
-		done:           make(chan struct{}),
+	done := make(chan struct{})
+	b.updateFn = func(acc tronaddress.Address, sun int64) {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		v := sunToTrx(sun)
+		got = append(got, update{acc.String(), fmt.Sprintf("%.6f", v)})
+		if len(got) == len(exp) {
+			close(done)
+		}
 	}
+	b.reader = mockClient
 
-	mockMonitor.reader = mockClient
-
-	require.NoError(t, mockMonitor.Start(tests.Context(t)))
+	require.NoError(t, b.Start(tests.Context(t)))
 	t.Cleanup(func() {
-		assert.NoError(t, mockMonitor.Close())
+		assert.NoError(t, b.Close())
 	})
 	select {
 	case <-time.After(tests.WaitTimeout(t)):
 		t.Fatal("timed out waiting for balance monitor")
-	case <-mockMonitor.done:
+	case <-done:
 	}
 
-	assert.EqualValues(t, exp, mockMonitor.got)
+	assert.EqualValues(t, exp, got)
 }
 
 func generateTronAddress() tronaddress.Address {
@@ -107,26 +113,4 @@ func (m *MockSolidityGRPCClient) GetAccountBalance(address tronaddress.Address) 
 		return m.GetAccountBalanceFunc(address)
 	}
 	return 0, fmt.Errorf("GetAccountBalance not implemented")
-}
-
-type update struct{ acc, bal string }
-
-type mockBalanceMonitor struct {
-	*balanceMonitor
-	got  []update
-	exp  []update
-	done chan struct{}
-}
-
-func (m *mockBalanceMonitor) updateProm(acc tronaddress.Address, sun int64) {
-	select {
-	case <-m.done:
-		return
-	default:
-	}
-	v := sunToTrx(sun)
-	m.got = append(m.got, update{acc.String(), fmt.Sprintf("%.6f", v)})
-	if len(m.got) == len(m.exp) {
-		close(m.done)
-	}
 }
