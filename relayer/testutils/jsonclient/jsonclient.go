@@ -17,13 +17,13 @@ import (
 
 type TronJsonClient struct {
 	baseURL string
-	client  *http.Client
+	client  JsonHttpClient
 }
 
-func NewTronJsonClient(baseURL string) *TronJsonClient {
+func NewTronJsonClient(baseURL string, client JsonHttpClient) *TronJsonClient {
 	return &TronJsonClient{
 		baseURL: baseURL,
-		client:  &http.Client{},
+		client:  client,
 	}
 }
 
