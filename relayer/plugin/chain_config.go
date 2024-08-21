@@ -23,11 +23,11 @@ var defaultConfigSet = chainConfigSet{
 
 // opt: remove
 type chainConfigSet struct {
-	BalancePollPeriod   time.Duration
 	BroadcastChanSize   uint64
 	ConfirmPollPeriod   time.Duration
 	OCR2CachePollPeriod time.Duration
 	OCR2CacheTTL        time.Duration
+	BalancePollPeriod   time.Duration
 }
 
 type ChainConfig struct {
