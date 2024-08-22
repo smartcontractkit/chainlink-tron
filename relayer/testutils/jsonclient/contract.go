@@ -15,16 +15,31 @@ type DeployContractRequest struct {
 	Visible                    bool   `json:"visible"`
 }
 
+type ParameterValue struct {
+	OwnerAddress string                 `json:"owner_address"`
+	NewContract  map[string]interface{} `json:"new_contract"`
+}
+
+type Parameter struct {
+	Value   ParameterValue `json:"value"`
+	TypeUrl string         `json:"type_url"`
+}
+
+type Contract struct {
+	Parameter Parameter `json:"parameter"`
+	Type      string    `json:"type"`
+}
+
 type Transaction struct {
 	Visible bool   `json:"visible"`
 	TxID    string `json:"txID"`
 	RawData struct {
-		Contract      []map[string]interface{} `json:"contract,omitempty"`
-		RefBlockBytes string                   `json:"ref_block_bytes,omitempty"`
-		RefBlockHash  string                   `json:"ref_block_hash,omitempty"`
-		Expiration    int64                    `json:"expiration,omitempty"`
-		FeeLimit      int64                    `json:"fee_limit,omitempty"`
-		Timestamp     int64                    `json:"timestamp,omitempty"`
+		Contract      []Contract `json:"contract,omitempty"`
+		RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
+		RefBlockHash  string     `json:"ref_block_hash,omitempty"`
+		Expiration    int64      `json:"expiration,omitempty"`
+		FeeLimit      int64      `json:"fee_limit,omitempty"`
+		Timestamp     int64      `json:"timestamp,omitempty"`
 	} `json:"raw_data"`
 	RawDataHex string   `json:"raw_data_hex"`
 	Signature  []string `json:"signature"`
@@ -48,16 +63,37 @@ type GetContractRequest struct {
 	Visible bool   `json:"visible"`
 }
 
+type JSONABI struct {
+	Entrys []struct {
+		Anonymous bool `json:"anonymous"`
+		Constant  bool `json:"constant"`
+		Inputs    []struct {
+			Indexed bool   `json:"indexed"`
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+		} `json:"inputs"`
+		Name    string `json:"name"`
+		Outputs []struct {
+			Indexed bool   `json:"indexed"`
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+		} `json:"outputs"`
+		Payable         bool   `json:"payable"`
+		StateMutability string `json:"stateMutability"`
+		Type            string `json:"type"`
+	} `json:"entrys"`
+}
+
 type GetContractResponse struct {
-	OriginAddress              string `json:"origin_address"`                // Contract creator address
-	ContractAddress            string `json:"contract_address"`              // Contract address
-	ABI                        string `json:"abi"`                           // ABI
-	Bytecode                   string `json:"bytecode"`                      // Bytecode
-	CallValue                  int64  `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
-	ConsumeUserResourcePercent int64  `json:"consume_user_resource_percent"` // Proportion of user energy consumption
-	Name                       string `json:"name"`                          // contract name
-	OriginEnergyLimit          int64  `json:"origin_energy_limit"`           // Each transaction is allowed to consume the maximum energy of the contract creator
-	CodeHash                   string `json:"code_hash"`                     // code hash
+	OriginAddress              string  `json:"origin_address"`                // Contract creator address
+	ContractAddress            string  `json:"contract_address"`              // Contract address
+	ABI                        JSONABI `json:"abi"`                           // ABI
+	Bytecode                   string  `json:"bytecode"`                      // Bytecode
+	CallValue                  int64   `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
+	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent"` // Proportion of user energy consumption
+	Name                       string  `json:"name"`                          // contract name
+	OriginEnergyLimit          int64   `json:"origin_energy_limit"`           // Each transaction is allowed to consume the maximum energy of the contract creator
+	CodeHash                   string  `json:"code_hash"`                     // code hash
 }
 
 func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, error) {
@@ -80,16 +116,6 @@ func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, err
 	}
 
 	return &contractInfo, nil
-}
-
-func (tc *TronJsonClient) GetContractABI(address string) (string, error) {
-	contractResponse, err := tc.GetContract(address)
-
-	if err != nil {
-		return "", fmt.Errorf("get contract abi failed: %v", err)
-	}
-
-	return contractResponse.ABI, nil
 }
 
 type TriggerSmartContractRequest struct {

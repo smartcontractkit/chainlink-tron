@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"net/url"
 )
 
 type JsonHttpClient interface {
@@ -14,10 +13,10 @@ type JsonHttpClient interface {
 type MockJsonClient struct {
 	code     int
 	response string
-	error    *url.Error
+	error    error
 }
 
-func NewMockJsonClient(code int, response string, err *url.Error) *MockJsonClient {
+func NewMockJsonClient(code int, response string, err error) *MockJsonClient {
 	return &MockJsonClient{
 		code:     code,
 		response: response,
