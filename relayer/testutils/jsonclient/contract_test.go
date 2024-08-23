@@ -505,4 +505,65 @@ func TestContractDeploy(t *testing.T) {
 	a.Equal(int64(1724323299478), transaction.RawData.Timestamp)
 	a.Equal("CreateSmartContract", transaction.RawData.Contract[0].Type)
 	a.Equal(deployRequest.OwnerAddress, transaction.RawData.Contract[0].Parameter.Value.OwnerAddress)
+	a.Equal("608060405234801561001057600080fd5b5060de8061001f6000396000f30060806040526004361060485763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416631ab06ee58114604d5780639507d39a146067575b600080fd5b348015605857600080fd5b506065600435602435608e565b005b348015607257600080fd5b50607c60043560a0565b60408051918252519081900360200190f35b60009182526020829052604090912055565b600090815260208190526040902054905600a165627a7a72305820fdfe832221d60dd582b4526afa20518b98c2e1cb0054653053a844cf265b25040029", transaction.RawData.Contract[0].Parameter.Value.NewContract.Bytecode)
+	a.Equal("SomeContract", transaction.RawData.Contract[0].Parameter.Value.NewContract.Name)
+	a.Equal("TJmmqjb1DK9TTZbQXzRQ2AuA94z4gKAPFh", transaction.RawData.Contract[0].Parameter.Value.NewContract.OriginAddress)
+}
+
+func TestTriggerSmartContract(t *testing.T) {
+	jsonresponse := `{
+  "result": {
+    "result": true
+  },
+  "transaction": {
+    "visible": true,
+    "txID": "c067951834db369d4e94080f4ebd8f54885e76e8cfd1545e6afbcf63d52842a2",
+    "raw_data": {
+      "contract": [
+        {
+          "parameter": {
+            "value": {
+              "data": "a9059cbb00000000000000000000004115208ef33a926919ed270e2fa61367b2da3753da0000000000000000000000000000000000000000000000000000000000000032",
+              "owner_address": "TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g",
+              "contract_address": "TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs"
+            },
+            "type_url": "type.googleapis.com/protocol.TriggerSmartContract"
+          },
+          "type": "TriggerSmartContract"
+        }
+      ],
+      "ref_block_bytes": "26da",
+      "ref_block_hash": "6e5a2311d5f54849",
+      "expiration": 1724409708000,
+      "fee_limit": 1000000000,
+      "timestamp": 1724409648766
+    },
+    "raw_data_hex": "0a0226da22086e5a2311d5f5484940e0fbcff697325aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541fd49eda0f23ff7ec1d03b52c3a45991c24cd440e12154142a1e39aefa49290f2b3f9ed688d7cecf86cd6e02244a9059cbb00000000000000000000004115208ef33a926919ed270e2fa61367b2da3753da000000000000000000000000000000000000000000000000000000000000003270feacccf6973290018094ebdc03"
+  }
+}`
+
+	code := http.StatusOK
+	jsonclient := NewTronJsonClient("baseurl", NewMockJsonClient(code, jsonresponse, nil))
+
+	a := assert.New(t)
+	r := require.New(t)
+
+	triggerResponse, err := jsonclient.TriggerSmartContract(&TriggerSmartContractRequest{OwnerAddress: "owneraddress"})
+	r.Nil(err, "get transaction info by id failed:", err)
+
+	a.True(triggerResponse.Result.Result)
+	a.True(triggerResponse.Transaction.Visible)
+	a.Equal("c067951834db369d4e94080f4ebd8f54885e76e8cfd1545e6afbcf63d52842a2", triggerResponse.Transaction.TxID)
+	r.Equal(1, len(triggerResponse.Transaction.RawData.Contract))
+	a.Equal("a9059cbb00000000000000000000004115208ef33a926919ed270e2fa61367b2da3753da0000000000000000000000000000000000000000000000000000000000000032", triggerResponse.Transaction.RawData.Contract[0].Parameter.Value.Data)
+	a.Equal("TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g", triggerResponse.Transaction.RawData.Contract[0].Parameter.Value.OwnerAddress)
+	a.Equal("TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs", triggerResponse.Transaction.RawData.Contract[0].Parameter.Value.ContractAddress)
+	a.Equal("type.googleapis.com/protocol.TriggerSmartContract", triggerResponse.Transaction.RawData.Contract[0].Parameter.TypeUrl)
+	a.Equal("TriggerSmartContract", triggerResponse.Transaction.RawData.Contract[0].Type)
+	a.Equal("26da", triggerResponse.Transaction.RawData.RefBlockBytes)
+	a.Equal("6e5a2311d5f54849", triggerResponse.Transaction.RawData.RefBlockHash)
+	a.Equal(int64(1724409708000), triggerResponse.Transaction.RawData.Expiration)
+	a.Equal(int64(1000000000), triggerResponse.Transaction.RawData.FeeLimit)
+	a.Equal(int64(1724409648766), triggerResponse.Transaction.RawData.Timestamp)
+	a.Equal("0a0226da22086e5a2311d5f5484940e0fbcff697325aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541fd49eda0f23ff7ec1d03b52c3a45991c24cd440e12154142a1e39aefa49290f2b3f9ed688d7cecf86cd6e02244a9059cbb00000000000000000000004115208ef33a926919ed270e2fa61367b2da3753da000000000000000000000000000000000000000000000000000000000000003270feacccf6973290018094ebdc03", triggerResponse.Transaction.RawDataHex)
 }

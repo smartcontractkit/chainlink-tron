@@ -15,9 +15,42 @@ type DeployContractRequest struct {
 	Visible                    bool   `json:"visible"`
 }
 
+type JSONABI struct {
+	Entrys []struct {
+		Anonymous bool `json:"anonymous"`
+		Constant  bool `json:"constant"`
+		Inputs    []struct {
+			Indexed bool   `json:"indexed"`
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+		} `json:"inputs"`
+		Name    string `json:"name"`
+		Outputs []struct {
+			Indexed bool   `json:"indexed"`
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+		} `json:"outputs"`
+		Payable         bool   `json:"payable"`
+		StateMutability string `json:"stateMutability"`
+		Type            string `json:"type"`
+	} `json:"entrys"`
+}
+
+type NewContract struct {
+	OriginAddress              string  `json:"origin_address"`                // Contract creator address
+	ContractAddress            string  `json:"contract_address"`              // Contract address
+	ABI                        JSONABI `json:"abi"`                           // ABI
+	Bytecode                   string  `json:"bytecode"`                      // Bytecode
+	CallValue                  int64   `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
+	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent"` // Proportion of user energy consumption
+	Name                       string  `json:"name"`                          // contract name
+	OriginEnergyLimit          int64   `json:"origin_energy_limit"`           // Each transaction is allowed to consume the maximum energy of the contract creator
+	CodeHash                   string  `json:"code_hash"`                     // code hash
+}
+
 type ParameterValue struct {
-	OwnerAddress string                 `json:"owner_address"`
-	NewContract  map[string]interface{} `json:"new_contract"`
+	OwnerAddress string      `json:"owner_address"`
+	NewContract  NewContract `json:"new_contract"`
 }
 
 type Parameter struct {
@@ -63,27 +96,6 @@ func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Trans
 type GetContractRequest struct {
 	Value   string `json:"value"`
 	Visible bool   `json:"visible"`
-}
-
-type JSONABI struct {
-	Entrys []struct {
-		Anonymous bool `json:"anonymous"`
-		Constant  bool `json:"constant"`
-		Inputs    []struct {
-			Indexed bool   `json:"indexed"`
-			Name    string `json:"name"`
-			Type    string `json:"type"`
-		} `json:"inputs"`
-		Name    string `json:"name"`
-		Outputs []struct {
-			Indexed bool   `json:"indexed"`
-			Name    string `json:"name"`
-			Type    string `json:"type"`
-		} `json:"outputs"`
-		Payable         bool   `json:"payable"`
-		StateMutability string `json:"stateMutability"`
-		Type            string `json:"type"`
-	} `json:"entrys"`
 }
 
 type GetContractResponse struct {
@@ -135,13 +147,45 @@ type TriggerSmartContractRequest struct {
 	Visible      bool  `json:"visible"`       // Whether the address is in base58check format
 }
 
+type TriggerResult struct {
+	Result bool `json:"result"`
+}
+
+type TriggerValue struct {
+	Data            string `json:"data"`
+	OwnerAddress    string `json:"owner_address"`
+	ContractAddress string `json:"contract_address"`
+}
+
+type TriggerParameter struct {
+	Value   TriggerValue `json:"value"`
+	TypeUrl string       `json:"type_url"`
+}
+
+type TriggerContract struct {
+	Parameter TriggerParameter `json:"parameter"`
+	Type      string           `json:"type"`
+}
+
+type TriggerRawData struct {
+	Contract      []TriggerContract `json:"contract,omitempty"`
+	RefBlockBytes string            `json:"ref_block_bytes,omitempty"`
+	RefBlockHash  string            `json:"ref_block_hash,omitempty"`
+	Expiration    int64             `json:"expiration,omitempty"`
+	FeeLimit      int64             `json:"fee_limit,omitempty"`
+	Timestamp     int64             `json:"timestamp,omitempty"`
+}
+
+type TriggerTransaction struct {
+	Visible    bool           `json:"visible"`
+	TxID       string         `json:"txID"`
+	RawData    TriggerRawData `json:"raw_data"`
+	RawDataHex string         `json:"raw_data_hex"`
+}
+
 type TriggerSmartContractResponse struct {
-	OwnerAddress    string `json:"owner_address"`    // Account address
-	ContractAddress string `json:"contract_address"` // Contract address
-	CallValue       int64  `json:"call_value"`       // The amount of TRX passed into the contract
-	Data            string `json:"data"`             // Operating parameters
-	CallTokenValue  int64  `json:"call_token_value"` // The amount of TRC-10 transferred into the contract
-	TokenId         int64  `json:"token_id"`         // TRC10 token id
+	Result      TriggerResult      `json:"result"`
+	Transaction TriggerTransaction `json:"transaction"`
 }
 
 func (tc *TronJsonClient) TriggerSmartContract(tcRequest *TriggerSmartContractRequest) (*TriggerSmartContractResponse, error) {
