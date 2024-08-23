@@ -30,17 +30,19 @@ type Contract struct {
 	Type      string    `json:"type"`
 }
 
+type RawData struct {
+	Contract      []Contract `json:"contract,omitempty"`
+	RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
+	RefBlockHash  string     `json:"ref_block_hash,omitempty"`
+	Expiration    int64      `json:"expiration,omitempty"`
+	FeeLimit      int64      `json:"fee_limit,omitempty"`
+	Timestamp     int64      `json:"timestamp,omitempty"`
+}
+
 type Transaction struct {
-	Visible bool   `json:"visible"`
-	TxID    string `json:"txID"`
-	RawData struct {
-		Contract      []Contract `json:"contract,omitempty"`
-		RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
-		RefBlockHash  string     `json:"ref_block_hash,omitempty"`
-		Expiration    int64      `json:"expiration,omitempty"`
-		FeeLimit      int64      `json:"fee_limit,omitempty"`
-		Timestamp     int64      `json:"timestamp,omitempty"`
-	} `json:"raw_data"`
+	Visible    bool     `json:"visible"`
+	TxID       string   `json:"txID"`
+	RawData    RawData  `json:"raw_data"`
 	RawDataHex string   `json:"raw_data_hex"`
 	Signature  []string `json:"signature"`
 }

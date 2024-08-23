@@ -6,8 +6,8 @@ type EnergyPrice struct {
 	Prices string `json:"prices"` // All historical energy unit price information. Each unit price change is separated by a comma. Before the colon is the millisecond timestamp, and after the colon is the energy unit price in sun.
 }
 
-func (tc *TronJsonClient) GetEnergyPrices() (*[]EnergyPrice, error) {
-	energyPrices := []EnergyPrice{}
+func (tc *TronJsonClient) GetEnergyPrices() (*EnergyPrice, error) {
+	energyPrices := EnergyPrice{}
 	getEnergyPricesEndpoint := "/wallet/getenergyprices"
 
 	_, _, err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
@@ -33,9 +33,22 @@ type BlockHeader struct {
 	WitnessSignature string          `json:"witness_signature,omitempty"`
 }
 
+type Return struct {
+	ContractRet string `json:"contractRet"`
+}
+
+type BlockTransactions struct {
+	Ret        []Return `json:"ret"`
+	TxID       string   `json:"txID"`
+	Signature  []string `json:"signature"`
+	RawData    RawData  `json:"raw_data"`
+	RawDataHex string   `json:"raw_data_hex"`
+}
+
 type Block struct {
-	Transactions []*Transaction `json:"transactions,omitempty"`
-	BlockHeader  *BlockHeader   `json:"block_header,omitempty"`
+	BlockID      string              `json:"blockID"`
+	Transactions []BlockTransactions `json:"transactions,omitempty"`
+	BlockHeader  BlockHeader         `json:"block_header,omitempty"`
 }
 
 func (tc *TronJsonClient) GetNowBlock() (*Block, error) {
