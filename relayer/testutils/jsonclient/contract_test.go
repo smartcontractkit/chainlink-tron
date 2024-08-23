@@ -567,3 +567,92 @@ func TestTriggerSmartContract(t *testing.T) {
 	a.Equal(int64(1724409648766), triggerResponse.Transaction.RawData.Timestamp)
 	a.Equal("0a0226da22086e5a2311d5f5484940e0fbcff697325aae01081f12a9010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412740a1541fd49eda0f23ff7ec1d03b52c3a45991c24cd440e12154142a1e39aefa49290f2b3f9ed688d7cecf86cd6e02244a9059cbb00000000000000000000004115208ef33a926919ed270e2fa61367b2da3753da000000000000000000000000000000000000000000000000000000000000003270feacccf6973290018094ebdc03", triggerResponse.Transaction.RawDataHex)
 }
+
+func TestTriggerConstantContract(t *testing.T) {
+	jsonresponse := `{
+  "result": {
+    "result": true
+  },
+  "energy_used": 541,
+  "constant_result": [
+    "00000000000000000000000000000000000000000000000000000001663ea8d6"
+  ],
+  "transaction": {
+    "ret": [
+      {}
+    ],
+    "visible": true,
+    "txID": "bf5d8b1917f8c6d31793ac0c0428b23a0a711143860fcf9be34b53801fd17454",
+    "raw_data": {
+      "contract": [
+        {
+          "parameter": {
+            "value": {
+              "data": "70a08231000000000000000000000000a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+              "owner_address": "TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g",
+              "contract_address": "TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs"
+            },
+            "type_url": "type.googleapis.com/protocol.TriggerSmartContract"
+          },
+          "type": "TriggerSmartContract"
+        }
+      ],
+      "ref_block_bytes": "2adf",
+      "ref_block_hash": "62a72c7aa9af9c65",
+      "expiration": 1724412825000,
+      "timestamp": 1724412768022
+    },
+    "raw_data_hex": "0a022adf220862a72c7aa9af9c6540a89b8ef897325a8e01081f1289010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412540a1541fd49eda0f23ff7ec1d03b52c3a45991c24cd440e12154142a1e39aefa49290f2b3f9ed688d7cecf86cd6e0222470a08231000000000000000000000000a614f803b6fd780986a42c78ec9c7f77e6ded13c7096de8af89732"
+  }
+}`
+
+	code := http.StatusOK
+	jsonclient := NewTronJsonClient("baseurl", NewMockJsonClient(code, jsonresponse, nil))
+
+	a := assert.New(t)
+	r := require.New(t)
+
+	triggerConstantC, err := jsonclient.TriggerConstantContract(&TriggerConstantContractRequest{})
+	r.Nil(err, "trigger constant contract failed: %v", err)
+
+	a.True(triggerConstantC.Result.Result)
+	a.Equal(int64(541), triggerConstantC.EnergyUsed)
+	a.Equal("00000000000000000000000000000000000000000000000000000001663ea8d6", triggerConstantC.ConstantResult[0])
+	a.True(triggerConstantC.Transaction.Visible)
+	a.Equal("bf5d8b1917f8c6d31793ac0c0428b23a0a711143860fcf9be34b53801fd17454", triggerConstantC.Transaction.TxID)
+	r.Equal(1, len(triggerConstantC.Transaction.RawData.Contract))
+	a.Equal("70a08231000000000000000000000000a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+		triggerConstantC.Transaction.RawData.Contract[0].Parameter.Value.Data)
+	a.Equal("TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g", triggerConstantC.Transaction.RawData.Contract[0].Parameter.Value.OwnerAddress)
+	a.Equal("TG3XXyExBkPp9nzdajDZsozEu4BkaSJozs", triggerConstantC.Transaction.RawData.Contract[0].Parameter.Value.ContractAddress)
+	a.Equal("type.googleapis.com/protocol.TriggerSmartContract", triggerConstantC.Transaction.RawData.Contract[0].Parameter.TypeUrl)
+	a.Equal("TriggerSmartContract", triggerConstantC.Transaction.RawData.Contract[0].Type)
+	a.Equal("2adf", triggerConstantC.Transaction.RawData.RefBlockBytes)
+	a.Equal("62a72c7aa9af9c65", triggerConstantC.Transaction.RawData.RefBlockHash)
+	a.Equal(int64(1724412825000), triggerConstantC.Transaction.RawData.Expiration)
+	a.Equal(int64(1724412768022), triggerConstantC.Transaction.RawData.Timestamp)
+	a.Equal("0a022adf220862a72c7aa9af9c6540a89b8ef897325a8e01081f1289010a31747970652e676f6f676c65617069732e636f6d2f70726f746f636f6c2e54726967676572536d617274436f6e747261637412540a1541fd49eda0f23ff7ec1d03b52c3a45991c24cd440e12154142a1e39aefa49290f2b3f9ed688d7cecf86cd6e0222470a08231000000000000000000000000a614f803b6fd780986a42c78ec9c7f77e6ded13c7096de8af89732",
+		triggerConstantC.Transaction.RawDataHex)
+
+}
+
+func TestBroadcastTransaction(t *testing.T) {
+	jsonresponse := `{
+  "code": "SIGERROR",
+  "txid": "77ddfa7093cc5f745c0d3a54abb89ef070f983343c05e0f89e5a52f3e5401299",
+  "message": "56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374"
+}`
+	code := http.StatusOK
+	jsonclient := NewTronJsonClient("baseurl", NewMockJsonClient(code, jsonresponse, nil))
+
+	a := assert.New(t)
+	r := require.New(t)
+
+	broadcastResponse, err := jsonclient.BroadcastTransaction(&Transaction{})
+	r.Nil(err, "trigger constant contract failed: %v", err)
+
+	a.Equal("SIGERROR", broadcastResponse.Code)
+	a.Equal("77ddfa7093cc5f745c0d3a54abb89ef070f983343c05e0f89e5a52f3e5401299", broadcastResponse.TxID)
+	a.Equal("56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374", broadcastResponse.Message)
+
+}

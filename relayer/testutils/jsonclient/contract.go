@@ -264,23 +264,26 @@ var (
 	}
 )
 
-type ReturnEnergyEstimate struct {
-	Result  bool               `json:"result"`  // Is the estimate successful
-	Code    ReturnResponseCode `json:"code"`    // (enum)	response code, an enum type
-	Message string             `json:"message"` // Result message
+type TriggerConstantContractResult struct {
+	Result bool `json:"result"`
 }
 
-type EnergyEstimateResult struct {
-	Result         ReturnEnergyEstimate `json:"result"`          // Run result
-	EnergyRequired int64                `json:"energy_required"` // Estimated energy to run the contract
+type ConstantRet struct{}
+
+type TriggerConstantTransaction struct {
+	Ret        []ConstantRet  `json:"ret"`
+	Visible    bool           `json:"visible"`
+	TxID       string         `json:"txID"`
+	RawData    TriggerRawData `json:"raw_data"`
+	RawDataHex string         `json:"raw_data_hex"`
 }
 
 type TriggerConstantContractResponse struct {
-	Result         EnergyEstimateResult `json:"result"`          // Run result, for detailed parameter definition, refer to EstimateEnergy
-	EnergyUsed     int64                `json:"energy_used"`     // Estimated energy consumption, including the basic energy consumption and penalty energy consumption
-	EnergyPenalty  int64                `json:"energy_penalty"`  // The penalty energy consumption
-	ConstantResult string               `json:"constant_result"` // []	Result list
-	Transaction    Transaction          `json:"transaction"`     // Transaction information, refer to GetTransactionByID
+	Result         TriggerConstantContractResult `json:"result"`          // Run result, for detailed parameter definition, refer to EstimateEnergy
+	EnergyUsed     int64                         `json:"energy_used"`     // Estimated energy consumption, including the basic energy consumption and penalty energy consumption
+	EnergyPenalty  int64                         `json:"energy_penalty"`  // The penalty energy consumption
+	ConstantResult []string                      `json:"constant_result"` // []	Result list
+	Transaction    TriggerConstantTransaction    `json:"transaction"`     // Transaction information, refer to GetTransactionByID
 }
 
 func (tc *TronJsonClient) TriggerConstantContract(tcRequest *TriggerConstantContractRequest) (*TriggerConstantContractResponse, error) {
@@ -326,6 +329,17 @@ type EnergyEstimateRequest struct {
 	CallTokenValue   int64  `json:"call_token_value"` // Amount of TRC10 token transferred with this transaction
 	TokenId          int64  `json:"token_id"`         // TRC10 token id
 	Visible          bool   `json:"visible"`          // Whether the address is in base58check format
+}
+
+type ReturnEnergyEstimate struct {
+	Result  bool               `json:"result"`  // Is the estimate successful
+	Code    ReturnResponseCode `json:"code"`    // (enum)   response code, an enum type
+	Message string             `json:"message"` // Result message
+}
+
+type EnergyEstimateResult struct {
+	Result         ReturnEnergyEstimate `json:"result"`          // Run result
+	EnergyRequired int64                `json:"energy_required"` // Estimated energy to run the contract
 }
 
 func (tc *TronJsonClient) EstimateEnergy(reqBody *EnergyEstimateRequest) (*EnergyEstimateResult, error) {
