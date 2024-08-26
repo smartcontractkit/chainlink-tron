@@ -10,9 +10,9 @@ func (tc *TronJsonClient) GetEnergyPrices() (*EnergyPrice, error) {
 	energyPrices := EnergyPrice{}
 	getEnergyPricesEndpoint := "/wallet/getenergyprices"
 
-	_, _, err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
+	err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
 	if err != nil {
-		return nil, fmt.Errorf("get energy prices failed: %v", err)
+		return nil, fmt.Errorf("get energy prices request (%s) failed: %v", tc.baseURL+getEnergyPricesEndpoint, err)
 	}
 	return &energyPrices, nil
 }
@@ -55,9 +55,9 @@ func (tc *TronJsonClient) GetNowBlock() (*Block, error) {
 	block := Block{}
 	getNowBlockEndpoint := "/wallet/getnowblock"
 
-	_, _, err := tc.post(tc.baseURL+getNowBlockEndpoint, nil, &block)
+	err := tc.post(tc.baseURL+getNowBlockEndpoint, nil, &block)
 	if err != nil {
-		return nil, fmt.Errorf("get latest block failed: %v", err)
+		return nil, fmt.Errorf("get latest block request (%s) failed: %v", tc.baseURL+getNowBlockEndpoint, err)
 	}
 
 	return &block, nil
@@ -71,12 +71,12 @@ func (tc *TronJsonClient) GetBlockByNum(num int32) (*Block, error) {
 	block := Block{}
 	getBlockByNumEndpoint := "/wallet/getblockbynum"
 
-	_, _, err := tc.post(tc.baseURL+getBlockByNumEndpoint,
+	err := tc.post(tc.baseURL+getBlockByNumEndpoint,
 		&GetBlockByNumRequest{
 			Num: num,
 		}, &block)
 	if err != nil {
-		return nil, fmt.Errorf("get block by num failed: %v", err)
+		return nil, fmt.Errorf("get block by num request (%s) failed: %v", tc.baseURL+getBlockByNumEndpoint, err)
 	}
 
 	return &block, nil

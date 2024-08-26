@@ -1,5 +1,7 @@
 package jsonclient
 
+import "fmt"
+
 type Transaction_ResultContractResult int32
 
 const (
@@ -119,13 +121,13 @@ func (tc *TronJsonClient) GetTransactionInfoById(txhash string) (*TransactionInf
 	transactionInfo := TransactionInfo{}
 	getTransactionInfoByIdEndpoint := "/wallet/gettransactioninfobyid"
 
-	_, _, err := tc.post(tc.baseURL+getTransactionInfoByIdEndpoint,
+	err := tc.post(tc.baseURL+getTransactionInfoByIdEndpoint,
 		&GetTransactionInfoByIDRequest{
 			Value: txhash,
 		}, &transactionInfo)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get transaction info by id request (%s) failed: %v", tc.baseURL+getTransactionInfoByIdEndpoint, err)
 	}
 
 	return &transactionInfo, nil

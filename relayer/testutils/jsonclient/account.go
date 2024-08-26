@@ -102,12 +102,12 @@ func (tc *TronJsonClient) GetAccount(address string) (*GetAccountResponse, error
 	getAccountEndpoint := "/wallet/getaccount"
 	getAccountResponse := GetAccountResponse{}
 
-	_, _, err := tc.post(tc.baseURL+getAccountEndpoint, &GetAccountRequest{
+	err := tc.post(tc.baseURL+getAccountEndpoint, &GetAccountRequest{
 		Address: address,
 		Visible: true,
 	}, &getAccountResponse)
 	if err != nil {
-		return nil, fmt.Errorf("get account failed: %v", err)
+		return nil, fmt.Errorf("get account (%s) failed: %v", tc.baseURL+getAccountEndpoint, err)
 	}
 
 	return &getAccountResponse, nil

@@ -27,7 +27,7 @@ func NewTronJsonClient(baseURL string, client JsonHttpClient) *TronJsonClient {
 	}
 }
 
-func (tc *TronJsonClient) request(method string, endpoint string, reqBody interface{}, responseBody interface{}) (int, []byte, error) {
+func (tc *TronJsonClient) request(method string, endpoint string, reqBody interface{}, responseBody interface{}) error {
 	var req *http.Request
 
 	if reqBody != nil {
@@ -35,18 +35,18 @@ func (tc *TronJsonClient) request(method string, endpoint string, reqBody interf
 		var err error
 		jsonbytes, err = json.Marshal(reqBody)
 		if err != nil {
-			return 0, []byte{}, NewMarshalError(err)
+			return fmt.Errorf("marshalling request failed: %v", err)
 		}
 
 		req, err = http.NewRequest(method, endpoint, bytes.NewBuffer(jsonbytes))
 		if err != nil {
-			return 0, []byte{}, NewRequestCreationError(endpoint, err)
+			return fmt.Errorf("creating http request failed: %v", err)
 		}
 	} else {
 		var err error
 		req, err = http.NewRequest(method, endpoint, nil)
 		if err != nil {
-			return 0, []byte{}, NewRequestCreationError(endpoint, err)
+			return fmt.Errorf("creating http request failed: %v", err)
 		}
 	}
 
@@ -55,33 +55,33 @@ func (tc *TronJsonClient) request(method string, endpoint string, reqBody interf
 
 	resp, err := tc.client.Do(req)
 	if err != nil {
-		return 0, []byte{}, NewRequestError(endpoint, err)
+		return fmt.Errorf("http request failed: %v", err)
 	}
 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, []byte{}, NewResponseBodyError(endpoint, err)
+		return fmt.Errorf("reading response body failed: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return resp.StatusCode, body, NewStatusCodeError(endpoint, body, resp.StatusCode)
+		return fmt.Errorf("invalid http status: %d", resp.StatusCode)
 	}
 
 	if err = json.Unmarshal(body, responseBody); err != nil {
-		return resp.StatusCode, body, NewUnmarshalError(err)
+		return fmt.Errorf("unmarshalling response body failed: %v", err)
 	}
 
-	return resp.StatusCode, body, nil
+	return nil
 
 }
 
-func (tc *TronJsonClient) post(endpoint string, reqBody, responseBody interface{}) (int, []byte, error) {
+func (tc *TronJsonClient) post(endpoint string, reqBody, responseBody interface{}) error {
 	return tc.request("POST", endpoint, reqBody, responseBody)
 }
 
-func (tc *TronJsonClient) get(endpoint string, responseBody interface{}) (int, []byte, error) {
+func (tc *TronJsonClient) get(endpoint string, responseBody interface{}) error {
 	return tc.request("GET", endpoint, nil, responseBody)
 }
 
