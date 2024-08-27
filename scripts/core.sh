@@ -69,8 +69,7 @@ for ((i = 1; i <= NODE_COUNT; i++)); do
 		--name "${container_name}.$i" \
 		--entrypoint bash \
 		"${image_name}" \
-		-c \
-		"echo -e \"${api_email}\\n${api_password}\" > /tmp/api_credentials && chainlink node start --api /tmp/api_credentials"
+		-c "echo -e '${api_email}\n${api_password}' > /tmp/api_credentials && chainlink node start --api /tmp/api_credentials"
 
 	echo "Waiting for core container to become ready.."
 	start_time=$(date +%s)
