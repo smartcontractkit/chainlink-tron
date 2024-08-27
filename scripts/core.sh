@@ -47,11 +47,9 @@ for ((i = 1; i <= NODE_COUNT; i++)); do
 	database_name="tron_test_${i}"
 	echo "Creating database: ${database_name}"
 	host_postgres_url="postgresql://postgres:postgres@127.0.0.1:5432/postgres"
-	psql "${host_postgres_url}" -c "DROP DATABASE ${database_name};"
-	# Create the database if it doesn't exist
-	psql "${host_postgres_url}" -tc "SELECT 1 FROM pg_database WHERE datname = '${database_name}'" \
-		| grep -q 1 \
-		|| psql "${host_postgres_url}" -c "CREATE DATABASE ${database_name};"
+	# Recreate the database
+	psql "${host_postgres_url}" -c "DROP DATABASE ${database_name};" &>/dev/null || true
+	psql "${host_postgres_url}" -c "CREATE DATABASE ${database_name};" &>/dev/null || true
 
 	listen_args=()
 	for ip in $listen_ips; do
@@ -71,7 +69,7 @@ for ((i = 1; i <= NODE_COUNT; i++)); do
 		-e 'CL_PASSWORD_KEYSTORE=asdfasdfasdfasdf' \
 		--name "${container_name}.$i" \
 		--entrypoint bash \
-		"${image_name}" \
+		${image_name} \
 		-c "echo -e '${api_email}\n${api_password}' > /tmp/api_credentials && chainlink node start --api /tmp/api_credentials"
 
 	echo "Waiting for core container to become ready.."
