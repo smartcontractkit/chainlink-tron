@@ -86,7 +86,7 @@ func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Trans
 
 	err := tc.post(tc.baseURL+deployEndpoint, reqBody, &transaction)
 	if err != nil {
-		return nil, fmt.Errorf("deploy contract request (%s) failed: %v", tc.baseURL+deployEndpoint, err)
+		return nil, fmt.Errorf("deploy contract request (%s) failed: %w", tc.baseURL+deployEndpoint, err)
 	}
 
 	return &transaction, nil
@@ -121,7 +121,7 @@ func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, err
 		}, &contractInfo)
 
 	if err != nil {
-		return nil, fmt.Errorf("get contract request (%s) failed: %v", tc.baseURL+getContractEndpoint, err)
+		return nil, fmt.Errorf("get contract request (%s) failed: %w", tc.baseURL+getContractEndpoint, err)
 	}
 
 	if len(contractInfo.ContractAddress) < 1 {
@@ -193,7 +193,7 @@ func (tc *TronJsonClient) TriggerSmartContract(tcRequest *TriggerSmartContractRe
 
 	err := tc.post(tc.baseURL+triggerContractEndpoint, tcRequest, &contractResponse)
 	if err != nil {
-		return nil, fmt.Errorf("trigger smart contract request (%s) failed: %v", tc.baseURL+triggerContractEndpoint, err)
+		return nil, fmt.Errorf("trigger smart contract request (%s) failed: %w", tc.baseURL+triggerContractEndpoint, err)
 
 	}
 
@@ -292,7 +292,7 @@ func (tc *TronJsonClient) TriggerConstantContract(tcRequest *TriggerConstantCont
 
 	err := tc.post(tc.baseURL+triggerContractEndpoint, tcRequest, &contractResponse)
 	if err != nil {
-		return nil, fmt.Errorf("trigger constant contract request (%s) failed: %v", tc.baseURL+triggerContractEndpoint, err)
+		return nil, fmt.Errorf("trigger constant contract request (%s) failed: %w", tc.baseURL+triggerContractEndpoint, err)
 	}
 
 	return &contractResponse, nil
@@ -312,7 +312,7 @@ func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*Broadcast
 	err := tc.post(tc.baseURL+broadcastEndpoint, reqBody, &response)
 
 	if err != nil {
-		return nil, fmt.Errorf("broadcast transaction request (%s) failed: %v", tc.baseURL+broadcastEndpoint, err)
+		return nil, fmt.Errorf("broadcast transaction request (%s) failed: %w", tc.baseURL+broadcastEndpoint, err)
 	}
 
 	return &response, nil
@@ -348,7 +348,7 @@ func (tc *TronJsonClient) EstimateEnergy(reqBody *EnergyEstimateRequest) (*Energ
 	err := tc.post(tc.baseURL+energyEstimateEndpoint, reqBody, &response)
 
 	if err != nil {
-		return nil, fmt.Errorf("energy estimation request (%s) failed: %v", tc.baseURL+energyEstimateEndpoint, err)
+		return nil, fmt.Errorf("energy estimation request (%s) failed: %w", tc.baseURL+energyEstimateEndpoint, err)
 	}
 
 	return &response, nil

@@ -127,7 +127,7 @@ func (tc *TronJsonClient) GetTransactionInfoById(txhash string) (*TransactionInf
 		}, &transactionInfo)
 
 	if err != nil {
-		return nil, fmt.Errorf("get transaction info by id request (%s) failed: %v", tc.baseURL+getTransactionInfoByIdEndpoint, err)
+		return nil, fmt.Errorf("get transaction info by id request (%s) failed: %w", tc.baseURL+getTransactionInfoByIdEndpoint, err)
 	}
 
 	return &transactionInfo, nil

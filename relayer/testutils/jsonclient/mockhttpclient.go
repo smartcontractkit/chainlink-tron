@@ -6,10 +6,6 @@ import (
 	"net/http"
 )
 
-type JsonHttpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
 type MockJsonClient struct {
 	code     int
 	response string
@@ -22,8 +18,8 @@ func NewMockJsonClient(code int, response string, err error) *MockJsonClient {
 		response: response,
 		error:    err,
 	}
-
 }
+
 func (c *MockJsonClient) Do(req *http.Request) (*http.Response, error) {
 	if c.error != nil {
 		return nil, c.error

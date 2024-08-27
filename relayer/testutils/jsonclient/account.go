@@ -107,7 +107,7 @@ func (tc *TronJsonClient) GetAccount(address string) (*GetAccountResponse, error
 		Visible: true,
 	}, &getAccountResponse)
 	if err != nil {
-		return nil, fmt.Errorf("get account (%s) failed: %v", tc.baseURL+getAccountEndpoint, err)
+		return nil, fmt.Errorf("get account (%s) failed: %w", tc.baseURL+getAccountEndpoint, err)
 	}
 
 	return &getAccountResponse, nil

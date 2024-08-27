@@ -613,7 +613,7 @@ func TestTriggerConstantContract(t *testing.T) {
 	r := require.New(t)
 
 	triggerConstantC, err := jsonclient.TriggerConstantContract(&TriggerConstantContractRequest{})
-	r.Nil(err, "trigger constant contract failed: %v", err)
+	r.Nil(err, "trigger constant contract failed: %w", err)
 
 	a.True(triggerConstantC.Result.Result)
 	a.Equal(int64(541), triggerConstantC.EnergyUsed)
@@ -649,7 +649,7 @@ func TestBroadcastTransaction(t *testing.T) {
 	r := require.New(t)
 
 	broadcastResponse, err := jsonclient.BroadcastTransaction(&Transaction{})
-	r.Nil(err, "trigger constant contract failed: %v", err)
+	r.Nil(err, "trigger constant contract failed: %w", err)
 
 	a.Equal("SIGERROR", broadcastResponse.Code)
 	a.Equal("77ddfa7093cc5f745c0d3a54abb89ef070f983343c05e0f89e5a52f3e5401299", broadcastResponse.TxID)
