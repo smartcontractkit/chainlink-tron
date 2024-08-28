@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	encodedParams, err := parsedABI.Pack("", params...)
 	require.NoError(t, err)
 
-	jsonClient := jsonclient.NewTronJsonClient(httpUrl)
+	jsonClient := jsonclient.NewTronJsonClient(httpUrl, &http.Client{})
 	tx, err := jsonClient.DeployContract(&jsonclient.DeployContractRequest{
 		OwnerAddress:               fromAddress,
 		ABI:                        abiJson,
@@ -93,10 +94,11 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 }
 
 func CheckContractDeployed(t *testing.T, httpUrl string, address string) (contractDeployed bool) {
-	jsonClient := jsonclient.NewTronJsonClient(httpUrl)
-	contractDeployed, err := jsonClient.GetContract(address)
+	jsonClient := jsonclient.NewTronJsonClient(httpUrl, &http.Client{})
+	_, err := jsonClient.GetContract(address)
 	require.NoError(t, err)
-	return contractDeployed
+
+	return true // require call above stops execution if false
 }
 
 func WaitForTransactionInfo(t *testing.T, grpcClient sdk.GrpcClient, txHash string, waitSecs int) *core.TransactionInfo {
