@@ -3,64 +3,64 @@ package jsonclient
 import "fmt"
 
 type DeployContractRequest struct {
-	OwnerAddress               string `json:"owner_address"`
-	ABI                        string `json:"abi"`
-	Bytecode                   string `json:"bytecode"`
-	Parameter                  string `json:"parameter"`
-	Name                       string `json:"name"`
-	CallValue                  int    `json:"call_value"`
-	FeeLimit                   int    `json:"fee_limit"`
-	ConsumeUserResourcePercent int    `json:"consume_user_resource_percent"`
-	OriginEnergyLimit          int    `json:"origin_energy_limit"`
-	Visible                    bool   `json:"visible"`
+	OwnerAddress               string `json:"owner_address,omitempty"`
+	ABI                        string `json:"abi,omitempty"`
+	Bytecode                   string `json:"bytecode,omitempty"`
+	Parameter                  string `json:"parameter,omitempty"`
+	Name                       string `json:"name,omitempty"`
+	CallValue                  int    `json:"call_value,omitempty"`
+	FeeLimit                   int    `json:"fee_limit,omitempty"`
+	ConsumeUserResourcePercent int    `json:"consume_user_resource_percent,omitempty"`
+	OriginEnergyLimit          int    `json:"origin_energy_limit,omitempty"`
+	Visible                    bool   `json:"visible,omitempty"`
 }
 
 type JSONABI struct {
 	Entrys []struct {
-		Anonymous bool `json:"anonymous"`
-		Constant  bool `json:"constant"`
+		Anonymous bool `json:"anonymous,omitempty"`
+		Constant  bool `json:"constant,omitempty"`
 		Inputs    []struct {
-			Indexed bool   `json:"indexed"`
-			Name    string `json:"name"`
-			Type    string `json:"type"`
-		} `json:"inputs"`
-		Name    string `json:"name"`
+			Indexed bool   `json:"indexed,omitempty"`
+			Name    string `json:"name,omitempty"`
+			Type    string `json:"type,omitempty"`
+		} `json:"inputs,omitempty"`
+		Name    string `json:"name,omitempty"`
 		Outputs []struct {
-			Indexed bool   `json:"indexed"`
-			Name    string `json:"name"`
-			Type    string `json:"type"`
-		} `json:"outputs"`
-		Payable         bool   `json:"payable"`
-		StateMutability string `json:"stateMutability"`
-		Type            string `json:"type"`
-	} `json:"entrys"`
+			Indexed bool   `json:"indexed,omitempty"`
+			Name    string `json:"name,omitempty"`
+			Type    string `json:"type,omitempty"`
+		} `json:"outputs,omitempty"`
+		Payable         bool   `json:"payable,omitempty"`
+		StateMutability string `json:"stateMutability,omitempty"`
+		Type            string `json:"type,omitempty"`
+	} `json:"entrys,omitempty"`
 }
 
 type NewContract struct {
-	OriginAddress              string  `json:"origin_address"`                // Contract creator address
-	ContractAddress            string  `json:"contract_address"`              // Contract address
-	ABI                        JSONABI `json:"abi"`                           // ABI
-	Bytecode                   string  `json:"bytecode"`                      // Bytecode
-	CallValue                  int64   `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
-	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent"` // Proportion of user energy consumption
-	Name                       string  `json:"name"`                          // contract name
-	OriginEnergyLimit          int64   `json:"origin_energy_limit"`           // Each transaction is allowed to consume the maximum energy of the contract creator
-	CodeHash                   string  `json:"code_hash"`                     // code hash
+	OriginAddress              string  `json:"origin_address,omitempty"`                // Contract creator address
+	ContractAddress            string  `json:"contract_address,omitempty"`              // Contract address
+	ABI                        JSONABI `json:"abi,omitempty"`                           // ABI
+	Bytecode                   string  `json:"bytecode,omitempty"`                      // Bytecode
+	CallValue                  int64   `json:"call_value,omitempty"`                    // The amount of TRX passed into the contract when deploying the contract
+	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent,omitempty"` // Proportion of user energy consumption
+	Name                       string  `json:"name,omitempty"`                          // contract name
+	OriginEnergyLimit          int64   `json:"origin_energy_limit,omitempty"`           // Each transaction is allowed to consume the maximum energy of the contract creator
+	CodeHash                   string  `json:"code_hash,omitempty"`                     // code hash
 }
 
 type ParameterValue struct {
-	OwnerAddress string      `json:"owner_address"`
-	NewContract  NewContract `json:"new_contract"`
+	OwnerAddress string      `json:"owner_address,omitempty"`
+	NewContract  NewContract `json:"new_contract,omitempty"`
 }
 
 type Parameter struct {
-	Value   ParameterValue `json:"value"`
-	TypeUrl string         `json:"type_url"`
+	Value   ParameterValue `json:"value,omitempty"`
+	TypeUrl string         `json:"type_url,omitempty"`
 }
 
 type Contract struct {
-	Parameter Parameter `json:"parameter"`
-	Type      string    `json:"type"`
+	Parameter Parameter `json:"parameter,omitempty"`
+	Type      string    `json:"type,omitempty"`
 }
 
 type RawData struct {
@@ -98,15 +98,15 @@ type GetContractRequest struct {
 }
 
 type GetContractResponse struct {
-	OriginAddress              string  `json:"origin_address"`                // Contract creator address
-	ContractAddress            string  `json:"contract_address"`              // Contract address
-	ABI                        JSONABI `json:"abi"`                           // ABI
-	Bytecode                   string  `json:"bytecode"`                      // Bytecode
-	CallValue                  int64   `json:"call_value"`                    // The amount of TRX passed into the contract when deploying the contract
-	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent"` // Proportion of user energy consumption
-	Name                       string  `json:"name"`                          // contract name
-	OriginEnergyLimit          int64   `json:"origin_energy_limit"`           // Each transaction is allowed to consume the maximum energy of the contract creator
-	CodeHash                   string  `json:"code_hash"`                     // code hash
+	OriginAddress              string  `json:"origin_address,omitempty"`                // Contract creator address
+	ContractAddress            string  `json:"contract_address,omitempty"`              // Contract address
+	ABI                        JSONABI `json:"abi,omitempty"`                           // ABI
+	Bytecode                   string  `json:"bytecode,omitempty"`                      // Bytecode
+	CallValue                  int64   `json:"call_value,omitempty"`                    // The amount of TRX passed into the contract when deploying the contract
+	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent,omitempty"` // Proportion of user energy consumption
+	Name                       string  `json:"name,omitempty"`                          // contract name
+	OriginEnergyLimit          int64   `json:"origin_energy_limit,omitempty"`           // Each transaction is allowed to consume the maximum energy of the contract creator
+	CodeHash                   string  `json:"code_hash,omitempty"`                     // code hash
 }
 
 func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, error) {
@@ -313,6 +313,10 @@ func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*Broadcast
 
 	if err != nil {
 		return nil, fmt.Errorf("broadcast transaction request (%s) failed: %w", tc.baseURL+broadcastEndpoint, err)
+	}
+
+	if !response.Result {
+		return nil, fmt.Errorf("broadcasting failed. Code: %s, Message: %s", response.Code, response.Message)
 	}
 
 	return &response, nil
