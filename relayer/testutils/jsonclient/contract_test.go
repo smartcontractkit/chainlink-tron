@@ -636,11 +636,13 @@ func TestTriggerConstantContract(t *testing.T) {
 
 }
 
-func TestBroadcastTransaction(t *testing.T) {
+func TestBroadcastTransactionFailure(t *testing.T) {
+	broadcasterr := "SIGERROR"
+	broadcastMessage := "56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374"
 	jsonresponse := `{
-  "code": "SIGERROR",
+  "code": "` + broadcasterr + `",
   "txid": "77ddfa7093cc5f745c0d3a54abb89ef070f983343c05e0f89e5a52f3e5401299",
-  "message": "56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374"
+  "message": "` + broadcastMessage + `"
 }`
 	code := http.StatusOK
 	jsonclient := NewTronJsonClient("baseurl", NewMockJsonClient(code, jsonresponse, nil))
@@ -649,10 +651,9 @@ func TestBroadcastTransaction(t *testing.T) {
 	r := require.New(t)
 
 	broadcastResponse, err := jsonclient.BroadcastTransaction(&Transaction{})
-	r.Nil(err, "trigger constant contract failed: %w", err)
-
-	a.Equal("SIGERROR", broadcastResponse.Code)
-	a.Equal("77ddfa7093cc5f745c0d3a54abb89ef070f983343c05e0f89e5a52f3e5401299", broadcastResponse.TxID)
-	a.Equal("56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374", broadcastResponse.Message)
+	r.Nil(broadcastResponse, "broadcast response should be nil")
+	r.NotNil(err, "broadcast successful when it should fail: %w", err)
+	errstr := fmt.Sprintf("broadcasting failed. Code: %s, Message: %s", broadcasterr, broadcastMessage)
+	a.Equal(errstr, err.Error())
 
 }
