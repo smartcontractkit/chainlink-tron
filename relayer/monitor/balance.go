@@ -21,6 +21,7 @@ type BalanceClient interface {
 	GetAccountBalance(addr tronaddress.Address) (int64, error)
 }
 
+// TODO: This chain-specific implementation should be replaced by the chain-agnostic implementation found at /aptos/relayer/monitor.
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the TRX balance of all ks keys to prometheus.
 func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, reader BalanceClient) services.Service {
 	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
