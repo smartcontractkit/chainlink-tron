@@ -8,11 +8,11 @@ import (
 
 type MockJsonClient struct {
 	code     int
-	response string
+	response []byte
 	error    error
 }
 
-func NewMockJsonClient(code int, response string, err error) *MockJsonClient {
+func NewMockJsonClient(code int, response []byte, err error) *MockJsonClient {
 	return &MockJsonClient{
 		code:     code,
 		response: response,
@@ -24,14 +24,14 @@ func (c *MockJsonClient) Do(req *http.Request) (*http.Response, error) {
 	if c.error != nil {
 		return nil, c.error
 	}
-	bodybytes := []byte(c.response)
-	length := len(bodybytes)
+
+	length := len(c.response)
 	headers := make(http.Header)
 	headers.Add("Content-Type", "application/json")
 
 	resp := http.Response{
 		StatusCode:    c.code,
-		Body:          io.NopCloser(bytes.NewReader(bodybytes)),
+		Body:          io.NopCloser(bytes.NewReader(c.response)),
 		ContentLength: int64(length),
 		Header:        headers,
 	}

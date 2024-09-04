@@ -15,25 +15,30 @@ type DeployContractRequest struct {
 	Visible                    bool   `json:"visible,omitempty"`
 }
 
+type EntryOutput struct {
+	Indexed bool   `json:"indexed,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+}
+
+type EntryInput struct {
+	Indexed bool   `json:"indexed,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+}
+type Entrys struct {
+	Name            string        `json:"name,omitempty"`
+	Anonymous       bool          `json:"anonymous,omitempty"`
+	Constant        bool          `json:"constant,omitempty"`
+	Payable         bool          `json:"payable,omitempty"`
+	StateMutability string        `json:"stateMutability,omitempty"`
+	Type            string        `json:"type,omitempty"`
+	Inputs          []EntryInput  `json:"inputs"`
+	Outputs         []EntryOutput `json:"outputs"`
+}
+
 type JSONABI struct {
-	Entrys []struct {
-		Anonymous bool `json:"anonymous,omitempty"`
-		Constant  bool `json:"constant,omitempty"`
-		Inputs    []struct {
-			Indexed bool   `json:"indexed,omitempty"`
-			Name    string `json:"name,omitempty"`
-			Type    string `json:"type,omitempty"`
-		} `json:"inputs,omitempty"`
-		Name    string `json:"name,omitempty"`
-		Outputs []struct {
-			Indexed bool   `json:"indexed,omitempty"`
-			Name    string `json:"name,omitempty"`
-			Type    string `json:"type,omitempty"`
-		} `json:"outputs,omitempty"`
-		Payable         bool   `json:"payable,omitempty"`
-		StateMutability string `json:"stateMutability,omitempty"`
-		Type            string `json:"type,omitempty"`
-	} `json:"entrys,omitempty"`
+	Entrys []Entrys `json:"entrys,omitempty"`
 }
 
 type NewContract struct {
@@ -49,8 +54,12 @@ type NewContract struct {
 }
 
 type ParameterValue struct {
-	OwnerAddress string      `json:"owner_address,omitempty"`
-	NewContract  NewContract `json:"new_contract,omitempty"`
+	OwnerAddress    string      `json:"owner_address,omitempty"`
+	ToAddress       string      `json:"to_address,omitempty"`
+	Data            string      `json:"data,omitempty"`
+	ContractAddress string      `json:"contract_address,omitempty"`
+	Amount          int64       `json:"amount,omitempty"`
+	NewContract     NewContract `json:"new_contract,omitempty"`
 }
 
 type Parameter struct {
@@ -73,11 +82,12 @@ type RawData struct {
 }
 
 type Transaction struct {
-	Visible    bool     `json:"visible"`
-	TxID       string   `json:"txID"`
-	RawData    RawData  `json:"raw_data"`
-	RawDataHex string   `json:"raw_data_hex"`
-	Signature  []string `json:"signature"`
+	Visible         bool     `json:"visible"`
+	TxID            string   `json:"txID"`
+	RawData         RawData  `json:"raw_data"`
+	RawDataHex      string   `json:"raw_data_hex"`
+	Signature       []string `json:"signature"`
+	ContractAddress string   `json:"contract_address"`
 }
 
 func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Transaction, error) {
