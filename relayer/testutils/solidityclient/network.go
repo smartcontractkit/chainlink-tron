@@ -37,6 +37,33 @@ type Return struct {
 	ContractRet string `json:"contractRet"`
 }
 
+type ParameterValue struct {
+	OwnerAddress    string `json:"owner_address,omitempty"`
+	ToAddress       string `json:"to_address,omitempty"`
+	Data            string `json:"data,omitempty"`
+	ContractAddress string `json:"contract_address,omitempty"`
+	Amount          int64  `json:"amount,omitempty"`
+}
+
+type Parameter struct {
+	Value   ParameterValue `json:"value,omitempty"`
+	TypeUrl string         `json:"type_url,omitempty"`
+}
+
+type Contract struct {
+	Parameter Parameter `json:"parameter,omitempty"`
+	Type      string    `json:"type,omitempty"`
+}
+
+type RawData struct {
+	Contract      []Contract `json:"contract,omitempty"`
+	RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
+	RefBlockHash  string     `json:"ref_block_hash,omitempty"`
+	Expiration    int64      `json:"expiration,omitempty"`
+	FeeLimit      int64      `json:"fee_limit,omitempty"`
+	Timestamp     int64      `json:"timestamp,omitempty"`
+}
+
 type BlockTransactions struct {
 	Ret        []Return `json:"ret"`
 	TxID       string   `json:"txID"`
