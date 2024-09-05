@@ -119,7 +119,7 @@ type GetTransactionInfoByIDRequest struct {
 
 func (tc *TronSolidityClient) GetTransactionInfoById(txhash string) (*TransactionInfo, error) {
 	transactionInfo := TransactionInfo{}
-	getTransactionInfoByIdEndpoint := "/wallet/gettransactioninfobyid"
+	getTransactionInfoByIdEndpoint := "/walletsolidity/gettransactioninfobyid"
 
 	err := tc.post(tc.baseURL+getTransactionInfoByIdEndpoint,
 		&GetTransactionInfoByIDRequest{

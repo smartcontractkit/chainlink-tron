@@ -153,7 +153,7 @@ type TriggerConstantContractResponse struct {
 }
 
 func (tc *TronSolidityClient) TriggerConstantContract(tcRequest *TriggerConstantContractRequest) (*TriggerConstantContractResponse, error) {
-	triggerContractEndpoint := "/wallet/triggerconstantcontract"
+	triggerContractEndpoint := "/walletsolidity/triggerconstantcontract"
 	contractResponse := TriggerConstantContractResponse{}
 
 	err := tc.post(tc.baseURL+triggerContractEndpoint, tcRequest, &contractResponse)
@@ -189,7 +189,7 @@ type EnergyEstimateResult struct {
 
 func (tc *TronSolidityClient) EstimateEnergy(reqBody *EnergyEstimateRequest) (*EnergyEstimateResult, error) {
 	response := EnergyEstimateResult{}
-	energyEstimateEndpoint := "/wallet/estimateenergy"
+	energyEstimateEndpoint := "/walletsolidity/estimateenergy"
 
 	err := tc.post(tc.baseURL+energyEstimateEndpoint, reqBody, &response)
 

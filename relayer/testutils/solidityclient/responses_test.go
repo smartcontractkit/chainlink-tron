@@ -30,17 +30,17 @@ var testcases = []testcase{
 			a.Equal(expectedGetBlockByNum, block)
 		},
 	},
-	{
-		name: "GetEnergyPrices",
-		apicall: func(a *assert.Assertions, r *require.Assertions) {
-			jsonsource := "getenergyprices.json"
-			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
-			eprices, err := client.GetEnergyPrices()
-			r.Nil(err, "request failed: %v", err)
-			a.Equal(expectedEnergyPrices, eprices)
-		},
-	},
+	// 	{
+	// 		name: "GetEnergyPrices",
+	// 		apicall: func(a *assert.Assertions, r *require.Assertions) {
+	// 			jsonsource := "getenergyprices.json"
+	// 			httpstatus := http.StatusOK
+	// 			client := setupSolidityClient(jsonsource, httpstatus, r)
+	// 			eprices, err := client.GetEnergyPrices()
+	// 			r.Nil(err, "request failed: %v", err)
+	// 			a.Equal(expectedEnergyPrices, eprices)
+	// 		},
+	// 	},
 	{
 		name: "GetNowBlock",
 		apicall: func(a *assert.Assertions, r *require.Assertions) {

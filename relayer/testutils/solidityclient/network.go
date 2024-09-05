@@ -2,21 +2,20 @@ package solidityclient
 
 import "fmt"
 
-type EnergyPrice struct {
-	Prices string `json:"prices"` // All historical energy unit price information. Each unit price change is separated by a comma. Before the colon is the millisecond timestamp, and after the colon is the energy unit price in sun.
-}
-
-func (tc *TronSolidityClient) GetEnergyPrices() (*EnergyPrice, error) {
-	energyPrices := EnergyPrice{}
-	getEnergyPricesEndpoint := "/wallet/getenergyprices"
-
-	err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
-	if err != nil {
-		return nil, fmt.Errorf("get energy prices request (%s) failed: %w", tc.baseURL+getEnergyPricesEndpoint, err)
-	}
-	return &energyPrices, nil
-}
-
+//	type EnergyPrice struct {
+//		Prices string `json:"prices"` // All historical energy unit price information. Each unit price change is separated by a comma. Before the colon is the millisecond timestamp, and after the colon is the energy unit price in sun.
+//	}
+//
+//	func (tc *TronSolidityClient) GetEnergyPrices() (*EnergyPrice, error) {
+//		energyPrices := EnergyPrice{}
+//		getEnergyPricesEndpoint := "/walletsolidity/getenergyprices"
+//
+//		err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
+//		if err != nil {
+//			return nil, fmt.Errorf("get energy prices request (%s) failed: %w", tc.baseURL+getEnergyPricesEndpoint, err)
+//		}
+//		return &energyPrices, nil
+//	}
 type BlockHeaderRaw struct {
 	Timestamp        int64  `json:"timestamp,omitempty"`
 	TxTrieRoot       string `json:"txTrieRoot,omitempty"`
@@ -80,9 +79,9 @@ type Block struct {
 
 func (tc *TronSolidityClient) GetNowBlock() (*Block, error) {
 	block := Block{}
-	getNowBlockEndpoint := "/wallet/getnowblock"
+	getNowBlockEndpoint := "/walletsolidity/getnowblock"
 
-	err := tc.post(tc.baseURL+getNowBlockEndpoint, nil, &block)
+	err := tc.get(tc.baseURL+getNowBlockEndpoint, &block)
 	if err != nil {
 		return nil, fmt.Errorf("get latest block request (%s) failed: %w", tc.baseURL+getNowBlockEndpoint, err)
 	}
@@ -96,7 +95,7 @@ type GetBlockByNumRequest struct {
 
 func (tc *TronSolidityClient) GetBlockByNum(num int32) (*Block, error) {
 	block := Block{}
-	getBlockByNumEndpoint := "/wallet/getblockbynum"
+	getBlockByNumEndpoint := "/walletsolidity/getblockbynum"
 
 	err := tc.post(tc.baseURL+getBlockByNumEndpoint,
 		&GetBlockByNumRequest{
