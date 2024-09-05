@@ -1,8 +1,5 @@
 package solidityclient
 
-//	var expectedEnergyPrices = &EnergyPrice{
-//		Prices: "0:100,1575871200000:10,1606537680000:40,1614238080000:140,1635739080000:280,1681895880000:420",
-//	}
 var expectedGetBlockByNum = &Block{
 	BlockID: "00000000000000c86d2473411771f83db5e314c01bc8f8cf0dc2f8892be6fd7f",
 	BlockHeader: BlockHeader{

@@ -2,20 +2,6 @@ package solidityclient
 
 import "fmt"
 
-//	type EnergyPrice struct {
-//		Prices string `json:"prices"` // All historical energy unit price information. Each unit price change is separated by a comma. Before the colon is the millisecond timestamp, and after the colon is the energy unit price in sun.
-//	}
-//
-//	func (tc *TronSolidityClient) GetEnergyPrices() (*EnergyPrice, error) {
-//		energyPrices := EnergyPrice{}
-//		getEnergyPricesEndpoint := "/walletsolidity/getenergyprices"
-//
-//		err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
-//		if err != nil {
-//			return nil, fmt.Errorf("get energy prices request (%s) failed: %w", tc.baseURL+getEnergyPricesEndpoint, err)
-//		}
-//		return &energyPrices, nil
-//	}
 type BlockHeaderRaw struct {
 	Timestamp        int64  `json:"timestamp,omitempty"`
 	TxTrieRoot       string `json:"txTrieRoot,omitempty"`

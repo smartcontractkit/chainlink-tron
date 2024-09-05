@@ -2,19 +2,6 @@ package solidityclient
 
 import "fmt"
 
-//	type DeployContractRequest struct {
-//		OwnerAddress               string `json:"owner_address,omitempty"`
-//		ABI                        string `json:"abi,omitempty"`
-//		Bytecode                   string `json:"bytecode,omitempty"`
-//		Parameter                  string `json:"parameter,omitempty"`
-//		Name                       string `json:"name,omitempty"`
-//		CallValue                  int    `json:"call_value,omitempty"`
-//		FeeLimit                   int    `json:"fee_limit,omitempty"`
-//		ConsumeUserResourcePercent int    `json:"consume_user_resource_percent,omitempty"`
-//		OriginEnergyLimit          int    `json:"origin_energy_limit,omitempty"`
-//		Visible                    bool   `json:"visible,omitempty"`
-//	}
-
 type EntryOutput struct {
 	Indexed bool   `json:"indexed,omitempty"`
 	Name    string `json:"name,omitempty"`
