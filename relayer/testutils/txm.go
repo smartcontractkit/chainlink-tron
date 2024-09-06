@@ -25,6 +25,7 @@ import (
 )
 
 func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.Duration) {
+	time.Sleep(5 * time.Second) // reduce flakiness
 	start := time.Now()
 	for {
 		queueLen, unconfirmedLen := txmgr.InflightCount()
