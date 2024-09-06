@@ -219,7 +219,8 @@ func runOCR2Test(
 
 	transmittersStr := make([]string, len(transmitters))
 	for i, t := range transmitters {
-		transmittersStr[i] = string(t)
+		evmAddress := ethcommon.HexToAddress(string(t))
+		transmittersStr[i] = string(utils.EthereumToTronAddressBase58(evmAddress))
 	}
 	require.Equal(t, chainlinkClient.GetNodeAddresses(), transmittersStr, "Transmitters should match node addresses")
 

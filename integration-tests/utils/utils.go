@@ -223,9 +223,7 @@ func MustConvertToEthAddress(t *testing.T, tronAddress string) common.Address {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ethAddressHex := "0x" + tronHexAddress.Hex()[4:]
-	ethAddress := common.HexToAddress(ethAddressHex)
-	return ethAddress
+	return tronHexAddress.EthAddress()
 }
 
 func MustMarshalParams(t *testing.T, params ...any) string {

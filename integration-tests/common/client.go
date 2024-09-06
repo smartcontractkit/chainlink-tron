@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/rs/zerolog/log"
@@ -116,12 +117,17 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 		var configPubKey [curve25519.PointSize]byte
 		copy(configPubKey[:], configPubKeyBytes)
 
+		// Convert TRON base58 transmitter address to hex format in tests for computing the offchain config hash
+		transmitterAddress, err := address.Base58ToAddress(key.TXKey.Data.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		oracleIdentity := confighelper.OracleIdentity{
 			OffchainPublicKey: offchainPubKey,
 			OnchainPublicKey:  onchainPubKeyBytes,
 			PeerID:            key.PeerID,
-			// Already in TRON base58 address format as per TRON keystore ID()
-			TransmitAccount: types.Account(key.TXKey.Data.ID),
+			TransmitAccount:   types.Account(transmitterAddress.EthAddress().Hex()),
 		}
 
 		oracleIdentityExtra := confighelper.OracleIdentityExtra{
