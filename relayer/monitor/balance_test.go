@@ -1,27 +1,35 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
 func TestBalanceMonitor(t *testing.T) {
 	const chainID = "Chainlinktest-42"
 	ks := keystore{}
+	accounts := []tronaddress.Address{}
 	for i := 0; i < 3; i++ {
-		addr := generateTronAddress()
-		ks = append(ks, addr)
+		pubKeyHex := generatePublicKeyHex()
+		addr, err := relayer.PublicKeyToTronAddress(pubKeyHex)
+		assert.NoError(t, err)
+		ks = append(ks, pubKeyHex)
+		accounts = append(accounts, addr)
 	}
 
 	bals := []int64{0, 1, 1_000_000}
@@ -35,12 +43,12 @@ func TestBalanceMonitor(t *testing.T) {
 	type update struct{ acc, bal string }
 	var exp []update
 	for i := range bals {
-		acc := ks[i]
+		acc := accounts[i]
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
 	mockClient.GetAccountBalanceFunc = func(address tronaddress.Address) (int64, error) {
-		for i, addr := range ks {
-			if addr.String() == address.String() {
+		for i, acc := range accounts {
+			if acc.String() == address.String() {
 				return bals[i], nil
 			}
 		}
@@ -82,6 +90,21 @@ func generateTronAddress() tronaddress.Address {
 	return key.Address
 }
 
+func generatePublicKeyHex() string {
+	randBytes := make([]byte, 64)
+	_, err := rand.Reader.Read(randBytes)
+	if err != nil {
+		panic("key generation: could not read from random source: " + err.Error())
+	}
+	reader := bytes.NewReader(randBytes)
+	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), reader)
+	if err != nil {
+		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
+	}
+	pubKeyBytes := crypto.FromECDSAPub(&privateKeyECDSA.PublicKey)
+	return fmt.Sprintf("%x", pubKeyBytes)
+}
+
 type config struct {
 	balancePollPeriod time.Duration
 }
@@ -90,11 +113,11 @@ func (c *config) BalancePollPeriod() time.Duration {
 	return c.balancePollPeriod
 }
 
-type keystore []tronaddress.Address
+type keystore []string
 
 func (k keystore) Accounts(ctx context.Context) (ks []string, err error) {
 	for _, acc := range k {
-		ks = append(ks, acc.String())
+		ks = append(ks, acc)
 	}
 	return
 }

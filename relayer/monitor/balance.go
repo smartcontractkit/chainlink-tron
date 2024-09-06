@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 )
 
 // Config defines the monitor configuration.
@@ -129,11 +130,15 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			return
 		default:
 		}
-		addr, err := tronaddress.Base58ToAddress(k)
+
+		// keystore.Accounts returns public keys encoded as hex strings
+		// we need to convert the public key into a Tron address
+		addr, err := relayer.PublicKeyToTronAddress(k)
 		if err != nil {
-			b.lggr.Errorw("Failed to parse address", "account", k, "err", err)
+			b.lggr.Errorw("Failed to decode public key from keystore", "publicKey", k, "err", err)
 			continue
 		}
+
 		sun, err := reader.GetAccountBalance(addr)
 		if err != nil {
 			b.lggr.Errorw("Failed to get balance", "account", k, "err", err)
