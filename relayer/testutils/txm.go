@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/jsonclient"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
@@ -71,7 +72,7 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	require.NoError(t, err)
 
 	jsonClient := jsonclient.NewTronJsonClient(httpUrl, &http.Client{})
-	tx, err := jsonClient.DeployContract(&jsonclient.DeployContractRequest{
+	tx, err := jsonClient.DeployContract(&api.DeployContractRequest{
 		OwnerAddress:               fromAddress,
 		ABI:                        abiJson,
 		Bytecode:                   codeHex,

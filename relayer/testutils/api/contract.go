@@ -1,5 +1,15 @@
 package api
 
+import (
+	"context"
+	"crypto/ecdsa"
+	"encoding/hex"
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+)
+
 type DeployContractRequest struct {
 	OwnerAddress               string `json:"owner_address,omitempty"`
 	ABI                        string `json:"abi,omitempty"`
@@ -86,6 +96,42 @@ type Transaction struct {
 	RawDataHex      string   `json:"raw_data_hex"`
 	Signature       []string `json:"signature"`
 	ContractAddress string   `json:"contract_address"`
+}
+
+func (t *Transaction) SignWithKey(privateKey *ecdsa.PrivateKey) error {
+	txIdBytes, err := hex.DecodeString(t.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to decode raw_data_hex: %w", err)
+	}
+
+	signature, err := crypto.Sign(txIdBytes, privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	signatureHex := hex.EncodeToString(signature)
+
+	t.Signature = []string{signatureHex}
+
+	return nil
+}
+
+func (t *Transaction) Sign(fromAddress string, keystore loop.Keystore) error {
+	txIdBytes, err := hex.DecodeString(t.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to decode raw_data_hex: %w", err)
+	}
+
+	signature, err := keystore.Sign(context.Background(), fromAddress, txIdBytes)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	signatureHex := hex.EncodeToString(signature)
+
+	t.Signature = []string{signatureHex}
+
+	return nil
 }
 
 type GetContractRequest struct {

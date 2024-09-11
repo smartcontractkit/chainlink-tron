@@ -1,4 +1,4 @@
-package solidityclient
+package common
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 )
 
 // readTestdata reads json responses from a subdirectory
-func readTestdata(filename string) ([]byte, error) {
+func ReadTestdata(filename string) ([]byte, error) {
 	pathtofile := "./testdata/" + filename
 	fd, err := os.Open(pathtofile)
 	if err != nil {

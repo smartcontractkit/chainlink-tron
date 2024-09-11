@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +73,7 @@ var testcases = []testcase{
 			jsonsource := "estimateenergy.json"
 			httpstatus := http.StatusOK
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			energy, err := client.EstimateEnergy(&EnergyEstimateRequest{})
+			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedEstimateEnergy, energy)
 		},
@@ -81,7 +84,7 @@ var testcases = []testcase{
 			jsonsource := "emptyresponse.json"
 			httpstatus := http.StatusInternalServerError
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			energy, err := client.EstimateEnergy(&EnergyEstimateRequest{})
+			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(energy)
 			r.NotNil(err, "request did not fail: %v", err)
 		},
@@ -103,7 +106,7 @@ var testcases = []testcase{
 			jsonsource := "deploycontract.json"
 			httpstatus := http.StatusOK
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			contract, err := client.DeployContract(&DeployContractRequest{})
+			contract, err := client.DeployContract(&api.DeployContractRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedContractDeploy, contract)
 		},
@@ -114,7 +117,7 @@ var testcases = []testcase{
 			jsonsource := "triggersmartcontract.json"
 			httpstatus := http.StatusOK
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			contract, err := client.TriggerSmartContract(&TriggerSmartContractRequest{})
+			contract, err := client.TriggerSmartContract(&api.TriggerSmartContractRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedTriggerSmartContract, contract)
 		},
@@ -125,7 +128,7 @@ var testcases = []testcase{
 			jsonsource := "triggerconstantcontract.json"
 			httpstatus := http.StatusOK
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			contract, err := client.TriggerConstantContract(&TriggerConstantContractRequest{})
+			contract, err := client.TriggerConstantContract(&api.TriggerConstantContractRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedTriggerConstantContract, contract)
 		},
@@ -139,7 +142,7 @@ var testcases = []testcase{
 			jsonsource := "broadcasttransactionfailure.json"
 			httpstatus := http.StatusOK
 			client := setupJsonClient(jsonsource, httpstatus, r)
-			broadcastResponse, err := client.BroadcastTransaction(&Transaction{})
+			broadcastResponse, err := client.BroadcastTransaction(&api.Transaction{})
 			r.Nil(broadcastResponse, "broadcast response should be nil")
 			r.NotNil(err, "broadcast should have failed")
 			errstr := fmt.Sprintf("broadcasting failed. Code: %s, Message: %s", broadcasterr, broadcastMessage)
@@ -161,7 +164,7 @@ var testcases = []testcase{
 }
 
 func setupJsonClient(jsonfile string, responsecode int, r *require.Assertions) *TronJsonClient {
-	jsonresponse, err := readTestdata(jsonfile)
+	jsonresponse, err := common.ReadTestdata(jsonfile)
 	r.Nil(err, "reading testdata failed: %v", err)
 	mockclient := NewMockJsonClient(responsecode, jsonresponse, nil)
 	return NewTronJsonClient("baseurl", mockclient)

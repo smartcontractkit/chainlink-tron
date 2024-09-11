@@ -5,7 +5,7 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
 )
 
-func (tc *TronJsonClient) DeployContract(reqBody *api.DeployContractRequest) (*apiTransaction, error) {
+func (tc *TronJsonClient) DeployContract(reqBody *api.DeployContractRequest) (*api.Transaction, error) {
 	transaction := api.Transaction{}
 	deployEndpoint := "/wallet/deploycontract"
 

@@ -5,6 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +61,7 @@ var testcases = []testcase{
 			jsonsource := "estimateenergy.json"
 			httpstatus := http.StatusOK
 			client := setupSolidityClient(jsonsource, httpstatus, r)
-			energy, err := client.EstimateEnergy(&EnergyEstimateRequest{})
+			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedEstimateEnergy, energy)
 		},
@@ -69,7 +72,7 @@ var testcases = []testcase{
 			jsonsource := "emptyresponse.json"
 			httpstatus := http.StatusInternalServerError
 			client := setupSolidityClient(jsonsource, httpstatus, r)
-			energy, err := client.EstimateEnergy(&EnergyEstimateRequest{})
+			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(energy)
 			r.NotNil(err, "request did not fail: %v", err)
 		},
@@ -80,7 +83,7 @@ var testcases = []testcase{
 			jsonsource := "triggerconstantcontract.json"
 			httpstatus := http.StatusOK
 			client := setupSolidityClient(jsonsource, httpstatus, r)
-			contract, err := client.TriggerConstantContract(&TriggerConstantContractRequest{})
+			contract, err := client.TriggerConstantContract(&api.TriggerConstantContractRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedTriggerConstantContract, contract)
 		},
@@ -100,7 +103,7 @@ var testcases = []testcase{
 }
 
 func setupSolidityClient(jsonfile string, responsecode int, r *require.Assertions) *TronSolidityClient {
-	jsonresponse, err := readTestdata(jsonfile)
+	jsonresponse, err := common.ReadTestdata(jsonfile)
 	r.Nil(err, "reading testdata failed: %v", err)
 	mockclient := NewMockSolidityClient(responsecode, jsonresponse, nil)
 	return NewTronSolidityClient("baseurl", mockclient)

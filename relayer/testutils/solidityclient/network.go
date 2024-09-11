@@ -1,70 +1,13 @@
 package solidityclient
 
-import "fmt"
+import (
+	"fmt"
 
-type BlockHeaderRaw struct {
-	Timestamp        int64  `json:"timestamp,omitempty"`
-	TxTrieRoot       string `json:"txTrieRoot,omitempty"`
-	ParentHash       string `json:"parentHash,omitempty"`
-	Number           int64  `json:"number,omitempty"`
-	WitnessId        int64  `json:"witness_id,omitempty"`
-	WitnessAddress   string `json:"witness_address,omitempty"`
-	Version          int32  `json:"version,omitempty"`
-	AccountStateRoot string `json:"accountStateRoot,omitempty"`
-}
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+)
 
-type BlockHeader struct {
-	RawData          *BlockHeaderRaw `json:"raw_data,omitempty"`
-	WitnessSignature string          `json:"witness_signature,omitempty"`
-}
-
-type Return struct {
-	ContractRet string `json:"contractRet"`
-}
-
-type ParameterValue struct {
-	OwnerAddress    string `json:"owner_address,omitempty"`
-	ToAddress       string `json:"to_address,omitempty"`
-	Data            string `json:"data,omitempty"`
-	ContractAddress string `json:"contract_address,omitempty"`
-	Amount          int64  `json:"amount,omitempty"`
-}
-
-type Parameter struct {
-	Value   ParameterValue `json:"value,omitempty"`
-	TypeUrl string         `json:"type_url,omitempty"`
-}
-
-type Contract struct {
-	Parameter Parameter `json:"parameter,omitempty"`
-	Type      string    `json:"type,omitempty"`
-}
-
-type RawData struct {
-	Contract      []Contract `json:"contract,omitempty"`
-	RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
-	RefBlockHash  string     `json:"ref_block_hash,omitempty"`
-	Expiration    int64      `json:"expiration,omitempty"`
-	FeeLimit      int64      `json:"fee_limit,omitempty"`
-	Timestamp     int64      `json:"timestamp,omitempty"`
-}
-
-type BlockTransactions struct {
-	Ret        []Return `json:"ret"`
-	TxID       string   `json:"txID"`
-	Signature  []string `json:"signature"`
-	RawData    RawData  `json:"raw_data"`
-	RawDataHex string   `json:"raw_data_hex"`
-}
-
-type Block struct {
-	BlockID      string              `json:"blockID"`
-	Transactions []BlockTransactions `json:"transactions,omitempty"`
-	BlockHeader  BlockHeader         `json:"block_header,omitempty"`
-}
-
-func (tc *TronSolidityClient) GetNowBlock() (*Block, error) {
-	block := Block{}
+func (tc *TronSolidityClient) GetNowBlock() (*api.Block, error) {
+	block := api.Block{}
 	getNowBlockEndpoint := "/walletsolidity/getnowblock"
 
 	err := tc.get(tc.baseURL+getNowBlockEndpoint, &block)
@@ -75,16 +18,12 @@ func (tc *TronSolidityClient) GetNowBlock() (*Block, error) {
 	return &block, nil
 }
 
-type GetBlockByNumRequest struct {
-	Num int32 `json:"num"` // defined as int32 in https://developers.tron.network/reference/wallet-getblockbynum
-}
-
-func (tc *TronSolidityClient) GetBlockByNum(num int32) (*Block, error) {
-	block := Block{}
+func (tc *TronSolidityClient) GetBlockByNum(num int32) (*api.Block, error) {
+	block := api.Block{}
 	getBlockByNumEndpoint := "/walletsolidity/getblockbynum"
 
 	err := tc.post(tc.baseURL+getBlockByNumEndpoint,
-		&GetBlockByNumRequest{
+		&api.GetBlockByNumRequest{
 			Num: num,
 		}, &block)
 	if err != nil {

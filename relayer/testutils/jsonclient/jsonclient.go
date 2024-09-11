@@ -2,17 +2,10 @@ package jsonclient
 
 import (
 	"bytes"
-	"context"
-	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 )
 
 type JsonHttpClient interface {
@@ -97,40 +90,4 @@ func (tc *TronJsonClient) post(endpoint string, reqBody, responseBody interface{
 
 func (tc *TronJsonClient) get(endpoint string, responseBody interface{}) error {
 	return tc.request("GET", endpoint, nil, responseBody)
-}
-
-func (t *Transaction) SignWithKey(privateKey *ecdsa.PrivateKey) error {
-	txIdBytes, err := hex.DecodeString(t.TxID)
-	if err != nil {
-		return fmt.Errorf("failed to decode raw_data_hex: %w", err)
-	}
-
-	signature, err := crypto.Sign(txIdBytes, privateKey)
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %w", err)
-	}
-
-	signatureHex := hex.EncodeToString(signature)
-
-	t.Signature = []string{signatureHex}
-
-	return nil
-}
-
-func (t *Transaction) Sign(fromAddress string, keystore loop.Keystore) error {
-	txIdBytes, err := hex.DecodeString(t.TxID)
-	if err != nil {
-		return fmt.Errorf("failed to decode raw_data_hex: %w", err)
-	}
-
-	signature, err := keystore.Sign(context.Background(), fromAddress, txIdBytes)
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %w", err)
-	}
-
-	signatureHex := hex.EncodeToString(signature)
-
-	t.Signature = []string{signatureHex}
-
-	return nil
 }

@@ -1,7 +1,11 @@
 package solidityclient
 
-var expectedGetAccount = &GetAccountResponse{
-	FrozenV2: []Account_FreezeV2{
+import (
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+)
+
+var expectedGetAccount = &api.GetAccountResponse{
+	FrozenV2: []api.Account_FreezeV2{
 		{},
 		{
 			Type: "ENERGY",
@@ -14,14 +18,14 @@ var expectedGetAccount = &GetAccountResponse{
 	LatestOprationTime:    1715145693000,
 	LatestConsumeFreeTime: 1715145693000,
 	NetWindowOptimized:    true,
-	AccountResource: AccountResource{
+	AccountResource: api.AccountResource{
 		LatestConsumeTimeForEnergy: 1717675329000,
 		EnergyWindowSize:           28800000,
 		EnergyWindowOptimized:      true,
 	},
-	ActivePermission: []Permission{
+	ActivePermission: []api.Permission{
 		{
-			Keys: []*Key{
+			Keys: []*api.Key{
 				{
 					Address: "TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g",
 					Weight:  1,
@@ -38,9 +42,9 @@ var expectedGetAccount = &GetAccountResponse{
 	CreateTime:        1637411046000,
 	LatestConsumeTime: 1717666029000,
 	NetWindowSize:     28800000,
-	OwnerPermission: Permission{
+	OwnerPermission: api.Permission{
 		Threshold: 1,
-		Keys: []*Key{
+		Keys: []*api.Key{
 			{
 				Address: "TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g",
 				Weight:  1,
