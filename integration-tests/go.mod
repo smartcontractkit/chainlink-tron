@@ -352,7 +352,7 @@ require (
 
 replace (
 	// original author is not maintaining the repo anymore
-	github.com/fbsobreira/gotron-sdk => github.com/cfal/gotron-sdk v0.0.0-20240707013539-ba2ce85cff06
+	github.com/fbsobreira/gotron-sdk => ../relayer/gotron-sdk
 
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
