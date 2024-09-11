@@ -1,97 +1,12 @@
 package jsonclient
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+)
 
-type DeployContractRequest struct {
-	OwnerAddress               string `json:"owner_address,omitempty"`
-	ABI                        string `json:"abi,omitempty"`
-	Bytecode                   string `json:"bytecode,omitempty"`
-	Parameter                  string `json:"parameter,omitempty"`
-	Name                       string `json:"name,omitempty"`
-	CallValue                  int    `json:"call_value,omitempty"`
-	FeeLimit                   int    `json:"fee_limit,omitempty"`
-	ConsumeUserResourcePercent int    `json:"consume_user_resource_percent,omitempty"`
-	OriginEnergyLimit          int    `json:"origin_energy_limit,omitempty"`
-	Visible                    bool   `json:"visible,omitempty"`
-}
-
-type EntryOutput struct {
-	Indexed bool   `json:"indexed,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Type    string `json:"type,omitempty"`
-}
-
-type EntryInput struct {
-	Indexed bool   `json:"indexed,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Type    string `json:"type,omitempty"`
-}
-type Entrys struct {
-	Name            string        `json:"name,omitempty"`
-	Anonymous       bool          `json:"anonymous,omitempty"`
-	Constant        bool          `json:"constant,omitempty"`
-	Payable         bool          `json:"payable,omitempty"`
-	StateMutability string        `json:"stateMutability,omitempty"`
-	Type            string        `json:"type,omitempty"`
-	Inputs          []EntryInput  `json:"inputs"`
-	Outputs         []EntryOutput `json:"outputs"`
-}
-
-type JSONABI struct {
-	Entrys []Entrys `json:"entrys,omitempty"`
-}
-
-type NewContract struct {
-	OriginAddress              string  `json:"origin_address,omitempty"`                // Contract creator address
-	ContractAddress            string  `json:"contract_address,omitempty"`              // Contract address
-	ABI                        JSONABI `json:"abi,omitempty"`                           // ABI
-	Bytecode                   string  `json:"bytecode,omitempty"`                      // Bytecode
-	CallValue                  int64   `json:"call_value,omitempty"`                    // The amount of TRX passed into the contract when deploying the contract
-	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent,omitempty"` // Proportion of user energy consumption
-	Name                       string  `json:"name,omitempty"`                          // contract name
-	OriginEnergyLimit          int64   `json:"origin_energy_limit,omitempty"`           // Each transaction is allowed to consume the maximum energy of the contract creator
-	CodeHash                   string  `json:"code_hash,omitempty"`                     // code hash
-}
-
-type ParameterValue struct {
-	OwnerAddress    string      `json:"owner_address,omitempty"`
-	ToAddress       string      `json:"to_address,omitempty"`
-	Data            string      `json:"data,omitempty"`
-	ContractAddress string      `json:"contract_address,omitempty"`
-	Amount          int64       `json:"amount,omitempty"`
-	NewContract     NewContract `json:"new_contract,omitempty"`
-}
-
-type Parameter struct {
-	Value   ParameterValue `json:"value,omitempty"`
-	TypeUrl string         `json:"type_url,omitempty"`
-}
-
-type Contract struct {
-	Parameter Parameter `json:"parameter,omitempty"`
-	Type      string    `json:"type,omitempty"`
-}
-
-type RawData struct {
-	Contract      []Contract `json:"contract,omitempty"`
-	RefBlockBytes string     `json:"ref_block_bytes,omitempty"`
-	RefBlockHash  string     `json:"ref_block_hash,omitempty"`
-	Expiration    int64      `json:"expiration,omitempty"`
-	FeeLimit      int64      `json:"fee_limit,omitempty"`
-	Timestamp     int64      `json:"timestamp,omitempty"`
-}
-
-type Transaction struct {
-	Visible         bool     `json:"visible"`
-	TxID            string   `json:"txID"`
-	RawData         RawData  `json:"raw_data"`
-	RawDataHex      string   `json:"raw_data_hex"`
-	Signature       []string `json:"signature"`
-	ContractAddress string   `json:"contract_address"`
-}
-
-func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Transaction, error) {
-	transaction := Transaction{}
+func (tc *TronJsonClient) DeployContract(reqBody *api.DeployContractRequest) (*apiTransaction, error) {
+	transaction := api.Transaction{}
 	deployEndpoint := "/wallet/deploycontract"
 
 	err := tc.post(tc.baseURL+deployEndpoint, reqBody, &transaction)
@@ -102,30 +17,13 @@ func (tc *TronJsonClient) DeployContract(reqBody *DeployContractRequest) (*Trans
 	return &transaction, nil
 }
 
-type GetContractRequest struct {
-	Value   string `json:"value"`
-	Visible bool   `json:"visible"`
-}
-
-type GetContractResponse struct {
-	OriginAddress              string  `json:"origin_address,omitempty"`                // Contract creator address
-	ContractAddress            string  `json:"contract_address,omitempty"`              // Contract address
-	ABI                        JSONABI `json:"abi,omitempty"`                           // ABI
-	Bytecode                   string  `json:"bytecode,omitempty"`                      // Bytecode
-	CallValue                  int64   `json:"call_value,omitempty"`                    // The amount of TRX passed into the contract when deploying the contract
-	ConsumeUserResourcePercent int64   `json:"consume_user_resource_percent,omitempty"` // Proportion of user energy consumption
-	Name                       string  `json:"name,omitempty"`                          // contract name
-	OriginEnergyLimit          int64   `json:"origin_energy_limit,omitempty"`           // Each transaction is allowed to consume the maximum energy of the contract creator
-	CodeHash                   string  `json:"code_hash,omitempty"`                     // code hash
-}
-
-func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, error) {
+func (tc *TronJsonClient) GetContract(address string) (*api.GetContractResponse, error) {
 
 	getContractEndpoint := "/wallet/getcontract"
-	var contractInfo GetContractResponse
+	var contractInfo api.GetContractResponse
 
 	err := tc.post(tc.baseURL+getContractEndpoint,
-		&GetContractRequest{
+		&api.GetContractRequest{
 			Value:   address,
 			Visible: true,
 		}, &contractInfo)
@@ -141,65 +39,9 @@ func (tc *TronJsonClient) GetContract(address string) (*GetContractResponse, err
 	return &contractInfo, nil
 }
 
-type TriggerSmartContractRequest struct {
-	OwnerAddress     string `json:"owner_address"`     // Address that triggers the contract, converted to a hex string
-	ContractAddress  string `json:"contract_address"`  // Contract address, converted to a hex string
-	FunctionSelector string `json:"function_selector"` // Function call, must not be left blank
-	Parameter        string `json:"parameter"`
-	Data             string `json:"data"`             // The data for interacting with smart contracts, including the contract function and parameters
-	FeeLimit         int32  `json:"fee_limit"`        // Maximum TRX consumption, measured in SUN
-	CallValue        int64  `json:"call_value"`       // Amount of TRX transferred with this transaction, measured in SUN
-	CallTokenValue   int64  `json:"call_token_value"` // Amount of TRC10 token transferred with this transaction
-	TokenId          int64  `json:"token_id"`         // TRC 10 token id
-	// typo in spec? json:"Permission_id" https://developers.tron.network/reference/triggersmartcontract
-	PermissionId int32 `json:"permission_id"` // for multi-signature
-	Visible      bool  `json:"visible"`       // Whether the address is in base58check format
-}
-
-type TriggerResult struct {
-	Result bool `json:"result"`
-}
-
-type TriggerValue struct {
-	Data            string `json:"data"`
-	OwnerAddress    string `json:"owner_address"`
-	ContractAddress string `json:"contract_address"`
-}
-
-type TriggerParameter struct {
-	Value   TriggerValue `json:"value"`
-	TypeUrl string       `json:"type_url"`
-}
-
-type TriggerContract struct {
-	Parameter TriggerParameter `json:"parameter"`
-	Type      string           `json:"type"`
-}
-
-type TriggerRawData struct {
-	Contract      []TriggerContract `json:"contract,omitempty"`
-	RefBlockBytes string            `json:"ref_block_bytes,omitempty"`
-	RefBlockHash  string            `json:"ref_block_hash,omitempty"`
-	Expiration    int64             `json:"expiration,omitempty"`
-	FeeLimit      int64             `json:"fee_limit,omitempty"`
-	Timestamp     int64             `json:"timestamp,omitempty"`
-}
-
-type TriggerTransaction struct {
-	Visible    bool           `json:"visible"`
-	TxID       string         `json:"txID"`
-	RawData    TriggerRawData `json:"raw_data"`
-	RawDataHex string         `json:"raw_data_hex"`
-}
-
-type TriggerSmartContractResponse struct {
-	Result      TriggerResult      `json:"result"`
-	Transaction TriggerTransaction `json:"transaction"`
-}
-
-func (tc *TronJsonClient) TriggerSmartContract(tcRequest *TriggerSmartContractRequest) (*TriggerSmartContractResponse, error) {
+func (tc *TronJsonClient) TriggerSmartContract(tcRequest *api.TriggerSmartContractRequest) (*api.TriggerSmartContractResponse, error) {
 	triggerContractEndpoint := "/wallet/triggersmartcontract"
-	contractResponse := TriggerSmartContractResponse{}
+	contractResponse := api.TriggerSmartContractResponse{}
 
 	err := tc.post(tc.baseURL+triggerContractEndpoint, tcRequest, &contractResponse)
 	if err != nil {
@@ -210,95 +52,9 @@ func (tc *TronJsonClient) TriggerSmartContract(tcRequest *TriggerSmartContractRe
 	return &contractResponse, nil
 }
 
-type TriggerConstantContractRequest struct {
-	OwnerAddress     string `json:"owner_address"`     // Owner address that triggers the contract. If visible=true, use base58check format, otherwise use hex format
-	ContractAddress  string `json:"contract_address"`  // Smart contract address. If visible=true, use base58check format, otherwise use hex format
-	FunctionSelector string `json:"function_selector"` // Function call, must not be left blank
-	Parameter        string `json:"parameter"`
-	Data             string `json:"data"`             // The bytecode of the contract or the data for interacting with smart contracts, including the contract function and parameters
-	CallValue        int64  `json:"call_value"`       // Amount of TRX transferred with this transaction, measured in SUN
-	CallTokenValue   int64  `json:"call_token_value"` // Amount of TRC10 token transferred with this transaction
-	TokenId          int64  `json:"token_id"`         // TRC10 token id
-	Visible          bool   `json:"visible"`          // Whether the address is in base58check format
-}
-
-type ReturnResponseCode int32
-
-const (
-	Return_SUCCESS                         ReturnResponseCode = 0
-	Return_SIGERROR                        ReturnResponseCode = 1 // error in signature
-	Return_CONTRACT_VALIDATE_ERROR         ReturnResponseCode = 2
-	Return_CONTRACT_EXE_ERROR              ReturnResponseCode = 3
-	Return_BANDWITH_ERROR                  ReturnResponseCode = 4
-	Return_DUP_TRANSACTION_ERROR           ReturnResponseCode = 5
-	Return_TAPOS_ERROR                     ReturnResponseCode = 6
-	Return_TOO_BIG_TRANSACTION_ERROR       ReturnResponseCode = 7
-	Return_TRANSACTION_EXPIRATION_ERROR    ReturnResponseCode = 8
-	Return_SERVER_BUSY                     ReturnResponseCode = 9
-	Return_NO_CONNECTION                   ReturnResponseCode = 10
-	Return_NOT_ENOUGH_EFFECTIVE_CONNECTION ReturnResponseCode = 11
-	Return_OTHER_ERROR                     ReturnResponseCode = 20
-)
-
-// Enum value maps for ReturnResponseCode.
-var (
-	ReturnResponseCode_name = map[int32]string{
-		0:  "SUCCESS",
-		1:  "SIGERROR",
-		2:  "CONTRACT_VALIDATE_ERROR",
-		3:  "CONTRACT_EXE_ERROR",
-		4:  "BANDWITH_ERROR",
-		5:  "DUP_TRANSACTION_ERROR",
-		6:  "TAPOS_ERROR",
-		7:  "TOO_BIG_TRANSACTION_ERROR",
-		8:  "TRANSACTION_EXPIRATION_ERROR",
-		9:  "SERVER_BUSY",
-		10: "NO_CONNECTION",
-		11: "NOT_ENOUGH_EFFECTIVE_CONNECTION",
-		20: "OTHER_ERROR",
-	}
-	ReturnResponseCode_value = map[string]int32{
-		"SUCCESS":                         0,
-		"SIGERROR":                        1,
-		"CONTRACT_VALIDATE_ERROR":         2,
-		"CONTRACT_EXE_ERROR":              3,
-		"BANDWITH_ERROR":                  4,
-		"DUP_TRANSACTION_ERROR":           5,
-		"TAPOS_ERROR":                     6,
-		"TOO_BIG_TRANSACTION_ERROR":       7,
-		"TRANSACTION_EXPIRATION_ERROR":    8,
-		"SERVER_BUSY":                     9,
-		"NO_CONNECTION":                   10,
-		"NOT_ENOUGH_EFFECTIVE_CONNECTION": 11,
-		"OTHER_ERROR":                     20,
-	}
-)
-
-type TriggerConstantContractResult struct {
-	Result bool `json:"result"`
-}
-
-type ConstantRet struct{}
-
-type TriggerConstantTransaction struct {
-	Ret        []ConstantRet  `json:"ret"`
-	Visible    bool           `json:"visible"`
-	TxID       string         `json:"txID"`
-	RawData    TriggerRawData `json:"raw_data"`
-	RawDataHex string         `json:"raw_data_hex"`
-}
-
-type TriggerConstantContractResponse struct {
-	Result         TriggerConstantContractResult `json:"result"`          // Run result, for detailed parameter definition, refer to EstimateEnergy
-	EnergyUsed     int64                         `json:"energy_used"`     // Estimated energy consumption, including the basic energy consumption and penalty energy consumption
-	EnergyPenalty  int64                         `json:"energy_penalty"`  // The penalty energy consumption
-	ConstantResult []string                      `json:"constant_result"` // []	Result list
-	Transaction    TriggerConstantTransaction    `json:"transaction"`     // Transaction information, refer to GetTransactionByID
-}
-
-func (tc *TronJsonClient) TriggerConstantContract(tcRequest *TriggerConstantContractRequest) (*TriggerConstantContractResponse, error) {
+func (tc *TronJsonClient) TriggerConstantContract(tcRequest *api.TriggerConstantContractRequest) (*api.TriggerConstantContractResponse, error) {
 	triggerContractEndpoint := "/wallet/triggerconstantcontract"
-	contractResponse := TriggerConstantContractResponse{}
+	contractResponse := api.TriggerConstantContractResponse{}
 
 	err := tc.post(tc.baseURL+triggerContractEndpoint, tcRequest, &contractResponse)
 	if err != nil {
@@ -308,15 +64,8 @@ func (tc *TronJsonClient) TriggerConstantContract(tcRequest *TriggerConstantCont
 	return &contractResponse, nil
 }
 
-type BroadcastResponse struct {
-	Result  bool   `json:"result"`
-	Code    string `json:"code"`
-	TxID    string `json:"txid"`
-	Message string `json:"message"`
-}
-
-func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*BroadcastResponse, error) {
-	response := BroadcastResponse{}
+func (tc *TronJsonClient) BroadcastTransaction(reqBody *api.Transaction) (*api.BroadcastResponse, error) {
+	response := api.BroadcastResponse{}
 	broadcastEndpoint := "/wallet/broadcasttransaction"
 
 	err := tc.post(tc.baseURL+broadcastEndpoint, reqBody, &response)
@@ -332,31 +81,8 @@ func (tc *TronJsonClient) BroadcastTransaction(reqBody *Transaction) (*Broadcast
 	return &response, nil
 }
 
-type EnergyEstimateRequest struct {
-	OwnerAddress     string `json:"owner_address"`     // Owner address that triggers the contract. If visible=true, use base58check format, otherwise use hex format
-	ContractAddress  string `json:"contract_address"`  // Smart contract address. If visible=true, use base58check format, otherwise use hex format
-	FunctionSelector string `json:"function_selector"` // Function call, must not be left blank
-	Parameter        string `json:"parameter"`
-	Data             string `json:"data"`             // The bytecode of the contract or the data for interacting with smart contracts, including the contract function and parameters
-	CallValue        int64  `json:"call_value"`       // Amount of TRX transferred with this transaction, measured in SUN
-	CallTokenValue   int64  `json:"call_token_value"` // Amount of TRC10 token transferred with this transaction
-	TokenId          int64  `json:"token_id"`         // TRC10 token id
-	Visible          bool   `json:"visible"`          // Whether the address is in base58check format
-}
-
-type ReturnEnergyEstimate struct {
-	Result  bool               `json:"result"`  // Is the estimate successful
-	Code    ReturnResponseCode `json:"code"`    // (enum)   response code, an enum type
-	Message string             `json:"message"` // Result message
-}
-
-type EnergyEstimateResult struct {
-	Result         ReturnEnergyEstimate `json:"result"`          // Run result
-	EnergyRequired int64                `json:"energy_required"` // Estimated energy to run the contract
-}
-
-func (tc *TronJsonClient) EstimateEnergy(reqBody *EnergyEstimateRequest) (*EnergyEstimateResult, error) {
-	response := EnergyEstimateResult{}
+func (tc *TronJsonClient) EstimateEnergy(reqBody *api.EnergyEstimateRequest) (*api.EnergyEstimateResult, error) {
+	response := api.EnergyEstimateResult{}
 	energyEstimateEndpoint := "/wallet/estimateenergy"
 
 	err := tc.post(tc.baseURL+energyEstimateEndpoint, reqBody, &response)

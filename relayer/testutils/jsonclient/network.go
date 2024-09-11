@@ -1,13 +1,13 @@
 package jsonclient
 
-import "fmt"
+import (
+	"fmt"
 
-type EnergyPrice struct {
-	Prices string `json:"prices"` // All historical energy unit price information. Each unit price change is separated by a comma. Before the colon is the millisecond timestamp, and after the colon is the energy unit price in sun.
-}
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
+)
 
-func (tc *TronJsonClient) GetEnergyPrices() (*EnergyPrice, error) {
-	energyPrices := EnergyPrice{}
+func (tc *TronJsonClient) GetEnergyPrices() (*api.EnergyPrice, error) {
+	energyPrices := api.EnergyPrice{}
 	getEnergyPricesEndpoint := "/wallet/getenergyprices"
 
 	err := tc.get(tc.baseURL+getEnergyPricesEndpoint, &energyPrices)
@@ -17,42 +17,8 @@ func (tc *TronJsonClient) GetEnergyPrices() (*EnergyPrice, error) {
 	return &energyPrices, nil
 }
 
-type BlockHeaderRaw struct {
-	Timestamp        int64  `json:"timestamp,omitempty"`
-	TxTrieRoot       string `json:"txTrieRoot,omitempty"`
-	ParentHash       string `json:"parentHash,omitempty"`
-	Number           int64  `json:"number,omitempty"`
-	WitnessId        int64  `json:"witness_id,omitempty"`
-	WitnessAddress   string `json:"witness_address,omitempty"`
-	Version          int32  `json:"version,omitempty"`
-	AccountStateRoot string `json:"accountStateRoot,omitempty"`
-}
-
-type BlockHeader struct {
-	RawData          *BlockHeaderRaw `json:"raw_data,omitempty"`
-	WitnessSignature string          `json:"witness_signature,omitempty"`
-}
-
-type Return struct {
-	ContractRet string `json:"contractRet"`
-}
-
-type BlockTransactions struct {
-	Ret        []Return `json:"ret"`
-	TxID       string   `json:"txID"`
-	Signature  []string `json:"signature"`
-	RawData    RawData  `json:"raw_data"`
-	RawDataHex string   `json:"raw_data_hex"`
-}
-
-type Block struct {
-	BlockID      string              `json:"blockID"`
-	Transactions []BlockTransactions `json:"transactions,omitempty"`
-	BlockHeader  BlockHeader         `json:"block_header,omitempty"`
-}
-
-func (tc *TronJsonClient) GetNowBlock() (*Block, error) {
-	block := Block{}
+func (tc *TronJsonClient) GetNowBlock() (*api.Block, error) {
+	block := api.Block{}
 	getNowBlockEndpoint := "/wallet/getnowblock"
 
 	err := tc.post(tc.baseURL+getNowBlockEndpoint, nil, &block)
@@ -63,16 +29,12 @@ func (tc *TronJsonClient) GetNowBlock() (*Block, error) {
 	return &block, nil
 }
 
-type GetBlockByNumRequest struct {
-	Num int32 `json:"num"` // defined as int32 in https://developers.tron.network/reference/wallet-getblockbynum
-}
-
-func (tc *TronJsonClient) GetBlockByNum(num int32) (*Block, error) {
-	block := Block{}
+func (tc *TronJsonClient) GetBlockByNum(num int32) (*api.Block, error) {
+	block := api.Block{}
 	getBlockByNumEndpoint := "/wallet/getblockbynum"
 
 	err := tc.post(tc.baseURL+getBlockByNumEndpoint,
-		&GetBlockByNumRequest{
+		&api.GetBlockByNumRequest{
 			Num: num,
 		}, &block)
 	if err != nil {
