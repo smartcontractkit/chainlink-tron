@@ -20,7 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/jsonclient"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/fullnodeclient"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -72,8 +72,8 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	encodedParams, err := parsedABI.Pack("", params...)
 	require.NoError(t, err)
 
-	jsonClient := jsonclient.NewTronJsonClient(httpUrl, &http.Client{})
-	tx, err := jsonClient.DeployContract(&api.DeployContractRequest{
+	fullnodeClient := fullnodeclient.NewClient(httpUrl, &http.Client{})
+	tx, err := fullnodeClient.DeployContract(&api.DeployContractRequest{
 		OwnerAddress:               fromAddress,
 		ABI:                        abiJson,
 		Bytecode:                   codeHex,
@@ -89,15 +89,15 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	err = tx.Sign(fromAddress, keystore)
 	require.NoError(t, err)
 
-	broadcastResponse, err := jsonClient.BroadcastTransaction(tx)
+	broadcastResponse, err := fullnodeClient.BroadcastTransaction(tx)
 	require.NoError(t, err)
 
 	return broadcastResponse.TxID
 }
 
 func CheckContractDeployed(t *testing.T, httpUrl string, address string) (contractDeployed bool) {
-	jsonClient := jsonclient.NewTronJsonClient(httpUrl, &http.Client{})
-	_, err := jsonClient.GetContract(address)
+	fullnodeClient := fullnodeclient.NewClient(httpUrl, &http.Client{})
+	_, err := fullnodeClient.GetContract(address)
 	require.NoError(t, err)
 
 	return true // require call above stops execution if false
