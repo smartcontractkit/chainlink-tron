@@ -1,4 +1,4 @@
-package jsonclient
+package httpclient
 
 import (
 	"bytes"
@@ -6,21 +6,21 @@ import (
 	"net/http"
 )
 
-type MockJsonClient struct {
+type MockHttpClient struct {
 	code     int
 	response []byte
 	error    error
 }
 
-func NewMockJsonClient(code int, response []byte, err error) *MockJsonClient {
-	return &MockJsonClient{
+func NewMockHttpClient(code int, response []byte, err error) *MockHttpClient {
+	return &MockHttpClient{
 		code:     code,
 		response: response,
 		error:    err,
 	}
 }
 
-func (c *MockJsonClient) Do(req *http.Request) (*http.Response, error) {
+func (c *MockHttpClient) Do(req *http.Request) (*http.Response, error) {
 	if c.error != nil {
 		return nil, c.error
 	}

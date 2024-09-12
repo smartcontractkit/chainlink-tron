@@ -1,4 +1,4 @@
-package jsonclient
+package httpclient
 
 import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"

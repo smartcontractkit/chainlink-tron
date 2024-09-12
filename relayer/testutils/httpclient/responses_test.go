@@ -1,6 +1,7 @@
-package solidityclient
+package httpclient
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -27,10 +28,21 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "getblockbynum.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			block, err := client.GetBlockByNum(123)
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedGetBlockByNum, block)
+		},
+	},
+	{
+		name: "GetEnergyPrices",
+		apicall: func(a *assert.Assertions, r *require.Assertions) {
+			jsonsource := "getenergyprices.json"
+			httpstatus := http.StatusOK
+			client := setupHttpClient(jsonsource, httpstatus, r)
+			eprices, err := client.GetEnergyPrices()
+			r.Nil(err, "request failed: %v", err)
+			a.Equal(expectedEnergyPrices, eprices)
 		},
 	},
 	{
@@ -38,7 +50,7 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "getnowblock.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			block, err := client.GetNowBlock()
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedGetNowBlock, block)
@@ -49,7 +61,7 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "gettransactioninfobyid.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			txinfo, err := client.GetTransactionInfoById("txhash")
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedGetTransactionInfoById, txinfo)
@@ -60,7 +72,7 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "estimateenergy.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedEstimateEnergy, energy)
@@ -71,10 +83,43 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "emptyresponse.json"
 			httpstatus := http.StatusInternalServerError
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			energy, err := client.EstimateEnergy(&api.EnergyEstimateRequest{})
 			r.Nil(energy)
 			r.NotNil(err, "request did not fail: %v", err)
+		},
+	},
+	{
+		name: "ContractGet",
+		apicall: func(a *assert.Assertions, r *require.Assertions) {
+			jsonsource := "getcontract.json"
+			httpstatus := http.StatusOK
+			client := setupHttpClient(jsonsource, httpstatus, r)
+			contract, err := client.GetContract("address")
+			r.Nil(err, "request failed: %v", err)
+			a.Equal(expectedContractGet, contract)
+		},
+	},
+	{
+		name: "ContractDeploy",
+		apicall: func(a *assert.Assertions, r *require.Assertions) {
+			jsonsource := "deploycontract.json"
+			httpstatus := http.StatusOK
+			client := setupHttpClient(jsonsource, httpstatus, r)
+			contract, err := client.DeployContract(&api.DeployContractRequest{})
+			r.Nil(err, "request failed: %v", err)
+			a.Equal(expectedContractDeploy, contract)
+		},
+	},
+	{
+		name: "TriggerSmartContract",
+		apicall: func(a *assert.Assertions, r *require.Assertions) {
+			jsonsource := "triggersmartcontract.json"
+			httpstatus := http.StatusOK
+			client := setupHttpClient(jsonsource, httpstatus, r)
+			contract, err := client.TriggerSmartContract(&api.TriggerSmartContractRequest{})
+			r.Nil(err, "request failed: %v", err)
+			a.Equal(expectedTriggerSmartContract, contract)
 		},
 	},
 	{
@@ -82,10 +127,26 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "triggerconstantcontract.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			contract, err := client.TriggerConstantContract(&api.TriggerConstantContractRequest{})
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedTriggerConstantContract, contract)
+		},
+	},
+	{
+		name: "BroadcastTransactionFailure",
+		apicall: func(a *assert.Assertions, r *require.Assertions) {
+			broadcasterr := "SIGERROR"
+			broadcastMessage := "56616c6964617465207369676e6174757265206572726f723a206d69737320736967206f7220636f6e7472616374"
+
+			jsonsource := "broadcasttransactionfailure.json"
+			httpstatus := http.StatusOK
+			client := setupHttpClient(jsonsource, httpstatus, r)
+			broadcastResponse, err := client.BroadcastTransaction(&api.Transaction{})
+			r.Nil(broadcastResponse, "broadcast response should be nil")
+			r.NotNil(err, "broadcast should have failed")
+			errstr := fmt.Sprintf("broadcasting failed. Code: %s, Message: %s", broadcasterr, broadcastMessage)
+			a.Equal(errstr, err.Error())
 		},
 	},
 	{
@@ -93,7 +154,7 @@ var testcases = []testcase{
 		apicall: func(a *assert.Assertions, r *require.Assertions) {
 			jsonsource := "getaccount.json"
 			httpstatus := http.StatusOK
-			client := setupSolidityClient(jsonsource, httpstatus, r)
+			client := setupHttpClient(jsonsource, httpstatus, r)
 			account, err := client.GetAccount("address")
 			r.Nil(err, "request failed: %v", err)
 			a.Equal(expectedGetAccount, account)
@@ -102,11 +163,11 @@ var testcases = []testcase{
 	},
 }
 
-func setupSolidityClient(jsonfile string, responsecode int, r *require.Assertions) *TronSolidityClient {
+func setupHttpClient(jsonfile string, responsecode int, r *require.Assertions) *TronHttpClient {
 	jsonresponse, err := common.ReadTestdata(jsonfile)
 	r.Nil(err, "reading testdata failed: %v", err)
-	mockclient := NewMockSolidityClient(responsecode, jsonresponse, nil)
-	return NewTronSolidityClient("baseurl", mockclient)
+	mockclient := NewMockHttpClient(responsecode, jsonresponse, nil)
+	return NewTronHttpClient("baseurl", mockclient)
 }
 
 func TestResponseUnmarshal(t *testing.T) {

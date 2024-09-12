@@ -1,17 +1,17 @@
-package solidityclient
+package fullnodeclient
 
 import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/httpclient"
 )
 
-type TronSolidityClient struct {
+type TronFullNodeClient struct {
 	tronclient *httpclient.TronHttpClient
 }
 
-func NewClient(baseURL string, client httpclient.HttpClient) *TronSolidityClient {
-	urlprefix := baseURL + "/walletsolidity"
+func NewClient(baseURL string, client httpclient.HttpClient) *TronFullNodeClient {
+	urlprefix := baseURL + "/wallet"
 	tronclient := httpclient.NewTronHttpClient(urlprefix, client)
-	return &TronSolidityClient{
+	return &TronFullNodeClient{
 		tronclient: tronclient,
 	}
 }

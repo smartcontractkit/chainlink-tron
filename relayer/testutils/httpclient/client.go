@@ -1,4 +1,4 @@
-package jsonclient
+package httpclient
 
 import (
 	"bytes"
@@ -8,25 +8,25 @@ import (
 	"net/http"
 )
 
-type JsonHttpClient interface {
+type HttpClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-var _ JsonHttpClient = &MockJsonClient{}
+var _ HttpClient = &MockHttpClient{}
 
-type TronJsonClient struct {
-	baseURL string
-	client  JsonHttpClient
+type TronHttpClient struct {
+	urlPrefix string
+	client    HttpClient
 }
 
-func NewTronJsonClient(baseURL string, client JsonHttpClient) *TronJsonClient {
-	return &TronJsonClient{
-		baseURL: baseURL,
-		client:  client,
+func NewTronHttpClient(urlprefix string, client HttpClient) *TronHttpClient {
+	return &TronHttpClient{
+		urlPrefix: urlprefix,
+		client:    client,
 	}
 }
 
-func (tc *TronJsonClient) request(method string, endpoint string, reqBody interface{}, responseBody interface{}) error {
+func (thc *TronHttpClient) request(method string, endpoint string, reqBody interface{}, responseBody interface{}) error {
 	var req *http.Request
 
 	if reqBody != nil {
@@ -52,7 +52,7 @@ func (tc *TronJsonClient) request(method string, endpoint string, reqBody interf
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := tc.client.Do(req)
+	resp, err := thc.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request failed: %w", err)
 	}
@@ -84,10 +84,10 @@ func (tc *TronJsonClient) request(method string, endpoint string, reqBody interf
 
 }
 
-func (tc *TronJsonClient) post(endpoint string, reqBody, responseBody interface{}) error {
-	return tc.request("POST", endpoint, reqBody, responseBody)
+func (thc *TronHttpClient) post(endpoint string, reqBody, responseBody interface{}) error {
+	return thc.request("POST", endpoint, reqBody, responseBody)
 }
 
-func (tc *TronJsonClient) get(endpoint string, responseBody interface{}) error {
-	return tc.request("GET", endpoint, nil, responseBody)
+func (thc *TronHttpClient) get(endpoint string, responseBody interface{}) error {
+	return thc.request("GET", endpoint, nil, responseBody)
 }
