@@ -33,6 +33,7 @@ func TestOCRLocal(t *testing.T) {
 	logger := common.GetTestLogger(t)
 
 	var genesisAddress string
+
 	var genesisPrivateKey *ecdsa.PrivateKey
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
