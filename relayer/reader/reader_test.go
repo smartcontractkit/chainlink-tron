@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 )
 
 var mockTxExtention = api.TransactionExtention{
@@ -114,7 +113,7 @@ func TestReader(t *testing.T) {
 		).Return(&mockTxExtention, nil).Once()
 		reader := reader.NewReader(grpcClient, testLogger)
 
-		res, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
+		res, err := reader.CallContract(address.ZeroAddress, "foo", nil)
 		require.NoError(t, err)
 		require.Equal(t, uint64(123), res["a"])
 		require.Equal(t, uint64(456), res["b"])
@@ -136,11 +135,11 @@ func TestReader(t *testing.T) {
 		).Return(&mockTxExtention, nil).Twice()
 		reader := reader.NewReader(grpcClient, testLogger)
 
-		_, err := reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
+		_, err := reader.CallContract(address.ZeroAddress, "foo", nil)
 		require.NoError(t, err)
 
 		// should not call GetContractABI again
-		_, err = reader.CallContract(address.HexToAddress(sdk.TRON_ZERO_ADDR_HEX), "foo", nil)
+		_, err = reader.CallContract(address.ZeroAddress, "foo", nil)
 		require.NoError(t, err)
 	})
 

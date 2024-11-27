@@ -43,7 +43,7 @@ func Signature(method string) []byte {
 	return b[:4]
 }
 
-func convetToAddress(v interface{}) (eCommon.Address, error) {
+func convertToAddress(v interface{}) (eCommon.Address, error) {
 	switch v.(type) {
 	case string:
 		addr, err := address.Base58ToAddress(v.(string))
@@ -51,6 +51,9 @@ func convetToAddress(v interface{}) (eCommon.Address, error) {
 			return eCommon.Address{}, fmt.Errorf("invalid address %s: %+v", v.(string), err)
 		}
 		return eCommon.BytesToAddress(addr.Bytes()[len(addr.Bytes())-20:]), nil
+	case address.Address:
+		addr := v.(address.Address)
+		return addr.EthAddress(), nil
 	}
 	return eCommon.Address{}, fmt.Errorf("invalid address %v", v)
 }
@@ -166,7 +169,7 @@ func GetPaddedParam(params []any) ([]byte, error) {
 				}
 			}
 		} else if ty.T == eABI.AddressTy {
-			if v, err = convetToAddress(v); err != nil {
+			if v, err = convertToAddress(v); err != nil {
 				return nil, err
 			}
 		} else if (ty.T == eABI.IntTy || ty.T == eABI.UintTy) && reflect.TypeOf(v).Kind() == reflect.String {

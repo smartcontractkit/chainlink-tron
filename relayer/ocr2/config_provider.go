@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 )
 
@@ -33,8 +32,7 @@ func NewConfigProvider(chainID *big.Int, contractAddress address.Address, reader
 	contractReader := NewContractReader(contractAddress, client, lggr)
 	cache := NewContractCache(cfg, contractReader, lggr)
 
-	evmContractAddress := relayer.TronToEVMAddress(contractAddress)
-
+	evmContractAddress := contractAddress.EthAddress()
 	offchainConfigDigester, err := NewOffchainConfigDigester(lggr, chainID, evmContractAddress)
 	if err != nil {
 		return nil, err

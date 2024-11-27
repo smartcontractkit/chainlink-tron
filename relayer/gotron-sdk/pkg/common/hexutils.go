@@ -2,20 +2,9 @@ package common
 
 import (
 	"encoding/hex"
+	"errors"
 	"strings"
 )
-
-var (
-	EmptyString = &hexError{"empty hex string"}
-)
-
-type hexError struct {
-	msg string
-}
-
-func (h *hexError) Error() string {
-	return h.msg
-}
 
 // BytesToHexString encodes bytes as a hex string.
 func BytesToHexString(bytes []byte) string {
@@ -27,7 +16,7 @@ func BytesToHexString(bytes []byte) string {
 // HexStringToBytes hex string as bytes
 func HexStringToBytes(input string) ([]byte, error) {
 	if len(input) == 0 {
-		return nil, EmptyString
+		return nil, errors.New("empty hex string")
 	}
 
 	return hex.DecodeString(strings.Replace(input, "0x", "", -1))

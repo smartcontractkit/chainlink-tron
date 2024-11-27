@@ -10,7 +10,6 @@ import (
 	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -226,7 +225,7 @@ func (c *OCR2ReaderClient) ConfigFromEventAt(ctx context.Context, address tronad
 	// TRON format addresses, must match the FromAccount value in ContractTransmitter
 	var parsedTransmitters []types.Account
 	for _, t := range transmitters {
-		parsedTransmitters = append(parsedTransmitters, types.Account(relayer.EVMToTronAddress(t).String()))
+		parsedTransmitters = append(parsedTransmitters, types.Account(tronaddress.EVMAddressToAddress(t).String()))
 	}
 
 	cc = ContractConfig{

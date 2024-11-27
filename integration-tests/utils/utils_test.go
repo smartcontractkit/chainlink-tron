@@ -3,7 +3,6 @@ package utils
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,11 +22,4 @@ func TestFunctionSignatureHash(t *testing.T) {
 	eventSignature := "ConfigSet(uint32,bytes32,uint64,address[],address[],uint8,bytes,uint64,bytes)"
 	hash := FunctionSignatureHash(eventSignature)
 	require.Equal(t, expectedHash, hash)
-}
-
-func TestEthereumToTronAddressBase58(t *testing.T) {
-	expectedAddress := "TRPcEapv4tHsT1qHyALLJhq8wKgS1B1cCo"
-	ethereumAddress := common.HexToAddress("0xa9274390EB1A0B9Cc081d75345116744d684c319")
-	address := EthereumToTronAddressBase58(ethereumAddress)
-	require.Equal(t, expectedAddress, address)
 }

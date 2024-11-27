@@ -1,4 +1,8 @@
-package api
+package soliditynode
+
+import (
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+)
 
 type GetAccountRequest struct {
 	Address string `json:"address"` // account address as a hex string
@@ -94,4 +98,17 @@ type GetAccountResponse struct {
 	AssetIssuedId                                string               `json:"asset_issued_ID"`          // TRC10 token ID created by the account
 	FreeAssetNetUsage                            map[string]int64     `json:"free_asset_net_usage"`     // <string, int64>	The amount of free bandwidth consumed by account transferring TRC10 tokens
 	FreeAssetNetUsagev2                          map[string]int64     `json:"free_asset_net_usageV2"`   // <string, int64> The amount of free bandwidth consumed by account transferring TRC10 tokens
+}
+
+func (tc *Client) GetAccount(accountAddress address.Address) (*GetAccountResponse, error) {
+	getAccountResponse := GetAccountResponse{}
+	err := tc.Post("/getaccount", &GetAccountRequest{
+		Address: accountAddress.String(),
+		Visible: true,
+	}, &getAccountResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return &getAccountResponse, nil
 }

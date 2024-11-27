@@ -12,8 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
 )
 
 const functionABI = `[{
@@ -90,8 +88,7 @@ func (d *TRONOffchainConfigDigester) ConfigDigest(cc types.ContractConfig) (type
 			if err != nil {
 				return types.ConfigDigest{}, fmt.Errorf("%v-th transmitter should be a TRON base58 address string, but got '%v'", i, transmitter)
 			}
-			a := relayer.TronToEVMAddress(base58Address)
-			transmitters = append(transmitters, a)
+			transmitters = append(transmitters, base58Address.EthAddress())
 		}
 	}
 

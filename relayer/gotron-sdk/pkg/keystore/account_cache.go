@@ -262,7 +262,10 @@ func (ac *accountCache) scanAccounts() error {
 		// Parse the address.
 		key.Address = ""
 		err = json.NewDecoder(buf).Decode(&key)
-		addr := address.HexToAddress(key.Address)
+		addr, err := address.HexToAddress(key.Address)
+		if err != nil {
+			return nil
+		}
 
 		switch {
 		case err != nil:

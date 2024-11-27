@@ -130,7 +130,7 @@ func (g *SolidityGrpcClient) GetTransactionInfoByID(id string) (*core.Transactio
 // TriggerConstantContract and return tx result
 func (g *SolidityGrpcClient) TriggerConstantContract(from, contractAddress, method string, params []any) (*api.TransactionExtention, error) {
 	var err error
-	fromDesc := address.HexToAddress("410000000000000000000000000000000000000000")
+	fromDesc := address.ZeroAddress
 	if len(from) > 0 {
 		fromDesc, err = address.Base58ToAddress(from)
 		if err != nil {

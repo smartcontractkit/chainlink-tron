@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/abi"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 )
 
@@ -173,8 +173,8 @@ func TestOCR2Reader(t *testing.T) {
 		configDigest := [32]byte{}
 		copy(configDigest[:], configDigestBytes)
 		configCount := 1
-		signers := []string{sdk.TRON_ZERO_ADDR_B58}
-		transmitters := []string{sdk.TRON_ZERO_ADDR_B58}
+		signers := []string{address.ZeroAddress.String()}
+		transmitters := []string{address.ZeroAddress.String()}
 		f := 3
 		onchainConfig := []byte{8, 9, 10, 11}
 		offchainConfigVersion := 2
@@ -224,7 +224,7 @@ func TestOCR2Reader(t *testing.T) {
 		require.Equal(t, configDigestHex, res.Config.ConfigDigest.Hex())
 		require.Equal(t, uint64(configCount), res.Config.ConfigCount)
 		require.Equal(t, []types.OnchainPublicKey{bytes.Repeat([]byte{0}, 20)}, res.Config.Signers)
-		require.Equal(t, []types.Account{sdk.TRON_ZERO_ADDR_B58}, res.Config.Transmitters)
+		require.Equal(t, []types.Account{types.Account(address.ZeroAddress.String())}, res.Config.Transmitters)
 		require.Equal(t, uint8(f), res.Config.F)
 		require.Equal(t, onchainConfig, res.Config.OnchainConfig)
 		require.Equal(t, uint64(offchainConfigVersion), res.Config.OffchainConfigVersion)

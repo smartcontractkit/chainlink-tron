@@ -1,7 +1,6 @@
 package testutils
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -9,9 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/contract"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/stretchr/testify/require"
 
@@ -19,8 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/api"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils/fullnodeclient"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
 
@@ -61,33 +59,21 @@ func DeployContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string, contra
 	return txHash
 }
 
-func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress string, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
-	parsedABI, err := abi.JSON(bytes.NewReader([]byte(abiJson)))
+func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress address.Address, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
+
+	fullnodeClient := fullnode.NewClient(httpUrl, &http.Client{})
+	deployResponse, err := fullnodeClient.DeployContract(
+		fromAddress, contractName, abiJson, codeHex, 0, 100, feeLimit, params)
 	require.NoError(t, err)
 
-	if params == nil {
-		params = []interface{}{}
-	}
+	tx := &deployResponse.Transaction
 
-	encodedParams, err := parsedABI.Pack("", params...)
+	txIdBytes, err := hex.DecodeString(tx.TxID)
 	require.NoError(t, err)
 
-	fullnodeClient := fullnodeclient.NewClient(httpUrl, &http.Client{})
-	tx, err := fullnodeClient.DeployContract(&api.DeployContractRequest{
-		OwnerAddress:               fromAddress,
-		ABI:                        abiJson,
-		Bytecode:                   codeHex,
-		Parameter:                  hex.EncodeToString(encodedParams),
-		Name:                       contractName,
-		FeeLimit:                   feeLimit,
-		ConsumeUserResourcePercent: 0,
-		OriginEnergyLimit:          10000000,
-		Visible:                    true,
-	})
+	signature, err := keystore.Sign(context.Background(), fromAddress.String(), txIdBytes)
 	require.NoError(t, err)
-
-	err = tx.Sign(fromAddress, keystore)
-	require.NoError(t, err)
+	tx.AddSignatureBytes(signature)
 
 	broadcastResponse, err := fullnodeClient.BroadcastTransaction(tx)
 	require.NoError(t, err)
@@ -95,8 +81,8 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	return broadcastResponse.TxID
 }
 
-func CheckContractDeployed(t *testing.T, httpUrl string, address string) (contractDeployed bool) {
-	fullnodeClient := fullnodeclient.NewClient(httpUrl, &http.Client{})
+func CheckContractDeployed(t *testing.T, httpUrl string, address address.Address) (contractDeployed bool) {
+	fullnodeClient := fullnode.NewClient(httpUrl, &http.Client{})
 	_, err := fullnodeClient.GetContract(address)
 	require.NoError(t, err)
 

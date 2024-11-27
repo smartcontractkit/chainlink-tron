@@ -61,9 +61,9 @@ func (c *ReaderClient) getContractABI(address tronaddress.Address) (abi *core.Sm
 	return
 }
 
-func (c *ReaderClient) CallContract(address tronaddress.Address, method string, params []any) (result map[string]interface{}, err error) {
+func (c *ReaderClient) CallContract(contractAddress tronaddress.Address, method string, params []any) (result map[string]interface{}, err error) {
 	// get contract abi
-	abi, err := c.getContractABI(address)
+	abi, err := c.getContractABI(contractAddress)
 	if err != nil {
 		return result, fmt.Errorf("error fetching abi: %w", err)
 	}
@@ -76,8 +76,8 @@ func (c *ReaderClient) CallContract(address tronaddress.Address, method string, 
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContract(
-		/* from= */ sdk.TRON_ZERO_ADDR_B58,
-		/* contractAddress= */ address.String(),
+		/* from= */ tronaddress.ZeroAddress.String(),
+		/* contractAddress= */ contractAddress.String(),
 		/* method= */ methodSignature,
 		/* params= */ params,
 	)

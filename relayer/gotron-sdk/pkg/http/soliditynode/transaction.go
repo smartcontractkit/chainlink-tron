@@ -1,75 +1,37 @@
-package api
+package soliditynode
 
-type Transaction_ResultContractResult int32
-
-const (
-	Transaction_Result_DEFAULT              Transaction_ResultContractResult = 0
-	Transaction_Result_SUCCESS              Transaction_ResultContractResult = 1
-	Transaction_Result_REVERT               Transaction_ResultContractResult = 2
-	Transaction_Result_BAD_JUMP_DESTINATION Transaction_ResultContractResult = 3
-	Transaction_Result_OUT_OF_MEMORY        Transaction_ResultContractResult = 4
-	Transaction_Result_PRECOMPILED_CONTRACT Transaction_ResultContractResult = 5
-	Transaction_Result_STACK_TOO_SMALL      Transaction_ResultContractResult = 6
-	Transaction_Result_STACK_TOO_LARGE      Transaction_ResultContractResult = 7
-	Transaction_Result_ILLEGAL_OPERATION    Transaction_ResultContractResult = 8
-	Transaction_Result_STACK_OVERFLOW       Transaction_ResultContractResult = 9
-	Transaction_Result_OUT_OF_ENERGY        Transaction_ResultContractResult = 10
-	Transaction_Result_OUT_OF_TIME          Transaction_ResultContractResult = 11
-	Transaction_Result_JVM_STACK_OVER_FLOW  Transaction_ResultContractResult = 12
-	Transaction_Result_UNKNOWN              Transaction_ResultContractResult = 13
-	Transaction_Result_TRANSFER_FAILED      Transaction_ResultContractResult = 14
-	Transaction_Result_INVALID_CODE         Transaction_ResultContractResult = 15
+import (
+	"errors"
 )
 
-// Enum value maps for Transaction_ResultContractResult.
-var (
-	Transaction_ResultContractResult_name = map[int32]string{
-		0:  "DEFAULT",
-		1:  "SUCCESS",
-		2:  "REVERT",
-		3:  "BAD_JUMP_DESTINATION",
-		4:  "OUT_OF_MEMORY",
-		5:  "PRECOMPILED_CONTRACT",
-		6:  "STACK_TOO_SMALL",
-		7:  "STACK_TOO_LARGE",
-		8:  "ILLEGAL_OPERATION",
-		9:  "STACK_OVERFLOW",
-		10: "OUT_OF_ENERGY",
-		11: "OUT_OF_TIME",
-		12: "JVM_STACK_OVER_FLOW",
-		13: "UNKNOWN",
-		14: "TRANSFER_FAILED",
-		15: "INVALID_CODE",
-	}
-	Transaction_ResultContractResult_value = map[string]int32{
-		"DEFAULT":              0,
-		"SUCCESS":              1,
-		"REVERT":               2,
-		"BAD_JUMP_DESTINATION": 3,
-		"OUT_OF_MEMORY":        4,
-		"PRECOMPILED_CONTRACT": 5,
-		"STACK_TOO_SMALL":      6,
-		"STACK_TOO_LARGE":      7,
-		"ILLEGAL_OPERATION":    8,
-		"STACK_OVERFLOW":       9,
-		"OUT_OF_ENERGY":        10,
-		"OUT_OF_TIME":          11,
-		"JVM_STACK_OVER_FLOW":  12,
-		"UNKNOWN":              13,
-		"TRANSFER_FAILED":      14,
-		"INVALID_CODE":         15,
-	}
+const (
+	TransactionResultDefault             = "DEFAULT"
+	TransactionResultSuccess             = "SUCCESS"
+	TransactionResultRevert              = "REVERT"
+	TransactionResultBadJumpDestination  = "BAD_JUMP_DESTINATION"
+	TransactionResultOutOfMemory         = "OUT_OF_MEMORY"
+	TransactionResultPrecompiledContract = "PRECOMPILED_CONTRACT"
+	TransactionResultStackTooSmall       = "STACK_TOO_SMALL"
+	TransactionResultStackTooLarge       = "STACK_TOO_LARGE"
+	TransactionResultIllegalOperation    = "ILLEGAL_OPERATION"
+	TransactionResultStackOverflow       = "STACK_OVERFLOW"
+	TransactionResultOutOfEnergy         = "OUT_OF_ENERGY"
+	TransactionResultOutOfTime           = "OUT_OF_TIME"
+	TransactionResultJvmStackOverflow    = "JVM_STACK_OVER_FLOW"
+	TransactionResultUnknown             = "UNKNOWN"
+	TransactionResultTransferFailed      = "TRANSFER_FAILED"
+	TransactionResultInvalidCode         = "INVALID_CODE"
 )
 
 type ResourceReceipt struct {
-	EnergyUsage        int64                            `json:"energy_usage,omitempty"`
-	EnergyFee          int64                            `json:"energy_fee,omitempty"`
-	OriginEnergyUsage  int64                            `json:"origin_energy_usage,omitempty"`
-	EnergyUsageTotal   int64                            `json:"energy_usage_total,omitempty"`
-	NetUsage           int64                            `json:"net_usage,omitempty"`
-	NetFee             int64                            `json:"net_fee,omitempty"`
-	Result             Transaction_ResultContractResult `json:"result,omitempty"`
-	EnergyPenaltyTotal int64                            `json:"energy_penalty_total,omitempty"`
+	EnergyUsage        int64  `json:"energy_usage,omitempty"`
+	EnergyFee          int64  `json:"energy_fee,omitempty"`
+	OriginEnergyUsage  int64  `json:"origin_energy_usage,omitempty"`
+	EnergyUsageTotal   int64  `json:"energy_usage_total,omitempty"`
+	NetUsage           int64  `json:"net_usage,omitempty"`
+	NetFee             int64  `json:"net_fee,omitempty"`
+	Result             string `json:"result,omitempty"`
+	EnergyPenaltyTotal int64  `json:"energy_penalty_total,omitempty"`
 }
 
 type Log struct {
@@ -102,7 +64,7 @@ type TransactionInfo struct {
 	ContractAddress        string                `json:"contract_address"`         // Contract address
 	Receipt                ResourceReceipt       `json:"receipt"`                  // Transaction receipt, including transaction execution result and transaction fee details, which contains the following fields:
 	Log                    []Log                 `json:"log"`                      // The log of events triggered during the smart contract call, each log includes the following information:
-	Result                 int                   `json:"result"`                   // Execution results. If the execution is successful, the field will not be displayed in the returned value, if the execution fails, the field will be "FAILED"
+	Result                 string                `json:"result"`                   // Execution results. If the execution is successful, the field will not be displayed in the returned value, if the execution fails, the field will be "FAILED"
 	ResMessage             string                `json:"resMessage"`               // When the transaction execution fails, the details of the failure will be returned through this field. Hex format, you can convert it to a string to get plaintext information.
 	WithdrawAmount         int64                 `json:"withdraw_amount"`          // For the withdrawal reward transaction、unfreeze transaction, they will withdraw the vote reward to account. The number of rewards withdrawn to the account is returned through this field, and the unit is sun
 	UnfreezeAmount         int64                 `json:"unfreeze_amount"`          // In the Stake1.0 stage, for unstaking transactions, this field returns the amount of unstaked TRX, the unit is sun
@@ -113,4 +75,22 @@ type TransactionInfo struct {
 
 type GetTransactionInfoByIDRequest struct {
 	Value string `json:"value"` // Transaction hash, i.e. transaction id
+}
+
+func (tc *Client) GetTransactionInfoById(txhash string) (*TransactionInfo, error) {
+	transactionInfo := TransactionInfo{}
+	err := tc.Post("/gettransactioninfobyid",
+		&GetTransactionInfoByIDRequest{
+			Value: txhash,
+		}, &transactionInfo)
+
+	if err != nil {
+		return nil, err
+	}
+	// even if the transaction doesn't exist, this returns 200.
+	if transactionInfo.ID == "" {
+		return nil, errors.New("transaction not found")
+	}
+
+	return &transactionInfo, nil
 }

@@ -24,6 +24,11 @@ const (
 	TronBytePrefix = byte(0x41)
 )
 
+var (
+	// Tron zero address - https://developers.tron.network/docs/faq#3-what-is-the-destruction-address-of-tron
+	ZeroAddress = Address(append([]byte{TronBytePrefix}, make([]byte, AddressLength-1)...))
+)
+
 // Address represents the 21 byte address of an Tron account.
 type Address []byte
 
@@ -47,12 +52,12 @@ func BigToAddress(b *big.Int) Address {
 
 // HexToAddress returns Address with byte values of s.
 // If s is larger than len(h), s will be cropped from the left.
-func HexToAddress(s string) Address {
+func HexToAddress(s string) (Address, error) {
 	addr, err := common.FromHex(s)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return addr
+	return addr, nil
 }
 
 // Base58ToAddress returns Address with byte values of s.
@@ -73,15 +78,21 @@ func Base64ToAddress(s string) (Address, error) {
 	return Address(decoded), nil
 }
 
+func EVMAddressToAddress(a eCommon.Address) Address {
+	return Address(append([]byte{TronBytePrefix}, a[:]...))
+}
+
 // String implements fmt.Stringer.
 func (a Address) String() string {
 	if len(a) == 0 {
 		return ""
 	}
 
+	// This is actually an invalid address, since all TRON addresses should start with `TronBytePrefix`.
 	if a[0] == 0 {
 		return new(big.Int).SetBytes(a.Bytes()).String()
 	}
+
 	return common.EncodeCheck(a.Bytes())
 }
 
@@ -115,4 +126,44 @@ func (a Address) Value() (driver.Value, error) {
 
 func (a Address) EthAddress() eCommon.Address {
 	return eCommon.BytesToAddress(a.Bytes()[1:])
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+// This marshals the address into Base58.
+func (a Address) MarshalJSON() ([]byte, error) {
+	if len(a) == 0 {
+		return []byte(`""`), nil
+	}
+	return []byte(fmt.Sprintf(`"%s"`, a.String())), nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (a *Address) UnmarshalJSON(data []byte) error {
+	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
+		return fmt.Errorf("invalid address format")
+	}
+
+	str := string(data[1 : len(data)-1])
+	if str == "" {
+		*a = nil
+		return nil
+	}
+
+	// If string starts with 'T', treat as base58
+	if str[0] == 'T' {
+		addr, err := Base58ToAddress(str)
+		if err != nil {
+			return fmt.Errorf("invalid base58 address: %v", err)
+		}
+		*a = addr
+		return nil
+	}
+
+	// Otherwise treat as hex
+	addr, err := HexToAddress(str)
+	if err != nil {
+		return fmt.Errorf("invalid Tron hex address: %v", err)
+	}
+	*a = addr
+	return nil
 }
