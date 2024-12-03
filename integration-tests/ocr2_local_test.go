@@ -56,8 +56,7 @@ func runOCR2Test(
 	privateKey *ecdsa.PrivateKey,
 	pubAddress address.Address, network string,
 ) {
-	var httpUrl string
-	var combinedClient *sdk.CombinedGrpcClient
+	var combinedClient *sdk.CombinedClient
 	var chainlinkClient *common.ChainlinkClient
 	var commonConfig *common.Common
 	var feeLimit int
@@ -69,17 +68,12 @@ func runOCR2Test(
 	case testutils.Devnet:
 		combinedClient, chainlinkClient, commonConfig = utils.SetupLocalStack(t, logger, pubAddress.String())
 		defer utils.TeardownLocalStack(t, logger, commonConfig)
-		httpUrl = os.Getenv("HTTP_URL")
-		if httpUrl == "" {
-			httpUrl = fmt.Sprintf("http://%s:%s/wallet", testutils.GetTronNodeIpAddress(), testutils.HttpPort)
-		}
 		feeLimit = testutils.DevnetFeeLimit
 		txnWaitTime = testutils.DevnetMaxWaitTime
 		pollFrequency = testutils.DevnetPollFrequency
 		ocrTransmissionFrequency = testutils.DevnetOcrTransmissionFrequency
 
 	case testutils.Shasta:
-		httpUrl = testutils.ShastaHttpUrl
 		combinedClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress.String(), network)
 		defer utils.TeardownTestnetStack(t, logger, commonConfig)
 		feeLimit = testutils.TestnetFeeLimit
@@ -88,7 +82,6 @@ func runOCR2Test(
 		ocrTransmissionFrequency = testutils.TestnetOcrTransmissionFrequency
 
 	case testutils.Nile:
-		httpUrl = testutils.NileHttpUrl
 		combinedClient, chainlinkClient, commonConfig = utils.SetupTestnetStack(t, logger, pubAddress.String(), network)
 		defer utils.TeardownTestnetStack(t, logger, commonConfig)
 		feeLimit = testutils.TestnetFeeLimit
@@ -115,9 +108,9 @@ func runOCR2Test(
 
 	var transferAmount int64 = utils.SunPerTrx * 500 // 500 TRX
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
-		transferTx, err := combinedClient.Transfer(pubAddress.String(), nodeAddr, transferAmount)
+		transferTx, err := combinedClient.Transfer(pubAddress, nodeAddr, transferAmount)
 		require.NoError(t, err, "Creation of Transfer Txn from genesis account to node failed")
-		_, err = txmgr.SignAndBroadcast(context.Background(), pubAddress.String(), transferTx)
+		_, err = txmgr.SignAndBroadcast(context.Background(), pubAddress, transferTx)
 		require.NoError(t, err, "Broadcast of Transfer Txn from genesis account to node failed")
 	}
 
@@ -127,14 +120,14 @@ func runOCR2Test(
 	for _, nodeAddr := range chainlinkClient.GetNodeAddresses() {
 		for {
 			// use the full node grpc client to check account for quicker feedback.
-			accountInfo, err := combinedClient.GrpcClient.GetAccount(nodeAddr)
+			accountInfo, err := combinedClient.Client.GetAccount(nodeAddr)
 			if err != nil {
 				// do not error on 'account not found' - this occurs when there is no account info (transfer hasnt executed yet)
 				if err.Error() == "account not found" {
 					time.Sleep(time.Second * time.Duration(pollFrequency))
 					continue
 				}
-				logger.Error().Str("address", nodeAddr).Err(err)
+				logger.Error().Str("address", nodeAddr.String()).Err(err)
 				t.Fatal("failed to get account info")
 			}
 
@@ -149,28 +142,29 @@ func runOCR2Test(
 			}
 			break
 		}
-		logger.Info().Str("address", nodeAddr).Msg("successfully funded")
+		logger.Info().Str("address", nodeAddr.String()).Msg("successfully funded")
 	}
 
-	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) string {
-		txHash := testutils.DeployContractByJson(t, httpUrl, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
+	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) address.Address {
+		txHash := testutils.SignAndDeployContract(t, combinedClient, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
 		// use full node client for quicker feedback
-		txInfo := testutils.WaitForTransactionInfo(t, combinedClient.GrpcClient, txHash, txnWaitTime)
-		contractAddress := address.Address(txInfo.ContractAddress)
-		contractDeployed := testutils.CheckContractDeployed(t, httpUrl, contractAddress)
+		txInfo := testutils.WaitForTransactionInfo(t, combinedClient.Client, txHash, txnWaitTime)
+		contractAddress, err := address.HexToAddress(txInfo.ContractAddress)
+		require.NoError(t, err)
+		contractDeployed := testutils.CheckContractDeployed(t, combinedClient.Client, contractAddress)
 		require.True(t, contractDeployed, "Contract not deployed")
-		return contractAddress.String()
+		return contractAddress
 	}
 
 	linkTokenArtifact := contract.MustLoadArtifact(t, "link-v0.8/LinkToken.json")
 	linkTokenAddress := deployContract("LinkToken", linkTokenArtifact, nil)
-	logger.Info().Str("address", linkTokenAddress).Msg("Link token contract deployed")
+	logger.Info().Str("address", linkTokenAddress.String()).Msg("Link token contract deployed")
 
 	readAccessControllerArtifact := contract.MustLoadArtifact(t, "ocr2-v0.8/SimpleReadAccessController.json")
 	billingAccessControllerAddress := deployContract("SimpleReadAccessController", readAccessControllerArtifact, nil)
-	logger.Info().Str("address", billingAccessControllerAddress).Msg("Billing access controller deployed")
+	logger.Info().Str("address", billingAccessControllerAddress.String()).Msg("Billing access controller deployed")
 	requesterAccessControllerAddress := deployContract("SimpleReadAccessController", readAccessControllerArtifact, nil)
-	logger.Info().Str("address", requesterAccessControllerAddress).Msg("Requester access controller deployed")
+	logger.Info().Str("address", requesterAccessControllerAddress.String()).Msg("Requester access controller deployed")
 
 	minAnswer := big.NewInt(0)
 	maxAnswer := new(big.Int)
@@ -181,48 +175,49 @@ func runOCR2Test(
 	description := "Test OCR2 Aggregator"
 	ocr2AggregatorArtifact := contract.MustLoadArtifact(t, "ocr2-v0.8/OCR2Aggregator.json")
 	ocr2AggregatorAddress := deployContract("OCR2Aggregator", ocr2AggregatorArtifact, []interface{}{
-		utils.MustConvertToEthAddress(t, linkTokenAddress),
+		linkTokenAddress.EthAddress(),
 		minAnswer,
 		maxAnswer,
-		utils.MustConvertToEthAddress(t, billingAccessControllerAddress),
-		utils.MustConvertToEthAddress(t, requesterAccessControllerAddress),
+		billingAccessControllerAddress.EthAddress(),
+		requesterAccessControllerAddress.EthAddress(),
 		decimals,
 		description,
 	})
-	logger.Info().Str("address", ocr2AggregatorAddress).Msg("OCR2 aggregator deployed")
+	logger.Info().Str("address", ocr2AggregatorAddress.String()).Msg("OCR2 aggregator deployed")
 
 	eacAggregatorProxyArtifact := contract.MustLoadArtifact(t, "ocr2-v0.6/EACAggregatorProxy.json")
 	eacAggregatorProxyAddress := deployContract("EACAggregatorProxy", eacAggregatorProxyArtifact, []interface{}{
-		utils.MustConvertToEthAddress(t, ocr2AggregatorAddress),
-		utils.MustConvertToEthAddress(t, requesterAccessControllerAddress),
+		ocr2AggregatorAddress.EthAddress(),
+		requesterAccessControllerAddress.EthAddress(),
 	})
-	logger.Info().Str("address", eacAggregatorProxyAddress).Msg("Aggregator proxy deployed")
+	logger.Info().Str("address", eacAggregatorProxyAddress.String()).Msg("Aggregator proxy deployed")
 
 	mintAmount := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
 	mintAmount = mintAmount.Mul(mintAmount, big.NewInt(50000))
 
-	err = txmgr.Enqueue(pubAddress.String(), linkTokenAddress, "grantMintAndBurnRoles(address)", "address", pubAddress.String())
+	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "grantMintAndBurnRoles(address)", "address", pubAddress)
 	require.NoError(t, err)
-	err = txmgr.Enqueue(pubAddress.String(), linkTokenAddress, "mint(address,uint256)", "address", ocr2AggregatorAddress, "uint256", mintAmount.String())
+	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "mint(address,uint256)", "address", ocr2AggregatorAddress, "uint256", mintAmount.String())
 	require.NoError(t, err)
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
 	// Use the full node grpc client to check balance for quicker feedback.
-	balanceResponse, err := combinedClient.GrpcClient.TriggerConstantContract("", linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
+	balanceResponse, err := combinedClient.Client.TriggerConstantContract(address.ZeroAddress, linkTokenAddress, "balanceOf(address)", []any{"address", ocr2AggregatorAddress})
 	require.NoError(t, err)
-	balanceValue := new(big.Int).SetBytes(balanceResponse.ConstantResult[0])
+	balanceValue, ok := new(big.Int).SetString(balanceResponse.ConstantResult[0], 16)
+	require.True(t, ok)
 
 	require.Equal(t, mintAmount, balanceValue)
 	logger.Info().Str("amount", mintAmount.String()).Msg("Minted LINK token")
 
 	signers, transmitters, f, _, offchainConfigVersion, offchainConfig := chainlinkClient.GetSetConfigArgs(t)
 
-	transmittersStr := make([]string, len(transmitters))
+	transmitterAddresses := make([]address.Address, len(transmitters))
 	for i, t := range transmitters {
 		evmAddress := ethcommon.HexToAddress(string(t))
-		transmittersStr[i] = address.EVMAddressToAddress(evmAddress).String()
+		transmitterAddresses[i] = address.EVMAddressToAddress(evmAddress)
 	}
-	require.Equal(t, chainlinkClient.GetNodeAddresses(), transmittersStr, "Transmitters should match node addresses")
+	require.Equal(t, chainlinkClient.GetNodeAddresses(), transmitterAddresses, "Transmitters should match node addresses")
 
 	// Define the values
 	onchainConfigBytes := []byte{}
@@ -241,9 +236,9 @@ func runOCR2Test(
 	}
 
 	// TODO: should we set onchainConfig as offchainConfig?
-	err = txmgr.Enqueue(pubAddress.String(), ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
+	err = txmgr.Enqueue(pubAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
 		/* signers= */ "address[]", signerAddresses,
-		/* trasmitters= */ "address[]", transmittersStr,
+		/* trasmitters= */ "address[]", transmitterAddresses,
 		/* f= */ "uint8", fmt.Sprintf("%d", f),
 		/* onchainConfig= */ "bytes", onchainConfigBytes,
 		/* offchainConfigVersion= */ "uint64", fmt.Sprintf("%d", offchainConfigVersion),
@@ -255,11 +250,11 @@ func runOCR2Test(
 
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
-	configDetailsResponse, err := combinedClient.GrpcClient.TriggerConstantContract("", ocr2AggregatorAddress, "latestConfigDetails()", nil)
+	configDetailsResponse, err := combinedClient.Client.TriggerConstantContract(address.ZeroAddress, ocr2AggregatorAddress, "latestConfigDetails()", nil)
 	require.NoError(t, err)
 
-	configCount := new(big.Int).SetBytes(configDetailsResponse.ConstantResult[0][0:32])
-	require.NoError(t, err)
+	configCount, ok := new(big.Int).SetString(configDetailsResponse.ConstantResult[0][0:64], 16)
+	require.True(t, ok)
 	require.Equal(t, big.NewInt(1), configCount)
 	logger.Info().Msg("successfully set config")
 
@@ -270,15 +265,14 @@ func runOCR2Test(
 		p2pPort,
 		commonConfig.MockUrl,
 		commonConfig.JuelsPerFeeCoinSource,
-		ocr2AggregatorAddress)
+		ocr2AggregatorAddress.String())
 	require.NoError(t, err, "Could not create jobs for contract")
 
-	err = validateRounds(t, combinedClient, utils.MustConvertAddress(t, ocr2AggregatorAddress), utils.MustConvertAddress(t, eacAggregatorProxyAddress), commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
+	err = validateRounds(t, combinedClient, ocr2AggregatorAddress, eacAggregatorProxyAddress, commonConfig.IsSoak, ocrTransmissionFrequency, commonConfig.TestDuration)
 	require.NoError(t, err, "Validating round should not fail")
-
 }
 
-func validateRounds(t *testing.T, combinedClient sdk.GrpcClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
+func validateRounds(t *testing.T, combinedClient *sdk.CombinedClient, ocrAddress address.Address, ocrProxyAddress address.Address, isSoak bool, ocrTransmissionFrequency, testDuration time.Duration) error {
 	var rounds int
 	if isSoak {
 		rounds = 99999999

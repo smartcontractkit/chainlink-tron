@@ -61,10 +61,14 @@ func NewChainlinkClient(env *environment.Environment, nodeName string, chainId s
 	}, nil
 }
 
-func (cc *ChainlinkClient) GetNodeAddresses() []string {
-	var addresses []string
+func (cc *ChainlinkClient) GetNodeAddresses() []address.Address {
+	var addresses []address.Address
 	for _, nodeKey := range cc.NodeKeys {
-		addresses = append(addresses, nodeKey.TXKey.Data.ID)
+		nodeAddress, err := address.Base58ToAddress(nodeKey.TXKey.Data.ID)
+		if err != nil {
+			panic(err)
+		}
+		addresses = append(addresses, nodeAddress)
 	}
 	return addresses
 }

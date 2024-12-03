@@ -2,14 +2,16 @@ package txm
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -33,7 +35,7 @@ type TronTxm struct {
 	Config                TronTxmConfig
 	EstimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	Client        sdk.GrpcClient
+	Client        sdk.FullNodeClient
 	BroadcastChan chan *TronTx
 	AccountStore  *AccountStore
 	Starter       utils.StartStopOnce
@@ -41,7 +43,7 @@ type TronTxm struct {
 	Stop          chan struct{}
 }
 
-func New(lgr logger.Logger, keystore loop.Keystore, client sdk.GrpcClient, config TronTxmConfig) *TronTxm {
+func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
 		Logger:                logger.Named(lgr, "TronTxm"),
 		Keystore:              keystore,
@@ -67,7 +69,7 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.Starter.Healthy()}
 }
 
-func (t *TronTxm) GetClient() sdk.GrpcClient {
+func (t *TronTxm) GetClient() sdk.FullNodeClient {
 	return t.Client
 }
 
@@ -84,7 +86,6 @@ func (t *TronTxm) Close() error {
 	return t.Starter.StopOnce("TronTxm", func() error {
 		close(t.Stop)
 		t.Done.Wait()
-		t.GetClient().Stop()
 		return nil
 	})
 }
@@ -92,8 +93,8 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress, method string, params ...any) error {
-	if _, err := t.Keystore.Sign(context.Background(), fromAddress, nil); err != nil {
+func (t *TronTxm) Enqueue(fromAddress, contractAddress address.Address, method string, params ...any) error {
+	if _, err := t.Keystore.Sign(context.Background(), fromAddress.String(), nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
@@ -129,27 +130,27 @@ func (t *TronTxm) broadcastLoop() {
 	for {
 		select {
 		case tx := <-t.BroadcastChan:
-			txExtention, err := t.TriggerSmartContract(ctx, tx)
+			triggerResponse, err := t.TriggerSmartContract(ctx, tx)
 			if err != nil {
 				t.Logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
 			}
 
-			txHash := common.BytesToHexString(txExtention.Txid)
+			coreTx := triggerResponse.Transaction
+			txHash := coreTx.TxID
 
-			coreTx := txExtention.Transaction
 			// RefBlockNum is optional and does not seem in use anymore.
-			t.Logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", common.BytesToHexString(coreTx.RawData.RefBlockHash), "feeLimit", coreTx.RawData.FeeLimit)
+			t.Logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
 
-			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, txExtention)
+			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
 			if err != nil {
-				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "txExtention", txExtention)
+				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "triggerResponse", triggerResponse)
 				continue
 			}
 
 			t.Logger.Infow("transaction broadcasted", "txHash", txHash)
 
-			txStore := t.AccountStore.GetTxStore(tx.FromAddress)
+			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
 			txStore.AddUnconfirmed(txHash, time.Now().Unix(), tx)
 
 		case <-t.Stop:
@@ -159,7 +160,7 @@ func (t *TronTxm) broadcastLoop() {
 	}
 }
 
-func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.TransactionExtention, error) {
+func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullnode.TriggerSmartContractResponse, error) {
 	energyUsed, err := t.estimateEnergy(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate energy: %+w", err)
@@ -177,79 +178,79 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*api.Tr
 		t.Logger.Errorw("failed to get energy unit price", "error", err)
 	}
 
-	feeLimit := energyUnitPrice * energyUsed
+	feeLimit := energyUnitPrice * int32(energyUsed)
 	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
 
-	t.Logger.Debugw("Trigger contract", "Energy Bump Times", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
+	t.Logger.Debugw("Trigger smart contract", "energyBumpTimes", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
-	txExtention, err := t.GetClient().TriggerContract(
+	txExtention, err := t.GetClient().TriggerSmartContract(
 		tx.FromAddress,
 		tx.ContractAddress,
 		tx.Method,
 		tx.Params,
 		paddedFeeLimit,
-		/* tAmount= (TRX amount) */ 0,
-		/* tTokenID= (TRC10 token id) */ "",
-		/* tTokenAmount= (TRC10 token amount) */ 0)
+		/* tAmount= (TRX amount) */ 0)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to call TriggerContract: %+w", err)
+		return nil, fmt.Errorf("failed to call TriggerSmartContract: %+w", err)
 	}
 
 	return txExtention, nil
 }
 
-func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress string, txExtention *api.TransactionExtention) (*api.Return, error) {
-	coreTx := txExtention.Transaction
+func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress address.Address, coreTx *common.Transaction) (*fullnode.BroadcastResponse, error) {
+	txIdBytes, err := hex.DecodeString(coreTx.TxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode transaction id: %+w", err)
+	}
 
-	// Previously we marshalled the raw protobuf data to figure out the hash, but we
-	// can just sign the transaction id.
-	// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/keystore.go#L273
-	// ref: https://github.com/tronprotocol/tronweb/blob/847008b1afd70a272f042e197d9a5fd5eba895fd/src/utils/crypto.ts#L61
-	signature, err := t.Keystore.Sign(ctx, fromAddress, txExtention.Txid)
+	signature, err := t.Keystore.Sign(ctx, fromAddress.String(), txIdBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign transaction: %+w", err)
 	}
 
-	coreTx.Signature = append(coreTx.Signature, signature)
+	coreTx.AddSignatureBytes(signature)
 
-	// the *api.Return error message and code is embedded in err.
-	apiReturn, err := t.broadcastTx(coreTx)
+	// the broadcast response code and error message is already checked by the full node client's BroadcastTranssaction function,
+	// and embedded inside `err`.
+	broadcastResponse, err := t.broadcastTx(coreTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
 
-	return apiReturn, nil
+	return broadcastResponse, nil
 }
 
-func (t *TronTxm) broadcastTx(tx *core.Transaction) (*api.Return, error) {
-	var apiReturn *api.Return
+func (t *TronTxm) broadcastTx(tx *common.Transaction) (*fullnode.BroadcastResponse, error) {
+	var broadcastResponse *fullnode.BroadcastResponse
 	var err error
 	startTime := time.Now()
 	attempt := 1
 	for time.Since(startTime) < MAX_BROADCAST_RETRY_DURATION {
-		apiReturn, err = t.GetClient().Broadcast(tx)
+		broadcastResponse, err = t.GetClient().BroadcastTransaction(tx)
 		if err == nil {
 			break
 		}
 
-		// err != nil, check response code
-		resCode := apiReturn.GetCode()
-		if resCode == api.Return_SERVER_BUSY || resCode == api.Return_BLOCK_UNSOLIDIFIED {
-			// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
-			t.Logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt)
-			time.Sleep(BROADCAST_DELAY_DURATION)
-			attempt = attempt + 1
-			continue
-		} else {
-			// do not retry on other broadcast errors
-			return nil, err
+		// unsuccessful, check response code
+		if !broadcastResponse.Result {
+			if broadcastResponse.Code == common.ResponseCodeServerBusy || broadcastResponse.Code == common.ResponseCodeBlockUnsolidified {
+				// wait and retry tx broadcast upon SERVER_BUSY and BLOCK_UNSOLIDIFIED error responses
+				t.Logger.Debugw("SERVER_BUSY or BLOCK_UNSOLIDIFIED: retry broadcast after timeout", "attempt", attempt)
+				time.Sleep(BROADCAST_DELAY_DURATION)
+				attempt = attempt + 1
+				continue
+			} else {
+				// do not retry on other broadcast errors. the error message and code is encoded in `err`.
+				return nil, err
+			}
+
 		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("SERVER_BUSY or BLOCK_UNSOLIDIFIED: max retry duration reached, error: %w", err)
 	}
-	return apiReturn, nil
+	return broadcastResponse, nil
 }
 
 func (t *TronTxm) confirmLoop() {
@@ -283,7 +284,7 @@ func (t *TronTxm) checkUnconfirmed() {
 	allUnconfirmedTxs := t.AccountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
 		for _, unconfirmedTx := range unconfirmedTxs {
-			txInfo, err := t.GetClient().GetTransactionInfoByID(unconfirmedTx.Hash)
+			txInfo, err := t.GetClient().GetTransactionInfoById(unconfirmedTx.Hash)
 			if err != nil {
 				// the default transaction expiration time is 60 seconds - if we still can't find the hash,
 				// rebroadcast since the transaction has expired.
@@ -304,21 +305,17 @@ func (t *TronTxm) checkUnconfirmed() {
 				continue
 			}
 			receipt := txInfo.Receipt
-			if receipt == nil {
-				t.Logger.Errorw("could not read transaction receipt", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
-				continue
-			}
 			contractResult := receipt.Result
 			switch contractResult {
-			case core.Transaction_Result_OUT_OF_ENERGY:
+			case soliditynode.TransactionResultOutOfEnergy:
 				t.Logger.Debugw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, true, false)
 				continue
-			case core.Transaction_Result_OUT_OF_TIME:
+			case soliditynode.TransactionResultOutOfTime:
 				t.Logger.Debugw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, true)
 				continue
-			case core.Transaction_Result_UNKNOWN:
+			case soliditynode.TransactionResultUnknown:
 				t.Logger.Debugw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, false)
 				continue
@@ -369,10 +366,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 			tx.Method,
 			tx.Params,
 			/* tAmount= */ 0,
-			/* tTokenID= */ "",
-			/* tTokenAmount= */ 0,
 		)
-
 		if err == nil {
 			t.Logger.Debugw("Estimated energy using EnergyEstimation Method", "energyRequired", estimateEnergyMessage.EnergyRequired, "tx", tx)
 			return estimateEnergyMessage.EnergyRequired, nil
@@ -387,16 +381,16 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	}
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
-	estimateTxExtention, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
+	triggerResponse, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
 	}
-	if estimateTxExtention.Result.Code > 0 {
-		return 0, fmt.Errorf("failed to call TriggerConstantContract due to %s", string(estimateTxExtention.Result.Message))
+	if !triggerResponse.Result.Result {
+		return 0, fmt.Errorf("failed to call TriggerConstantContract due to %s %s", triggerResponse.Result.Code, triggerResponse.Result.Message)
 	}
 
-	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", estimateTxExtention.EnergyUsed, "energyPenalty", estimateTxExtention.EnergyPenalty, "tx", tx)
+	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
-	return estimateTxExtention.EnergyUsed, nil
+	return triggerResponse.EnergyUsed, nil
 }

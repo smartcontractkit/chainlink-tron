@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -250,22 +249,22 @@ func MustConvertAddress(t *testing.T, tronAddress string) address.Address {
 }
 
 // SetupLocalStack sets up chainlink node, client, gRPC client and config for the local tests
-func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (*sdk.CombinedGrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
-	grpcUrl := os.Getenv("GRPC_URL")
-	if grpcUrl == "" {
-		grpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcPort)
+func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (*sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+	fullNodeUrl := os.Getenv("FULL_NODE_URL")
+	if fullNodeUrl == "" {
+		fullNodeUrl = fmt.Sprintf("http://%s:%s/wallet", testutils.GetTronNodeIpAddress(), testutils.FullNodePort)
 	}
-	solidityGrpcUrl := os.Getenv("SOLIDITY_GRPC_URL")
-	if solidityGrpcUrl == "" {
-		solidityGrpcUrl = fmt.Sprintf("grpc://%s:%s/?insecure=true", testutils.GetTronNodeIpAddress(), testutils.GrpcSolidityPort)
+	solidityNodeUrl := os.Getenv("SOLIDITY_URL")
+	if solidityNodeUrl == "" {
+		solidityNodeUrl = fmt.Sprintf("http://%s:%s/walletsolidity", testutils.GetTronNodeIpAddress(), testutils.SolidityNodePort)
 	}
-	internalGrpcUrl := os.Getenv("INTERNAL_GRPC_URL")
-	if internalGrpcUrl == "" {
-		internalGrpcUrl = testutils.DefaultInternalGrpcUrl
+	internalFullNodeUrl := os.Getenv("INTERNAL_FULL_NODE_URL")
+	if internalFullNodeUrl == "" {
+		internalFullNodeUrl = testutils.DefaultInternalFullNodeUrl
 	}
-	internalSolidityUrl := os.Getenv("INTERNAL_SOLIDITY_URL")
-	if internalSolidityUrl == "" {
-		internalSolidityUrl = testutils.DefaultInternalSolidityUrl
+	internalSolidityNodeUrl := os.Getenv("INTERNAL_SOLIDITY_NODE_URL")
+	if internalSolidityNodeUrl == "" {
+		internalSolidityNodeUrl = testutils.DefaultInternalSolidityNodeUrl
 	}
 	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
 	if internalJsonRpcUrl == "" {
@@ -275,9 +274,9 @@ func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string)
 	logger.Info().Msg("Starting java-tron container...")
 	err := testutils.StartTronNode(genesisAddress)
 	require.NoError(t, err, "Could not start java-tron container")
-	logger.Info().Str("grpc url", grpcUrl).Msg("TRON node config")
+	logger.Info().Str("fullNodeUrl", fullNodeUrl).Str("solidityNodeUrl", solidityNodeUrl).Msg("TRON node config")
 
-	return setUpTronEnvironment(t, logger, grpcUrl, solidityGrpcUrl, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl, genesisAddress)
+	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl, internalJsonRpcUrl, genesisAddress)
 }
 
 func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
@@ -289,21 +288,21 @@ func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testc
 }
 
 // SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
-func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient *sdk.CombinedGrpcClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
-	var grpcUrl, solidityUrl, jsonRpcUrl string
+func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient *sdk.CombinedClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
+	var fullNodeUrl, solidityNodeUrl, jsonRpcUrl string
 	switch network {
 	case testutils.Shasta:
-		grpcUrl = testutils.ShastaGrpcUrl
-		solidityUrl = testutils.ShastaGrpcSolidityUrl
+		fullNodeUrl = testutils.ShastaFullNodeUrl
+		solidityNodeUrl = testutils.ShastaSolidityNodeUrl
 		jsonRpcUrl = testutils.ShastaJsonRpcUrl
 	case testutils.Nile:
-		grpcUrl = testutils.NileGrpcUrl
-		solidityUrl = testutils.NileGrpcSolidityUrl
+		fullNodeUrl = testutils.NileFullNodeUrl
+		solidityNodeUrl = testutils.NileSolidityNodeUrl
 		jsonRpcUrl = testutils.NileJsonRpcUrl
 	default:
 		t.Fatalf("Unknown network: %s", network)
 	}
-	return setUpTronEnvironment(t, logger, grpcUrl, solidityUrl, grpcUrl, solidityUrl, jsonRpcUrl, pubAddress)
+	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, fullNodeUrl, solidityNodeUrl, jsonRpcUrl, pubAddress)
 }
 
 func TeardownTestnetStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
@@ -313,22 +312,22 @@ func TeardownTestnetStack(t *testing.T, logger zerolog.Logger, commonConfig *tes
 
 // setupTronEnvironment creates chainlink client, gRPC client and chainId for the tests
 func setUpTronEnvironment(
-	t *testing.T, logger zerolog.Logger, grpcUrl,
-	solidityGrpcUrl, internalGrpcUrl, internalSolidityUrl,
+	t *testing.T, logger zerolog.Logger, fullNodeUrl,
+	solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl,
 	internalJsonRpcUrl, genesisAddress string,
-) (*sdk.CombinedGrpcClient, *testcommon.ChainlinkClient, *testcommon.Common) {
-	grpcUrlObj, err := url.Parse(grpcUrl)
+) (*sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+	fullNodeUrlObj, err := url.Parse(fullNodeUrl)
 	require.NoError(t, err)
-	solidityGrpcUrlObj, err := url.Parse(solidityGrpcUrl)
-	require.NoError(t, err)
-
-	grpcClient, err := sdk.CreateCombinedGrpcClient(grpcUrlObj, solidityGrpcUrlObj)
+	solidityNodeUrlObj, err := url.Parse(solidityNodeUrl)
 	require.NoError(t, err)
 
-	blockInfo, err := grpcClient.GetBlockByNum(0)
+	combinedClient, err := sdk.CreateCombinedClient(fullNodeUrlObj, solidityNodeUrlObj)
 	require.NoError(t, err)
 
-	blockId := blockInfo.Blockid
+	blockInfo, err := combinedClient.GetBlockByNum(0)
+	require.NoError(t, err)
+
+	blockId := blockInfo.BlockID
 	// previously, we took the whole genesis block id as the chain id, which is the case depending on java-tron node config:
 	// https://github.com/tronprotocol/java-tron/blob/b1fc2f0f2bd79527099bc3027b9aba165c2e20c2/actuator/src/main/java/org/tron/core/vm/program/Program.java#L1271
 	//
@@ -336,15 +335,20 @@ func setUpTronEnvironment(
 	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
 	// is important for the config digest calculation:
 	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
-	chainId := "0x" + hex.EncodeToString(blockId[len(blockId)-4:])
+	chainId := "0x" + blockId[len(blockId)-8:]
 	logger.Info().Str("chain id", chainId).Msg("Read first block")
 
-	commonConfig := testcommon.NewCommon(t, chainId, internalGrpcUrl, internalSolidityUrl, internalJsonRpcUrl)
+	commonConfig := testcommon.NewCommon(t, chainId, internalFullNodeUrl, internalSolidityNodeUrl, internalJsonRpcUrl)
 	commonConfig.SetLocalEnvironment(t, genesisAddress)
 
 	chainlinkClient, err := testcommon.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CLNodeName)
 	require.NoError(t, err, "Could not create chainlink client")
-	logger.Info().Str("node addresses", strings.Join(chainlinkClient.GetNodeAddresses(), " ")).Msg("Created chainlink client")
 
-	return grpcClient, chainlinkClient, commonConfig
+	logMessage := logger.Info()
+	for i, nodeAddress := range chainlinkClient.GetNodeAddresses() {
+		logMessage.Str(fmt.Sprintf("node %d", i+1), nodeAddress.String())
+	}
+	logMessage.Msg("Created chainlink client")
+
+	return combinedClient, chainlinkClient, commonConfig
 }

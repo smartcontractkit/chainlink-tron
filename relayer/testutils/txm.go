@@ -4,15 +4,11 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/contract"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -38,36 +34,12 @@ func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.D
 	}
 }
 
-func DeployContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string, contractName string, abiJson string, codeHex string) string {
-	abi, err := contract.JSONtoABI(abiJson)
-	require.NoError(t, err)
-
-	txExtention, err := txmgr.GetClient().DeployContract(
-		fromAddress,
-		contractName,
-		abi,
-		codeHex,
-		/* feeLimit= */ 1000000000,
-		/* curPercent= */ 100,
-		/* oeLimit= */ 10000000)
-	require.NoError(t, err)
-
-	_, err = txmgr.SignAndBroadcast(context.Background(), fromAddress, txExtention)
-	require.NoError(t, err)
-
-	txHash := common.BytesToHexString(txExtention.Txid)
-	return txHash
-}
-
-func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, fromAddress address.Address, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
-
-	fullnodeClient := fullnode.NewClient(httpUrl, &http.Client{})
+func SignAndDeployContract(t *testing.T, fullnodeClient sdk.FullNodeClient, keystore loop.Keystore, fromAddress address.Address, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
 	deployResponse, err := fullnodeClient.DeployContract(
 		fromAddress, contractName, abiJson, codeHex, 0, 100, feeLimit, params)
 	require.NoError(t, err)
 
 	tx := &deployResponse.Transaction
-
 	txIdBytes, err := hex.DecodeString(tx.TxID)
 	require.NoError(t, err)
 
@@ -81,17 +53,16 @@ func DeployContractByJson(t *testing.T, httpUrl string, keystore loop.Keystore, 
 	return broadcastResponse.TxID
 }
 
-func CheckContractDeployed(t *testing.T, httpUrl string, address address.Address) (contractDeployed bool) {
-	fullnodeClient := fullnode.NewClient(httpUrl, &http.Client{})
+func CheckContractDeployed(t *testing.T, fullnodeClient sdk.FullNodeClient, address address.Address) (contractDeployed bool) {
 	_, err := fullnodeClient.GetContract(address)
 	require.NoError(t, err)
 
 	return true // require call above stops execution if false
 }
 
-func WaitForTransactionInfo(t *testing.T, grpcClient sdk.GrpcClient, txHash string, waitSecs int) *core.TransactionInfo {
+func WaitForTransactionInfo(t *testing.T, client sdk.FullNodeClient, txHash string, waitSecs int) *soliditynode.TransactionInfo {
 	for i := 1; i <= waitSecs; i++ {
-		txInfo, err := grpcClient.GetTransactionInfoByID(txHash)
+		txInfo, err := client.GetTransactionInfoById(txHash)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue

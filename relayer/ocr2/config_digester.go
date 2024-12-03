@@ -66,8 +66,6 @@ func NewOffchainConfigDigester(lggr logger.Logger, chainID *big.Int, contractAdd
 }
 
 func (d *TRONOffchainConfigDigester) ConfigDigest(cc types.ContractConfig) (types.ConfigDigest, error) {
-	d.lggr.Error("DEBUG: called ConfigDigest")
-
 	signers := []ethcommon.Address{}
 	for i, signer := range cc.Signers {
 		if len(signer) != ethcommon.AddressLength {

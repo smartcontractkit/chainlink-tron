@@ -1,13 +1,13 @@
 package reader
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 
-	tronabi "github.com/fbsobreira/gotron-sdk/pkg/abi"
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -17,51 +17,50 @@ import (
 
 //go:generate mockery --name Reader --output ../mocks/
 type Reader interface {
-	CallContract(address tronaddress.Address, method string, params []any) (map[string]interface{}, error)
+	CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
-	GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
+	GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
-	BaseClient() sdk.GrpcClient
+	BaseClient() sdk.FullNodeClient
 }
 
 var _ Reader = (*ReaderClient)(nil)
 
 type ReaderClient struct {
-	rpc  sdk.GrpcClient
+	rpc  sdk.FullNodeClient
 	lggr logger.Logger
-	abi  map[string]*core.SmartContract_ABI
+	abi  map[string]*common.JSONABI
 }
 
-func NewReader(rpc sdk.GrpcClient, lggr logger.Logger) *ReaderClient {
+func NewReader(rpc sdk.FullNodeClient, lggr logger.Logger) *ReaderClient {
 	return &ReaderClient{
 		rpc:  rpc,
 		lggr: lggr,
-		abi:  map[string]*core.SmartContract_ABI{},
+		abi:  map[string]*common.JSONABI{},
 	}
 }
 
-func (c *ReaderClient) BaseClient() sdk.GrpcClient {
+func (c *ReaderClient) BaseClient() sdk.FullNodeClient {
 	return c.rpc
 }
 
-func (c *ReaderClient) getContractABI(address tronaddress.Address) (abi *core.SmartContract_ABI, err error) {
+func (c *ReaderClient) getContractABI(contractAddress address.Address) (*common.JSONABI, error) {
 	// return cached abi if cached
-	if abi, ok := c.abi[address.String()]; ok {
+	if abi, ok := c.abi[contractAddress.String()]; ok {
 		return abi, nil
 	}
 
 	// otherwise fetch from chain
-	abi, err = c.rpc.GetContractABI(address.String())
+	response, err := c.rpc.GetContract(contractAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract ABI: %w", err)
 	}
 	// cache abi for future use
-	c.abi[address.String()] = abi
-
-	return
+	c.abi[contractAddress.String()] = response.ABI
+	return response.ABI, nil
 }
 
-func (c *ReaderClient) CallContract(contractAddress tronaddress.Address, method string, params []any) (result map[string]interface{}, err error) {
+func (c *ReaderClient) CallContract(contractAddress address.Address, method string, params []any) (result map[string]interface{}, err error) {
 	// get contract abi
 	abi, err := c.getContractABI(contractAddress)
 	if err != nil {
@@ -69,15 +68,15 @@ func (c *ReaderClient) CallContract(contractAddress tronaddress.Address, method 
 	}
 
 	// get method signature
-	methodSignature, err := relayer.GetFunctionSignature(abi, method)
+	methodSignature, err := abi.GetFunctionSignature(method)
 	if err != nil {
 		return result, fmt.Errorf("failed to get method sighash: %w", err)
 	}
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContract(
-		/* from= */ tronaddress.ZeroAddress.String(),
-		/* contractAddress= */ contractAddress.String(),
+		/* from= */ address.ZeroAddress,
+		/* contractAddress= */ contractAddress,
 		/* method= */ methodSignature,
 		/* params= */ params,
 	)
@@ -89,12 +88,16 @@ func (c *ReaderClient) CallContract(contractAddress tronaddress.Address, method 
 	}
 
 	// parse return value
-	parser, err := tronabi.GetParser(abi, method)
+	parser, err := abi.GetOutputParser(method)
 	if err != nil {
 		return result, fmt.Errorf("failed to get abi parser: %w", err)
 	}
 	result = map[string]interface{}{}
-	err = parser.UnpackIntoMap(result, res.ConstantResult[0])
+	constantResultBytes, err := hex.DecodeString(res.ConstantResult[0])
+	if err != nil {
+		return result, fmt.Errorf("failed to decode constant result: %w", err)
+	}
+	err = parser.UnpackIntoMap(result, constantResultBytes)
 	if err != nil {
 		return result, fmt.Errorf("failed to unpack result: %w", err)
 	}
@@ -107,19 +110,24 @@ func (c *ReaderClient) LatestBlockHeight() (blockHeight uint64, err error) {
 		return blockHeight, fmt.Errorf("couldn't get latest block: %w", err)
 	}
 
-	return uint64(nowBlock.GetBlockHeader().GetRawData().Number), nil
+	return uint64(nowBlock.BlockHeader.RawData.Number), nil
 }
 
-func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
+func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
+	// check if block number fits in int32
+	if blockNum > uint64(math.MaxInt32) {
+		return nil, fmt.Errorf("block number %d exceeds maximum int32 value", blockNum)
+	}
+
 	// get abi
-	abi, err := c.getContractABI(address)
+	abi, err := c.getContractABI(contractAddress)
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get contract abi: %w", err))
 		return nil, err
 	}
 
 	// get event topic hash
-	eventSignature, err := relayer.GetFunctionSignature(abi, eventName)
+	eventSignature, err := abi.GetFunctionSignature(eventName)
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get event signature: %w", err))
 		return nil, err
@@ -127,14 +135,16 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	eventTopicHash := relayer.GetEventTopicHash(eventSignature)
 
 	// get block
-	block, err := c.rpc.GetBlockByNum(int64(blockNum))
+	block, err := c.rpc.GetBlockByNum(int32(blockNum))
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get block by number: %w", err))
 		return nil, err
 	}
 
+	contractAddressHex := contractAddress.Hex()[2:]
+
 	// iterate over transactions
-	eventLogs := []*core.TransactionInfo_Log{}
+	eventLogs := []soliditynode.Log{}
 	for _, tx := range block.Transactions {
 		contract := tx.Transaction.RawData.Contract
 		// This should be exactly 1 for any contract transaction.
@@ -144,37 +154,29 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 		if contract[0].Parameter.TypeUrl != "type.googleapis.com/protocol.TriggerSmartContract" {
 			continue
 		}
-		triggerSmartContract := &core.TriggerSmartContract{}
-		if err := contract[0].Parameter.UnmarshalTo(triggerSmartContract); err != nil {
-			c.lggr.Error(fmt.Sprintf("failed to unmarshal TriggerSmartContract transaction %s", hex.EncodeToString(tx.Txid)))
+		if contractAddressHex != contract[0].Parameter.Value.ContractAddress {
 			continue
 		}
-
-		if !bytes.Equal(address.Bytes(), triggerSmartContract.ContractAddress) {
-			continue
-		}
-
-		transactionInfo, err := c.rpc.GetTransactionInfoByID(hex.EncodeToString(tx.Txid))
+		transactionInfo, err := c.rpc.GetTransactionInfoById(tx.TxID)
 		if err != nil {
 			c.lggr.Error(fmt.Errorf("failed to fetch transaction info: %w", err))
 			continue
 		}
 
 		for _, log := range transactionInfo.Log {
-			// TODO: this check no longer works as expected, understand why the addresses are different
-			// if !bytes.Equal(log.Address, address.Bytes()) {
-			//   continue
-			// }
+			// we don't bother comparing log.Address since we already matched the contract address
+			// before retrieving the transaction. log.Address is a string in hex, but without the 0x41
+			// prefix, which is why a simple match did not work before.
 
 			// check first topic in log against event topic hash
-			if len(log.Topics) == 0 || !bytes.Equal(log.Topics[0], eventTopicHash) {
+			if len(log.Topics) == 0 || log.Topics[0] != eventTopicHash {
 				continue
 			}
 			eventLogs = append(eventLogs, log)
 		}
 	}
 
-	parser, err := tronabi.GetInputsParser(abi, eventName)
+	parser, err := abi.GetInputParser(eventName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input parser for event %s: %w", eventName, err)
 	}
@@ -182,7 +184,11 @@ func (c *ReaderClient) GetEventsFromBlock(address tronaddress.Address, eventName
 	var events = []map[string]interface{}{}
 	for _, log := range eventLogs {
 		event := make(map[string]interface{})
-		err = parser.UnpackIntoMap(event, log.Data)
+		dataBytes, err := hex.DecodeString(log.Data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode event data: %w", err)
+		}
+		err = parser.UnpackIntoMap(event, dataBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack event log: %w", err)
 		}

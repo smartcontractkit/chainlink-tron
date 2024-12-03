@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +24,7 @@ import (
 func TestBalanceMonitor(t *testing.T) {
 	const chainID = "Chainlinktest-42"
 	ks := keystore{}
-	accounts := []tronaddress.Address{}
+	accounts := []address.Address{}
 	for i := 0; i < 3; i++ {
 		pubKeyHex := generatePublicKeyHex()
 		addr, err := relayer.PublicKeyToTronAddress(pubKeyHex)
@@ -46,9 +47,9 @@ func TestBalanceMonitor(t *testing.T) {
 		acc := accounts[i]
 		exp = append(exp, update{acc.String(), expBals[i]})
 	}
-	mockClient.GetAccountBalanceFunc = func(address tronaddress.Address) (int64, error) {
+	mockClient.GetAccountBalanceFunc = func(accountAddress address.Address) (int64, error) {
 		for i, acc := range accounts {
-			if acc.String() == address.String() {
+			if acc.String() == accountAddress.String() {
 				return bals[i], nil
 			}
 		}
@@ -58,7 +59,7 @@ func TestBalanceMonitor(t *testing.T) {
 	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, mockClient)
 	var got []update
 	done := make(chan struct{})
-	b.updateFn = func(acc tronaddress.Address, sun int64) {
+	b.updateFn = func(acc address.Address, sun int64) {
 		select {
 		case <-done:
 			return
@@ -85,7 +86,7 @@ func TestBalanceMonitor(t *testing.T) {
 	assert.EqualValues(t, exp, got)
 }
 
-func generateTronAddress() tronaddress.Address {
+func generateTronAddress() address.Address {
 	key := testutils.CreateKey(rand.Reader)
 	return key.Address
 }
@@ -128,12 +129,16 @@ func (k keystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, err
 }
 
 type MockSolidityGRPCClient struct {
-	GetAccountBalanceFunc func(address tronaddress.Address) (int64, error)
+	GetAccountBalanceFunc func(accountAddress address.Address) (int64, error)
 }
 
-func (m *MockSolidityGRPCClient) GetAccountBalance(address tronaddress.Address) (int64, error) {
+func (m *MockSolidityGRPCClient) GetAccount(accountAddress address.Address) (*soliditynode.GetAccountResponse, error) {
 	if m.GetAccountBalanceFunc != nil {
-		return m.GetAccountBalanceFunc(address)
+		balance, err := m.GetAccountBalanceFunc(accountAddress)
+		if err != nil {
+			return nil, err
+		}
+		return &soliditynode.GetAccountResponse{Balance: balance}, nil
 	}
-	return 0, fmt.Errorf("GetAccountBalance not implemented")
+	return nil, fmt.Errorf("GetAccount not implemented")
 }

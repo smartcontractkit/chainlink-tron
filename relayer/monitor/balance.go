@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -19,7 +20,7 @@ type Config interface {
 }
 
 type BalanceClient interface {
-	GetAccountBalance(addr tronaddress.Address) (int64, error)
+	GetAccount(accountAddress address.Address) (*soliditynode.GetAccountResponse, error)
 }
 
 // TODO: This chain-specific implementation should be replaced by the chain-agnostic one found at /aptos/relayer/monitor.
@@ -49,7 +50,7 @@ type balanceMonitor struct {
 	lggr      logger.Logger
 	ks        core.Keystore
 	newReader func() (BalanceClient, error)
-	updateFn  func(acc tronaddress.Address, sun int64) // overridable for testing
+	updateFn  func(acc address.Address, sun int64) // overridable for testing
 
 	reader BalanceClient
 
@@ -139,11 +140,12 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			continue
 		}
 
-		sun, err := reader.GetAccountBalance(addr)
+		response, err := reader.GetAccount(addr)
 		if err != nil {
-			b.lggr.Errorw("Failed to get balance", "account", k, "err", err)
+			b.lggr.Errorw("Failed to get account info", "account", k, "err", err)
 			continue
 		}
+		sun := response.Balance
 		gotSomeBals = true
 		b.updateFn(addr, sun)
 	}

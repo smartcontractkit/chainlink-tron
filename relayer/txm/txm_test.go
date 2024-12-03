@@ -11,8 +11,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/api"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
@@ -28,14 +30,14 @@ var config = trontxm.TronTxmConfig{
 	ConfirmPollSecs:   2,
 }
 var genesisAccountKey = testutils.CreateKey(rand.Reader)
-var genesisAddress = genesisAccountKey.Address.String()
+var genesisAddress = genesisAccountKey.Address
 var genesisPrivateKey = genesisAccountKey.PrivateKey
 
 func waitForMaxRetryDuration() {
 	time.Sleep(trontxm.MAX_BROADCAST_RETRY_DURATION + (2 * time.Second))
 }
 
-func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*trontxm.TronTxm, logger.Logger, *observer.ObservedLogs) {
+func setupTxm(t *testing.T, fullNodeClient sdk.FullNodeClient) (*trontxm.TronTxm, logger.Logger, *observer.ObservedLogs) {
 	testLogger, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
 	txm := trontxm.TronTxm{
 		Logger:                testLogger,
@@ -43,7 +45,7 @@ func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*trontxm.TronTxm, logger
 		Config:                config,
 		EstimateEnergyEnabled: true,
 
-		Client:        grpcClient,
+		Client:        fullNodeClient,
 		BroadcastChan: make(chan *trontxm.TronTx, config.BroadcastChanSize),
 		AccountStore:  trontxm.NewAccountStore(),
 		Stop:          make(chan struct{}),
@@ -54,51 +56,49 @@ func setupTxm(t *testing.T, grpcClient sdk.GrpcClient) (*trontxm.TronTxm, logger
 
 func TestTxm(t *testing.T) {
 	// setup
-	grpcClient := mocks.NewGrpcClient(t)
-	grpcClient.On("Start", mock.Anything).Maybe().Return(nil)
-	grpcClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&api.EstimateEnergyMessage{
-		Result: &api.Return{
-			Result: true,
-		},
+	fullNodeClient := mocks.NewFullNodeClient(t)
+	fullNodeClient.On("Start", mock.Anything).Maybe().Return(nil)
+	fullNodeClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&soliditynode.EnergyEstimateResult{
+		Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 		EnergyRequired: 1000,
 	}, nil)
-	grpcClient.On("GetEnergyPrices").Maybe().Return(&api.PricesResponseMessage{Prices: "0:420"}, nil)
+	fullNodeClient.On("GetEnergyPrices").Maybe().Return(&fullnode.EnergyPrices{Prices: "0:420"}, nil)
 	txid, err := hex.DecodeString("2a037789237971c1c1d648f7b90b70c68a9aa6b0a2892f947213286346d0210d")
 	require.NoError(t, err)
-	grpcClient.On("TriggerContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&api.TransactionExtention{
-		Transaction: &core.Transaction{
-			RawData: &core.TransactionRaw{
+	fullNodeClient.On("TriggerSmartContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&fullnode.TriggerSmartContractResponse{
+		Transaction: &common.Transaction{
+			TxID: hex.EncodeToString(txid),
+			RawData: common.RawData{
 				Timestamp:    123,
 				Expiration:   456,
-				RefBlockHash: []byte("abc"),
+				RefBlockHash: "abc",
 				FeeLimit:     789,
 			},
 		},
-		Txid:           txid,
-		ConstantResult: [][]byte{{0x01}},
-		Result:         &api.Return{Result: true},
-		EnergyUsed:     1000,
+		Result: fullnode.TriggerResult{Result: true},
 	}, nil)
-	grpcClient.On("Broadcast", mock.Anything).Maybe().Return(&api.Return{
+
+	fullNodeClient.On("BroadcastTransaction", mock.Anything).Maybe().Return(&fullnode.BroadcastResponse{
 		Result:  true,
-		Code:    api.Return_SUCCESS,
-		Message: []byte("broadcast message"),
+		Code:    "SUCCESS",
+		Message: "broadcast message",
 	}, nil)
-	grpcClient.On("GetTransactionInfoByID", mock.Anything).Maybe().Return(&core.TransactionInfo{
-		Receipt:     &core.ResourceReceipt{Result: core.Transaction_Result_SUCCESS},
+
+	fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 		BlockNumber: 123,
 	}, nil)
-	keystore = testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
+	keystore = testutils.NewTestKeystore(genesisAddress.String(), genesisPrivateKey)
 
 	t.Run("Invalid input params", func(t *testing.T) {
-		txm, _, _ := setupTxm(t, grpcClient)
+		txm, _, _ := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()", "param1")
 		require.Error(t, err)
 		require.ErrorContains(t, err, "odd number of params")
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		txm, lggr, observedLogs := setupTxm(t, grpcClient)
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 
@@ -109,13 +109,14 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Retry on broadcast server busy", func(t *testing.T) {
-		grpcClient.On("Broadcast", mock.Anything).Unset()
-		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
-			Code:    api.Return_SERVER_BUSY,
-			Message: []byte("server busy"),
+			Code:    "SERVER_BUSY",
+			Message: "server busy",
 		}, fmt.Errorf("some err"))
-		txm, _, observedLogs := setupTxm(t, grpcClient)
+
+		txm, _, observedLogs := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 
@@ -129,13 +130,13 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Retry on broadcast block unsolidified", func(t *testing.T) {
-		grpcClient.On("Broadcast", mock.Anything).Unset()
-		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
-			Code:    api.Return_BLOCK_UNSOLIDIFIED,
-			Message: []byte("block unsolid"),
+			Code:    "BLOCK_UNSOLIDIFIED",
+			Message: "block unsolid",
 		}, fmt.Errorf("some err"))
-		txm, _, observedLogs := setupTxm(t, grpcClient)
+		txm, _, observedLogs := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 
@@ -149,13 +150,13 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("No retry on other broadcast err", func(t *testing.T) {
-		grpcClient.On("Broadcast", mock.Anything).Unset()
-		grpcClient.On("Broadcast", mock.Anything).Return(&api.Return{
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
+		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
-			Code:    api.Return_BANDWITH_ERROR,
-			Message: []byte("some error"),
+			Code:    "BANDWITH_ERROR",
+			Message: "some error",
 		}, fmt.Errorf("some err"))
-		txm, lggr, observedLogs := setupTxm(t, grpcClient)
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
 		require.NoError(t, err)
 

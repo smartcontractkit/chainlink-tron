@@ -10,24 +10,21 @@ import (
 
 const (
 	// Local RPCs
-	DefaultInternalGrpcUrl     = "grpc://host.docker.internal:16669/?insecure=true"
-	DefaultInternalSolidityUrl = "grpc://host.docker.internal:16670/?insecure=true"
-	DefaultInternalJsonRpcUrl  = "http://host.docker.internal:16672"
-	HttpPort                   = "16667"
-	SolidityPort               = "16668"
-	GrpcPort                   = "16669"
-	GrpcSolidityPort           = "16670"
+	DefaultInternalFullNodeUrl     = "http://host.docker.internal:16667/wallet"
+	DefaultInternalSolidityNodeUrl = "http://host.docker.internal:16668/walletsolidity"
+	DefaultInternalJsonRpcUrl      = "http://host.docker.internal:16672"
+	FullNodePort                   = "16667"
+	SolidityNodePort               = "16668"
 
 	// Testnet RPCs
 	// Urls can be found at https://developers.tron.network/reference/background
-	ShastaHttpUrl         = "https://api.shasta.trongrid.io"
-	ShastaGrpcUrl         = "grpc://grpc.shasta.trongrid.io:50051?insecure=true"
-	ShastaGrpcSolidityUrl = "grpc://grpc.shasta.trongrid.io:50052?insecure=true"
+	ShastaFullNodeUrl     = "https://api.shasta.trongrid.io/wallet"
+	ShastaSolidityNodeUrl = "https://api.shasta.trongrid.io/walletsolidity"
 	ShastaJsonRpcUrl      = "https://api.shasta.trongrid.io/jsonrpc"
-	NileHttpUrl           = "https://nile.trongrid.io"
-	NileGrpcUrl           = "grpc://grpc.nile.trongrid.io:50051?insecure=true"
-	NileGrpcSolidityUrl   = "grpc://grpc.nile.trongrid.io:50061?insecure=true"
-	NileJsonRpcUrl        = "https://nile.trongrid.io/jsonrpc"
+
+	NileFullNodeUrl     = "https://nile.trongrid.io/wallet"
+	NileSolidityNodeUrl = "https://nile.trongrid.io/walletsolidity"
+	NileJsonRpcUrl      = "https://nile.trongrid.io/jsonrpc"
 
 	// Configs for TXM
 	DevnetFeeLimit                  = 1_000_000_000

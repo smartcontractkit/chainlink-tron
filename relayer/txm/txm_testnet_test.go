@@ -9,12 +9,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/client"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
@@ -27,12 +26,10 @@ func TestTxmNile(t *testing.T) {
 	runTestnetTest(t, "grpc.nile.trongrid.io:50051")
 }
 
-func runTestnetTest(t *testing.T, grpcAddress string) {
+func runTestnetTest(t *testing.T, fullnodeUrl string) {
 	logger := logger.Test(t)
 
-	grpcClient := client.NewGrpcClientWithTimeout(grpcAddress, 15*time.Second)
-	err := grpcClient.Start(grpc.WithTransportCredentials(credentials.NewTLS(nil)))
-	require.NoError(t, err)
+	fullnodeClient := fullnode.NewClient(fullnodeUrl, sdk.CreateHttpClientWithTimeout(15*time.Second, false))
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
@@ -42,16 +39,16 @@ func runTestnetTest(t *testing.T, grpcAddress string) {
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	require.NoError(t, err)
 
-	pubAddress := address.PubkeyToAddress(privateKey.PublicKey).String()
+	pubAddress := address.PubkeyToAddress(privateKey.PublicKey)
 
 	logger.Debugw("Loaded private key", "address", pubAddress)
 
-	keystore := testutils.NewTestKeystore(pubAddress, privateKey)
+	keystore := testutils.NewTestKeystore(pubAddress.String(), privateKey)
 
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, grpcClient, config, keystore, pubAddress, 5)
+	runTxmTest(t, logger, fullnodeClient, config, keystore, pubAddress, 5)
 }

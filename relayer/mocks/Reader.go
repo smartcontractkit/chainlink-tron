@@ -15,28 +15,28 @@ type Reader struct {
 }
 
 // BaseClient provides a mock function with given fields:
-func (_m *Reader) BaseClient() sdk.GrpcClient {
+func (_m *Reader) BaseClient() sdk.FullNodeClient {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for BaseClient")
 	}
 
-	var r0 sdk.GrpcClient
-	if rf, ok := ret.Get(0).(func() sdk.GrpcClient); ok {
+	var r0 sdk.FullNodeClient
+	if rf, ok := ret.Get(0).(func() sdk.FullNodeClient); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(sdk.GrpcClient)
+			r0 = ret.Get(0).(sdk.FullNodeClient)
 		}
 	}
 
 	return r0
 }
 
-// CallContract provides a mock function with given fields: _a0, method, params
-func (_m *Reader) CallContract(_a0 address.Address, method string, params []interface{}) (map[string]interface{}, error) {
-	ret := _m.Called(_a0, method, params)
+// CallContract provides a mock function with given fields: contractAddress, method, params
+func (_m *Reader) CallContract(contractAddress address.Address, method string, params []interface{}) (map[string]interface{}, error) {
+	ret := _m.Called(contractAddress, method, params)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CallContract")
@@ -45,10 +45,10 @@ func (_m *Reader) CallContract(_a0 address.Address, method string, params []inte
 	var r0 map[string]interface{}
 	var r1 error
 	if rf, ok := ret.Get(0).(func(address.Address, string, []interface{}) (map[string]interface{}, error)); ok {
-		return rf(_a0, method, params)
+		return rf(contractAddress, method, params)
 	}
 	if rf, ok := ret.Get(0).(func(address.Address, string, []interface{}) map[string]interface{}); ok {
-		r0 = rf(_a0, method, params)
+		r0 = rf(contractAddress, method, params)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]interface{})
@@ -56,7 +56,7 @@ func (_m *Reader) CallContract(_a0 address.Address, method string, params []inte
 	}
 
 	if rf, ok := ret.Get(1).(func(address.Address, string, []interface{}) error); ok {
-		r1 = rf(_a0, method, params)
+		r1 = rf(contractAddress, method, params)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -64,9 +64,9 @@ func (_m *Reader) CallContract(_a0 address.Address, method string, params []inte
 	return r0, r1
 }
 
-// GetEventsFromBlock provides a mock function with given fields: _a0, eventName, blockNum
-func (_m *Reader) GetEventsFromBlock(_a0 address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
-	ret := _m.Called(_a0, eventName, blockNum)
+// GetEventsFromBlock provides a mock function with given fields: contractAddress, eventName, blockNum
+func (_m *Reader) GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
+	ret := _m.Called(contractAddress, eventName, blockNum)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEventsFromBlock")
@@ -75,10 +75,10 @@ func (_m *Reader) GetEventsFromBlock(_a0 address.Address, eventName string, bloc
 	var r0 []map[string]interface{}
 	var r1 error
 	if rf, ok := ret.Get(0).(func(address.Address, string, uint64) ([]map[string]interface{}, error)); ok {
-		return rf(_a0, eventName, blockNum)
+		return rf(contractAddress, eventName, blockNum)
 	}
 	if rf, ok := ret.Get(0).(func(address.Address, string, uint64) []map[string]interface{}); ok {
-		r0 = rf(_a0, eventName, blockNum)
+		r0 = rf(contractAddress, eventName, blockNum)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]map[string]interface{})
@@ -86,7 +86,7 @@ func (_m *Reader) GetEventsFromBlock(_a0 address.Address, eventName string, bloc
 	}
 
 	if rf, ok := ret.Get(1).(func(address.Address, string, uint64) error); ok {
-		r1 = rf(_a0, eventName, blockNum)
+		r1 = rf(contractAddress, eventName, blockNum)
 	} else {
 		r1 = ret.Error(1)
 	}

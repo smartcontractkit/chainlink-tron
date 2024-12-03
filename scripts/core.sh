@@ -49,7 +49,7 @@ for ((i = 1; i <= NODE_COUNT; i++)); do
 	host_postgres_url="postgresql://postgres:postgres@127.0.0.1:5432/postgres"
 	# Recreate the database
 	psql "${host_postgres_url}" -c "DROP DATABASE ${database_name};" &>/dev/null || true
-	psql "${host_postgres_url}" -c "CREATE DATABASE ${database_name};" &>/dev/null || true
+	psql "${host_postgres_url}" -c "CREATE DATABASE ${database_name};"
 
 	listen_args=()
 	for ip in $listen_ips; do

@@ -77,7 +77,7 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		"bytes32", vs,
 	}
 
-	return oc.txm.Enqueue(oc.senderAddress.String(), oc.contractAddress.String(), "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
+	return oc.txm.Enqueue(oc.senderAddress, oc.contractAddress, "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
 }
 
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(

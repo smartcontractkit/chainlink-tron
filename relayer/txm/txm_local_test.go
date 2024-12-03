@@ -13,15 +13,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/client"
-	"github.com/fbsobreira/gotron-sdk/pkg/common"
+	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
 )
@@ -29,50 +27,48 @@ import (
 func TestTxmLocal(t *testing.T) {
 	logger := logger.Test(t)
 
-	var genesisAddress string
+	var genesisAddress address.Address
 	var genesisPrivateKey *ecdsa.PrivateKey
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
 		genesisAccountKey := testutils.CreateKey(rand.Reader)
-		genesisAddress = genesisAccountKey.Address.String()
+		genesisAddress = genesisAccountKey.Address
 		genesisPrivateKey = genesisAccountKey.PrivateKey
 	} else {
 		privateKey, err := crypto.HexToECDSA(privateKeyHex)
 		require.NoError(t, err)
 
-		genesisAddress = address.PubkeyToAddress(privateKey.PublicKey).String()
+		genesisAddress = address.PubkeyToAddress(privateKey.PublicKey)
 		genesisPrivateKey = privateKey
 	}
-	logger.Debugw("Using genesis account", "address", genesisAddress)
+	logger.Debugw("Using genesis account", "address", genesisAddress.String())
 
-	err := testutils.StartTronNode(genesisAddress)
+	err := testutils.StartTronNode(genesisAddress.String())
 	require.NoError(t, err)
 	logger.Debugw("Started TRON node")
 
-	keystore := testutils.NewTestKeystore(genesisAddress, genesisPrivateKey)
+	keystore := testutils.NewTestKeystore(genesisAddress.String(), genesisPrivateKey)
 
 	ipAddress := testutils.GetTronNodeIpAddress()
-	rpcAddress := ipAddress + ":" + testutils.GrpcPort
+	rpcAddress := "http://" + ipAddress + ":" + testutils.FullNodePort + "/wallet"
 
-	grpcClient := client.NewGrpcClientWithTimeout(rpcAddress, 15*time.Second)
-	err = grpcClient.Start(grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
+	fullnodeClient := fullnode.NewClient(rpcAddress, sdk.CreateHttpClientWithTimeout(15*time.Second, false))
 
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
 	}
 
-	runTxmTest(t, logger, grpcClient, config, keystore, genesisAddress, 10)
+	runTxmTest(t, logger, fullnodeClient, config, keystore, genesisAddress, 10)
 }
 
-func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClient, config txm.TronTxmConfig, keystore loop.Keystore, fromAddress string, iterations int) {
-	txmgr := txm.New(logger, keystore, grpcClient, config)
+func runTxmTest(t *testing.T, logger logger.Logger, fullnodeClient *fullnode.Client, config txm.TronTxmConfig, keystore loop.Keystore, fromAddress address.Address, iterations int) {
+	txmgr := txm.New(logger, keystore, fullnodeClient, config)
 	err := txmgr.Start(context.Background())
 	require.NoError(t, err)
 
-	contractAddress := deployTestContractByJson(t, txmgr, fromAddress, keystore)
+	contractAddress := deployTestContract(t, txmgr, fromAddress, keystore)
 	logger.Debugw("Deployed test contract", "contractAddress", contractAddress)
 
 	expectedValue := 0
@@ -94,19 +90,15 @@ func runTxmTest(t *testing.T, logger logger.Logger, grpcClient *client.GrpcClien
 	testutils.WaitForInflightTxs(logger, txmgr, 30*time.Second)
 
 	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
-	// this address maps to 0x410000000000000000000000000000000000000000 where 0x41 is the TRON address
-	// prefix.
-	zeroAddress := "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
-	txExtention, err := txmgr.GetClient().TriggerConstantContract(zeroAddress, contractAddress, "count()", nil)
+	txExtention, err := txmgr.GetClient().TriggerConstantContract(address.ZeroAddress, contractAddress, "count()", nil)
 	require.NoError(t, err)
 
 	constantResult := txExtention.ConstantResult
 	require.Equal(t, len(constantResult), 1)
 
-	actualValueStr := common.BytesToHexString(constantResult[0])
-	actualValue, err := strconv.ParseInt(actualValueStr[2:], 16, 32)
+	actualValue, err := strconv.ParseInt(constantResult[0], 16, 32)
 	require.NoError(t, err)
-	logger.Debugw("Read count value", "countStr", actualValueStr, "count", actualValue, "expected", expectedValue)
+	logger.Debugw("Read count value", "countStr", constantResult[0], "count", actualValue, "expected", expectedValue)
 
 	require.Equal(t, int64(expectedValue), actualValue)
 }
@@ -146,22 +138,12 @@ func getTestCounterContract() (string, string) {
 	return abiJson, codeHex
 }
 
-func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress string) string {
+func deployTestContract(t *testing.T, txmgr *txm.TronTxm, fromAddress address.Address, keystore loop.Keystore) address.Address {
 	abiJson, codeHex := getTestCounterContract()
-
-	txHash := testutils.DeployContract(t, txmgr, fromAddress, "Counter", abiJson, codeHex)
-	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
-	contractAddress := address.Address(txInfo.ContractAddress).String()
-	return contractAddress
-}
-
-func deployTestContractByJson(t *testing.T, txmgr *txm.TronTxm, fromAddress string, keystore loop.Keystore) string {
-	abiJson, codeHex := getTestCounterContract()
-	httpUrl := "http://" + testutils.GetTronNodeIpAddress() + ":" + testutils.HttpPort + "/wallet"
-	a, err := address.Base58ToAddress(fromAddress)
+	client := txmgr.GetClient()
+	txHash := testutils.SignAndDeployContract(t, client, keystore, fromAddress, "Counter", abiJson, codeHex, testutils.DevnetFeeLimit, nil)
+	txInfo := testutils.WaitForTransactionInfo(t, client, txHash, 30)
+	contractAddress, err := address.HexToAddress(txInfo.ContractAddress)
 	require.NoError(t, err)
-	txHash := testutils.DeployContractByJson(t, httpUrl, keystore, a, "Counter", abiJson, codeHex, testutils.DevnetFeeLimit, nil)
-	txInfo := testutils.WaitForTransactionInfo(t, txmgr.GetClient(), txHash, 30)
-	contractAddress := address.Address(txInfo.ContractAddress).String()
 	return contractAddress
 }

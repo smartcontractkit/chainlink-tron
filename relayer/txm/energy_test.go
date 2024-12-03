@@ -17,7 +17,7 @@ func TestParseLatestEnergyPrice(t *testing.T) {
 	testCases := []struct {
 		name            string
 		energyPricesStr string
-		expectedPrice   int64
+		expectedPrice   int32
 		expectedErrMsg  string
 	}{
 		{
@@ -55,9 +55,9 @@ func TestParseLatestEnergyPrice(t *testing.T) {
 
 func TestCalculatePaddedFeeLimit(t *testing.T) {
 	tests := []struct {
-		feeLimit int64
-		attempt  uint64
-		expected int64
+		feeLimit int32
+		attempt  uint32
+		expected int32
 	}{
 		{feeLimit: 1000, attempt: 0, expected: 1000},
 		{feeLimit: 1000, attempt: 1, expected: 1500},

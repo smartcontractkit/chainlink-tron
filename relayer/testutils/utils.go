@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/keystore"
 	"github.com/pborman/uuid"
 )
 
@@ -18,7 +17,17 @@ import (
 // recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
 // the function we need is keystore.newKey which is unfortunately private.
 // ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
-func CreateKey(rand io.Reader) *keystore.Key {
+
+type TestKey struct {
+	ID uuid.UUID // Version 4 "random" for unique id not derived from key data
+	// to simplify lookups we also store the address
+	Address address.Address
+	// we only store privkey as pubkey/address can be derived from it
+	// privkey in this struct is always in plaintext
+	PrivateKey *ecdsa.PrivateKey
+}
+
+func CreateKey(rand io.Reader) *TestKey {
 	randBytes := make([]byte, 64)
 	_, err := rand.Read(randBytes)
 	if err != nil {
@@ -33,9 +42,9 @@ func CreateKey(rand io.Reader) *keystore.Key {
 	return key
 }
 
-func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *keystore.Key {
+func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *TestKey {
 	id := uuid.NewRandom()
-	key := &keystore.Key{
+	key := &TestKey{
 		ID:         id,
 		Address:    address.PubkeyToAddress(privateKeyECDSA.PublicKey),
 		PrivateKey: privateKeyECDSA,
