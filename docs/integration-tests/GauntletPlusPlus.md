@@ -16,7 +16,7 @@ Description: Shasta is the testnet that is used for testing purposes. The parame
 
 - Chain Name: [Shasta Testnet](https://shasta.tronscan.org/#/)
 - Chain Id: `0x94a9059e` - last four bytes of the genesis block hash
-- Public RPCs: [https://api.shasta.trongrid.io/jsonrpc](https://api.shasta.trongrid.io/jsonrpc)
+- Public RPCs: [https://api.shasta.trongrid.io/](https://api.shasta.trongrid.io/)
 
 ### Nile
 
@@ -33,9 +33,8 @@ ChainID = '<id>'
 
 [[Tron.Nodes]]
 Name = 'primary'
-URL = '<grpc url>'
-SolidityUrl = '<solidity grpc url>'
-JsonRpcUrl = '<json RPC URL>'
+URL = '<full node http url>'
+SolidityUrl = '<solidity http url>'
 
 [Log]
 Level = 'debug'

@@ -266,17 +266,13 @@ func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string)
 	if internalSolidityNodeUrl == "" {
 		internalSolidityNodeUrl = testutils.DefaultInternalSolidityNodeUrl
 	}
-	internalJsonRpcUrl := os.Getenv("INTERNAL_JSON_RPC_URL")
-	if internalJsonRpcUrl == "" {
-		internalJsonRpcUrl = testutils.DefaultInternalJsonRpcUrl
-	}
 
 	logger.Info().Msg("Starting java-tron container...")
 	err := testutils.StartTronNode(genesisAddress)
 	require.NoError(t, err, "Could not start java-tron container")
 	logger.Info().Str("fullNodeUrl", fullNodeUrl).Str("solidityNodeUrl", solidityNodeUrl).Msg("TRON node config")
 
-	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl, internalJsonRpcUrl, genesisAddress)
+	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl, genesisAddress)
 }
 
 func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
@@ -289,20 +285,18 @@ func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testc
 
 // SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
 func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient *sdk.CombinedClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
-	var fullNodeUrl, solidityNodeUrl, jsonRpcUrl string
+	var fullNodeUrl, solidityNodeUrl string
 	switch network {
 	case testutils.Shasta:
 		fullNodeUrl = testutils.ShastaFullNodeUrl
 		solidityNodeUrl = testutils.ShastaSolidityNodeUrl
-		jsonRpcUrl = testutils.ShastaJsonRpcUrl
 	case testutils.Nile:
 		fullNodeUrl = testutils.NileFullNodeUrl
 		solidityNodeUrl = testutils.NileSolidityNodeUrl
-		jsonRpcUrl = testutils.NileJsonRpcUrl
 	default:
 		t.Fatalf("Unknown network: %s", network)
 	}
-	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, fullNodeUrl, solidityNodeUrl, jsonRpcUrl, pubAddress)
+	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, fullNodeUrl, solidityNodeUrl, pubAddress)
 }
 
 func TeardownTestnetStack(t *testing.T, logger zerolog.Logger, commonConfig *testcommon.Common) {
@@ -314,7 +308,7 @@ func TeardownTestnetStack(t *testing.T, logger zerolog.Logger, commonConfig *tes
 func setUpTronEnvironment(
 	t *testing.T, logger zerolog.Logger, fullNodeUrl,
 	solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl,
-	internalJsonRpcUrl, genesisAddress string,
+	genesisAddress string,
 ) (*sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
 	fullNodeUrlObj, err := url.Parse(fullNodeUrl)
 	require.NoError(t, err)
@@ -338,7 +332,7 @@ func setUpTronEnvironment(
 	chainId := "0x" + blockId[len(blockId)-8:]
 	logger.Info().Str("chain id", chainId).Msg("Read first block")
 
-	commonConfig := testcommon.NewCommon(t, chainId, internalFullNodeUrl, internalSolidityNodeUrl, internalJsonRpcUrl)
+	commonConfig := testcommon.NewCommon(t, chainId, internalFullNodeUrl, internalSolidityNodeUrl)
 	commonConfig.SetLocalEnvironment(t, genesisAddress)
 
 	chainlinkClient, err := testcommon.NewChainlinkClient(commonConfig.Env, commonConfig.ChainId, CLNodeName)

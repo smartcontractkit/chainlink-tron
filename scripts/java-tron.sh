@@ -71,8 +71,6 @@ for ((i=1; i<=$node_count; i++)); do
   solidity_node_http_port="${i}6668"
   full_node_grpc_port="${i}6669"
   solidity_node_grpc_port="${i}6670"
-  full_node_jsonrpc_port="${i}6671"
-  solidity_node_jsonrpc_port="${i}6672"
 
   listen_args=()
   for ip in $listen_ips; do
@@ -80,8 +78,6 @@ for ((i=1; i<=$node_count; i++)); do
     listen_args+=("-p" "${ip}:${solidity_node_http_port}:16668")
     listen_args+=("-p" "${ip}:${full_node_grpc_port}:16669")
     listen_args+=("-p" "${ip}:${solidity_node_grpc_port}:16670")
-    listen_args+=("-p" "${ip}:${full_node_jsonrpc_port}:16671")
-    listen_args+=("-p" "${ip}:${solidity_node_jsonrpc_port}:16672")
   done
 
   docker run \

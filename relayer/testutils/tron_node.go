@@ -12,7 +12,6 @@ const (
 	// Local RPCs
 	DefaultInternalFullNodeUrl     = "http://host.docker.internal:16667/wallet"
 	DefaultInternalSolidityNodeUrl = "http://host.docker.internal:16668/walletsolidity"
-	DefaultInternalJsonRpcUrl      = "http://host.docker.internal:16672"
 	FullNodePort                   = "16667"
 	SolidityNodePort               = "16668"
 
@@ -20,11 +19,9 @@ const (
 	// Urls can be found at https://developers.tron.network/reference/background
 	ShastaFullNodeUrl     = "https://api.shasta.trongrid.io/wallet"
 	ShastaSolidityNodeUrl = "https://api.shasta.trongrid.io/walletsolidity"
-	ShastaJsonRpcUrl      = "https://api.shasta.trongrid.io/jsonrpc"
 
 	NileFullNodeUrl     = "https://nile.trongrid.io/wallet"
 	NileSolidityNodeUrl = "https://nile.trongrid.io/walletsolidity"
-	NileJsonRpcUrl      = "https://nile.trongrid.io/jsonrpc"
 
 	// Configs for TXM
 	DevnetFeeLimit                  = 1_000_000_000
