@@ -1,7 +1,6 @@
 package sdk
 
 import (
-	"errors"
 	"net/url"
 	"time"
 
@@ -29,12 +28,9 @@ func CreateCombinedClient(fullnodeUrl, soliditynodeUrl *url.URL) (*CombinedClien
 }
 
 func CreateCombinedClientWithTimeout(fullnodeUrl, soliditynodeUrl *url.URL, timeout time.Duration) (*CombinedClient, error) {
-	if hasInsecureFlag(fullnodeUrl) != hasInsecureFlag(soliditynodeUrl) {
-		return nil, errors.New("inconsistent insecure flag")
-	}
-	httpClient := CreateHttpClientWithTimeout(timeout, hasInsecureFlag(fullnodeUrl))
-	fullnodeClient := fullnode.NewClient(cleanUrlString(fullnodeUrl), httpClient)
-	soliditynodeClient := soliditynode.NewClient(cleanUrlString(soliditynodeUrl), httpClient)
+	httpClient := CreateHttpClientWithTimeout(timeout)
+	fullnodeClient := fullnode.NewClient(fullnodeUrl.String(), httpClient)
+	soliditynodeClient := soliditynode.NewClient(soliditynodeUrl.String(), httpClient)
 
 	return NewCombinedClient(fullnodeClient, soliditynodeClient), nil
 }

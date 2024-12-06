@@ -259,7 +259,8 @@ func (t *TronTxm) confirmLoop() {
 	_, cancel := utils.ContextFromChan(t.Stop)
 	defer cancel()
 
-	tick := time.After(time.Duration(t.Config.ConfirmPollSecs) * time.Second)
+	pollDuration := time.Duration(t.Config.ConfirmPollSecs) * time.Second
+	tick := time.After(pollDuration)
 
 	t.Logger.Debugw("confirmLoop: started")
 
@@ -270,7 +271,7 @@ func (t *TronTxm) confirmLoop() {
 
 			t.checkUnconfirmed()
 
-			remaining := time.Duration(t.Config.ConfirmPollSecs) - time.Since(start)
+			remaining := pollDuration - time.Since(start)
 			tick = time.After(utils.WithJitter(remaining.Abs()))
 
 		case <-t.Stop:

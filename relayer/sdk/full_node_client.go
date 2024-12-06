@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -32,13 +31,13 @@ type FullNodeClient interface {
 
 var _ FullNodeClient = &fullnode.Client{}
 
-func CreateHttpClientWithTimeout(timeout time.Duration, insecureSkipVerify bool) *http.Client {
+func CreateHttpClientWithTimeout(timeout time.Duration) *http.Client {
 	// Create custom HTTP client with timeout
 	return &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecureSkipVerify,
+				InsecureSkipVerify: false,
 			},
 		},
 	}
@@ -49,29 +48,9 @@ func CreateFullNodeClient(httpUrl *url.URL) (FullNodeClient, error) {
 }
 
 func CreateFullNodeClientWithTimeout(httpUrl *url.URL, timeout time.Duration) (FullNodeClient, error) {
-	httpClient := CreateHttpClientWithTimeout(timeout, hasInsecureFlag(httpUrl))
+	httpClient := CreateHttpClientWithTimeout(timeout)
 
 	// Create the client
-	client := fullnode.NewClient(cleanUrlString(httpUrl), httpClient)
+	client := fullnode.NewClient(httpUrl.String(), httpClient)
 	return client, nil
-}
-
-func hasInsecureFlag(u *url.URL) bool {
-	values := u.Query()
-	insecureValues, ok := values["insecure"]
-	if !ok || len(insecureValues) == 0 {
-		return false
-	}
-	insecureValue := strings.ToLower(insecureValues[0])
-	return insecureValue == "true" || insecureValue == "1"
-}
-
-// removes query params
-func cleanUrlString(u *url.URL) string {
-	cleanUrl := &url.URL{
-		Scheme: u.Scheme,
-		Host:   u.Host,
-		Path:   u.Path,
-	}
-	return cleanUrl.String()
 }

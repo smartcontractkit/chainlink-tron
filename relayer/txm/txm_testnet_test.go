@@ -29,7 +29,7 @@ func TestTxmNile(t *testing.T) {
 func runTestnetTest(t *testing.T, fullnodeUrl string) {
 	logger := logger.Test(t)
 
-	fullnodeClient := fullnode.NewClient(fullnodeUrl, sdk.CreateHttpClientWithTimeout(15*time.Second, false))
+	fullnodeClient := fullnode.NewClient(fullnodeUrl, sdk.CreateHttpClientWithTimeout(15*time.Second))
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {

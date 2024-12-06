@@ -53,7 +53,7 @@ func TestTxmLocal(t *testing.T) {
 	ipAddress := testutils.GetTronNodeIpAddress()
 	rpcAddress := "http://" + ipAddress + ":" + testutils.FullNodePort + "/wallet"
 
-	fullnodeClient := fullnode.NewClient(rpcAddress, sdk.CreateHttpClientWithTimeout(15*time.Second, false))
+	fullnodeClient := fullnode.NewClient(rpcAddress, sdk.CreateHttpClientWithTimeout(15*time.Second))
 
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
