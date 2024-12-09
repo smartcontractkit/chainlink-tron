@@ -65,12 +65,21 @@ func TestTxm(t *testing.T) {
 	fullNodeClient.On("GetEnergyPrices").Maybe().Return(&fullnode.EnergyPrices{Prices: "0:420"}, nil)
 	txid, err := hex.DecodeString("2a037789237971c1c1d648f7b90b70c68a9aa6b0a2892f947213286346d0210d")
 	require.NoError(t, err)
+
+	fullNodeClient.On("GetNowBlock").Maybe().Return(&soliditynode.Block{
+		BlockHeader: &soliditynode.BlockHeader{
+			RawData: &soliditynode.BlockHeaderRaw{
+				Timestamp: 1000,
+			},
+		},
+	}, nil)
+
 	fullNodeClient.On("TriggerSmartContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&fullnode.TriggerSmartContractResponse{
 		Transaction: &common.Transaction{
 			TxID: hex.EncodeToString(txid),
 			RawData: common.RawData{
 				Timestamp:    123,
-				Expiration:   456,
+				Expiration:   2000,
 				RefBlockHash: "abc",
 				FeeLimit:     789,
 			},

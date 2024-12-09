@@ -140,7 +140,7 @@ func (t *TronTxm) broadcastLoop() {
 			txHash := coreTx.TxID
 
 			// RefBlockNum is optional and does not seem in use anymore.
-			t.Logger.Debugw("created transaction", "txHash", txHash, "timestamp", coreTx.RawData.Timestamp, "expiration", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
+			t.Logger.Debugw("created transaction", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
 
 			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
 			if err != nil {
@@ -148,10 +148,10 @@ func (t *TronTxm) broadcastLoop() {
 				continue
 			}
 
-			t.Logger.Infow("transaction broadcasted", "txHash", txHash)
+			t.Logger.Infow("transaction broadcasted", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
 
 			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
-			txStore.AddUnconfirmed(txHash, time.Now().Unix(), tx)
+			txStore.AddUnconfirmed(txHash, coreTx.RawData.Expiration, tx)
 
 		case <-t.Stop:
 			t.Logger.Debugw("broadcastLoop: stopped")
@@ -284,18 +284,27 @@ func (t *TronTxm) confirmLoop() {
 func (t *TronTxm) checkUnconfirmed() {
 	allUnconfirmedTxs := t.AccountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
+		nowBlock, err := t.GetClient().GetNowBlock()
+		if err != nil {
+			t.Logger.Errorw("could not get latest block", "error", err)
+			continue
+		}
+		if nowBlock.BlockHeader == nil || nowBlock.BlockHeader.RawData == nil {
+			t.Logger.Errorw("could not read latest block header")
+			continue
+		}
+		timestampMs := nowBlock.BlockHeader.RawData.Timestamp
 		for _, unconfirmedTx := range unconfirmedTxs {
 			txInfo, err := t.GetClient().GetTransactionInfoById(unconfirmedTx.Hash)
 			if err != nil {
-				// the default transaction expiration time is 60 seconds - if we still can't find the hash,
-				// rebroadcast since the transaction has expired.
-				if (time.Now().Unix() - unconfirmedTx.Timestamp) > 150 {
+				// if the transaction has expired and we still can't find the hash, rebroadcast.
+				if unconfirmedTx.ExpirationMs < timestampMs {
 					err = t.AccountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
 					if err != nil {
 						t.Logger.Errorw("could not confirm expired transaction locally", "error", err)
 						continue
 					}
-					t.Logger.Debugw("transaction missing after expiry", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash)
+					t.Logger.Debugw("transaction missing after expiry", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "timestampMs", timestampMs, "expirationMs", unconfirmedTx.ExpirationMs)
 					t.maybeRetry(unconfirmedTx, false, false)
 				}
 				continue
@@ -309,19 +318,19 @@ func (t *TronTxm) checkUnconfirmed() {
 			contractResult := receipt.Result
 			switch contractResult {
 			case soliditynode.TransactionResultOutOfEnergy:
-				t.Logger.Debugw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Errorw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, true, false)
 				continue
 			case soliditynode.TransactionResultOutOfTime:
-				t.Logger.Debugw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Errorw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, true)
 				continue
 			case soliditynode.TransactionResultUnknown:
-				t.Logger.Debugw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
+				t.Logger.Errorw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
 				t.maybeRetry(unconfirmedTx, false, false)
 				continue
 			}
-			t.Logger.Debugw("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
+			t.Logger.Infow("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
 		}
 	}
 }
@@ -329,11 +338,11 @@ func (t *TronTxm) checkUnconfirmed() {
 func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOutOfTimeError bool) {
 	tx := unconfirmedTx.Tx
 	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
-		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash)
+		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
 		return
 	}
 	if tx.OutOfTimeErrors >= 2 {
-		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash)
+		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
 		return
 	}
 
@@ -345,7 +354,7 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 		tx.OutOfTimeErrors += 1
 	}
 
-	t.Logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt)
+	t.Logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
 
 	select {
 	case t.BroadcastChan <- tx:

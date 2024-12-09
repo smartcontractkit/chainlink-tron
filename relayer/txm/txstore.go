@@ -9,9 +9,9 @@ import (
 )
 
 type UnconfirmedTx struct {
-	Hash      string
-	Timestamp int64
-	Tx        *TronTx
+	Hash         string
+	ExpirationMs int64
+	Tx           *TronTx
 }
 
 // TxStore tracks broadcast & unconfirmed txs per account address per chain id
@@ -27,7 +27,7 @@ func NewTxStore() *TxStore {
 	}
 }
 
-func (s *TxStore) AddUnconfirmed(hash string, timestamp int64, tx *TronTx) error {
+func (s *TxStore) AddUnconfirmed(hash string, expirationMs int64, tx *TronTx) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -36,9 +36,9 @@ func (s *TxStore) AddUnconfirmed(hash string, timestamp int64, tx *TronTx) error
 	}
 
 	s.unconfirmedTxes[hash] = &UnconfirmedTx{
-		Hash:      hash,
-		Timestamp: timestamp,
-		Tx:        tx,
+		Hash:         hash,
+		ExpirationMs: expirationMs,
+		Tx:           tx,
 	}
 
 	return nil
@@ -64,7 +64,7 @@ func (s *TxStore) GetUnconfirmed() []*UnconfirmedTx {
 	sort.Slice(unconfirmed, func(i, j int) bool {
 		a := unconfirmed[i]
 		b := unconfirmed[j]
-		return a.Timestamp < b.Timestamp
+		return a.ExpirationMs < b.ExpirationMs
 	})
 
 	return unconfirmed
