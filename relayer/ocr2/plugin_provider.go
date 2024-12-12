@@ -61,7 +61,7 @@ func (p *pluginProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker 
 	return p.configProvider.ContractConfigTracker()
 }
 
-func (p *pluginProvider) ChainReader() types.ContractReader {
+func (p *pluginProvider) ContractReader() types.ContractReader {
 	return p.chainReader
 }
 

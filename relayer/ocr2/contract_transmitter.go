@@ -95,7 +95,7 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
 }
 
 // FromAccount returns the account from which the transmitter invokes the contract
-func (oc *contractTransmitter) FromAccount() (ocrtypes.Account, error) {
+func (oc *contractTransmitter) FromAccount(ctx context.Context) (ocrtypes.Account, error) {
 	return ocrtypes.Account(oc.senderAddress.String()), nil
 }
 

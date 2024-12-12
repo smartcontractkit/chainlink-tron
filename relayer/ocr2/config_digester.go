@@ -1,6 +1,7 @@
 package ocr2
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"strings"
@@ -65,7 +66,7 @@ func NewOffchainConfigDigester(lggr logger.Logger, chainID *big.Int, contractAdd
 	}, nil
 }
 
-func (d *TRONOffchainConfigDigester) ConfigDigest(cc types.ContractConfig) (types.ConfigDigest, error) {
+func (d *TRONOffchainConfigDigester) ConfigDigest(ctx context.Context, cc types.ContractConfig) (types.ConfigDigest, error) {
 	signers := []ethcommon.Address{}
 	for i, signer := range cc.Signers {
 		if len(signer) != ethcommon.AddressLength {
@@ -109,7 +110,7 @@ func (d *TRONOffchainConfigDigester) ConfigDigest(cc types.ContractConfig) (type
 	return calculatedDigest, nil
 }
 
-func (d *TRONOffchainConfigDigester) ConfigDigestPrefix() (types.ConfigDigestPrefix, error) {
+func (d *TRONOffchainConfigDigester) ConfigDigestPrefix(ctx context.Context) (types.ConfigDigestPrefix, error) {
 	return types.ConfigDigestPrefixEVM, nil
 }
 
