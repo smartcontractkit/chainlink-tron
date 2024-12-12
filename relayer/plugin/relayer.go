@@ -175,8 +175,12 @@ func nodeStatus(n *NodeConfig, id string) (types.NodeStatus, error) {
 }
 
 // Relayer interface
+func (t *TronRelayer) NewContractWriter(_ context.Context, _ []byte) (types.ContractWriter, error) {
+	return nil, errors.New("not supported")
+}
+
 func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfig []byte) (types.ContractReader, error) {
-	return nil, errors.New("TODO")
+	return nil, errors.New("not supported")
 }
 
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
@@ -228,4 +232,8 @@ func (t *TronRelayer) NewMedianProvider(ctx context.Context, relayargs types.Rel
 	medianProvider := ocr2.NewMedianProvider(ctx, t.cfg, medianContract, configProvider, contractAddress, senderAddress, t.txm, t.lggr)
 
 	return medianProvider, nil
+}
+
+func (t *TronRelayer) LatestHead(ctx context.Context) (types.Head, error) {
+	return types.Head{}, errors.New("TODO")
 }

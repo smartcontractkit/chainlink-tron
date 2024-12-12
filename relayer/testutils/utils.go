@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 )
 
 // this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
@@ -43,7 +43,10 @@ func CreateKey(rand io.Reader) *TestKey {
 }
 
 func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *TestKey {
-	id := uuid.NewRandom()
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
 	key := &TestKey{
 		ID:         id,
 		Address:    address.PubkeyToAddress(privateKeyECDSA.PublicKey),
