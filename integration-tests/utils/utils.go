@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -194,7 +195,7 @@ func GenerateOCR2Report() (hexReport string, medianObservation string, err error
 	medianHex := fmt.Sprintf("0x%x", median)
 
 	reportCodec := evmreportcodec.ReportCodec{}
-	report, err := reportCodec.BuildReport(paos)
+	report, err := reportCodec.BuildReport(context.Background(), paos)
 	if err != nil {
 		return "", "", err
 	}
