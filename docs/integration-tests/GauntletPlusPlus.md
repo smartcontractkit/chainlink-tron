@@ -34,7 +34,7 @@ ChainID = '<id>'
 [[Tron.Nodes]]
 Name = 'primary'
 URL = '<full node http url>'
-SolidityUrl = '<solidity http url>'
+SolidityURL = '<solidity http url>'
 
 [Log]
 Level = 'debug'

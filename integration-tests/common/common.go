@@ -117,7 +117,7 @@ ChainID = '%s'
 [[Tron.Nodes]]
 Name = 'primary'
 URL = '%s'
-SolidityUrl = '%s'
+SolidityURL = '%s'
 
 [Log]
 Level = 'debug'
