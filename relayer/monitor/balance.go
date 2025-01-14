@@ -142,7 +142,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 
 		response, err := reader.GetAccount(addr)
 		if err != nil {
-			b.lggr.Errorw("Failed to get account info", "account", k, "err", err)
+			b.lggr.Warnw("Failed to get account info, account may have no funds", "account", addr.String(), "err", err)
 			continue
 		}
 		sun := response.Balance
