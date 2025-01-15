@@ -5,7 +5,7 @@ set -euo pipefail
 bash "$(dirname -- "$0")/core.down.sh"
 
 container_name="chainlink-tron.core"
-container_version="2.3.0"
+container_version="2.19.0"
 
 # https://github.com/smartcontractkit/chainlink/blob/600365a7a27508d699dbd4b994fafba7dc288659/integration-tests/client/chainlink_k8s.go#L82-L83
 api_email="notreal@fakeemail.ch"
