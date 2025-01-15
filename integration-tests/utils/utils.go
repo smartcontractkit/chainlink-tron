@@ -330,7 +330,10 @@ func setUpTronEnvironment(
 	// and the last 4 bytes is the chain id both when retrieved by eth_chainId and via the `block.chainid` call in the TVM, which
 	// is important for the config digest calculation:
 	// https://github.com/smartcontractkit/libocr/blob/063ceef8c42eeadbe94221e55b8892690d36099a/contract2/OCR2Aggregator.sol#L27
-	chainId := "0x" + blockId[len(blockId)-8:]
+	chainIdHex := blockId[len(blockId)-8:]
+	chainIdInt := new(big.Int)
+	chainIdInt.SetString(chainIdHex, 16)
+	chainId := chainIdInt.String()
 	logger.Info().Str("chain id", chainId).Msg("Read first block")
 
 	commonConfig := testcommon.NewCommon(t, chainId, internalFullNodeUrl, internalSolidityNodeUrl)
