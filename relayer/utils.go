@@ -2,6 +2,7 @@ package relayer
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -25,6 +26,10 @@ func ByteArrayToStr(b [][]byte) string {
 }
 
 func PublicKeyToTronAddress(pubKey string) (address.Address, error) {
+	if pubKey == "" {
+		return nil, fmt.Errorf("public key cannot be empty")
+	}
+
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return nil, err

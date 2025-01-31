@@ -113,6 +113,9 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 		copy(offchainPubKey[:], offchainPubKeyBytes)
 
 		configPubKeyBytes, err := hex.DecodeString(strings.TrimPrefix(key.OCR2Key.Data.Attributes.ConfigPublicKey, "ocr2cfg_tron_"))
+		if err != nil {
+			t.Fatal(err)
+		}
 		if len(configPubKeyBytes) != curve25519.PointSize {
 			t.Fatal(fmt.Sprintf("Invalid config public key length. Expected %d bytes, got %d bytes", curve25519.PointSize, len(configPubKeyBytes)))
 			return

@@ -149,6 +149,9 @@ func (t *TronRelayer) GetChainStatus(ctx context.Context) (types.ChainStatus, er
 }
 
 func (t *TronRelayer) ListNodeStatuses(ctx context.Context, pageSize int32, pageToken string) (stats []types.NodeStatus, nextPageToken string, total int, err error) {
+	if pageSize < 0 {
+		pageSize = 0
+	}
 	return chains.ListNodeStatuses(int(pageSize), pageToken, t.listNodeStatuses)
 }
 

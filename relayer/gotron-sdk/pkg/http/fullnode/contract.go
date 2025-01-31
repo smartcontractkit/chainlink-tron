@@ -35,12 +35,18 @@ type DeployContractResponse struct {
 
 func (tc *Client) DeployContract(ownerAddress address.Address, contractName, abiJson, bytecode string, oeLimit, curPercent, feeLimit int, params []interface{}) (*DeployContractResponse, error) {
 	parsedABI, err := eABI.JSON(bytes.NewReader([]byte(abiJson)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ABI: %w", err)
+	}
 
 	if params == nil {
 		params = []interface{}{}
 	}
 
 	encodedParams, err := parsedABI.Pack("", params...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode params: %w", err)
+	}
 
 	reqBody := DeployContractRequest{
 		OwnerAddress:               ownerAddress.String(),
@@ -55,9 +61,7 @@ func (tc *Client) DeployContract(ownerAddress address.Address, contractName, abi
 	}
 
 	response := DeployContractResponse{}
-
-	err = tc.Post("/deploycontract", reqBody, &response)
-	if err != nil {
+	if err := tc.Post("/deploycontract", reqBody, &response); err != nil {
 		return nil, err
 	}
 
