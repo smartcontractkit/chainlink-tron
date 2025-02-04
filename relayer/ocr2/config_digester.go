@@ -76,19 +76,13 @@ func (d *TRONOffchainConfigDigester) ConfigDigest(ctx context.Context, cc types.
 		signers = append(signers, a)
 	}
 	transmitters := []ethcommon.Address{}
-	// These should be saved as EVM hex addresses on-chain. However we can support both in case of a migration.
+	// These should be saved as EVM hex addresses on-chain, however this logic supports any valid Tron address format in case of a migration.
 	for i, transmitter := range cc.Transmitters {
-		if ethcommon.IsHexAddress(string(transmitter)) {
-			// This is an EVM hex address
-			transmitters = append(transmitters, ethcommon.HexToAddress(string(transmitter)))
-		} else {
-			// This is a TRON base58 address, convert to EVM hex address
-			base58Address, err := address.Base58ToAddress(string(transmitter))
-			if err != nil {
-				return types.ConfigDigest{}, fmt.Errorf("%v-th transmitter should be a TRON base58 address string, but got '%v'", i, transmitter)
-			}
-			transmitters = append(transmitters, base58Address.EthAddress())
+		address, err := address.StringToAddress(string(transmitter))
+		if err != nil {
+			return types.ConfigDigest{}, fmt.Errorf("%v-th transmitter should be a valid Tron address string, but got '%v'", i, transmitter)
 		}
+		transmitters = append(transmitters, address.EthAddress())
 	}
 
 	calculatedDigest, err := d.configDigestFromConfigData(

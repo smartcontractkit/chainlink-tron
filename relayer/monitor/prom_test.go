@@ -14,7 +14,7 @@ func TestBalanceMonitorUpdateProm(t *testing.T) {
 		chainID: "testChainID",
 	}
 
-	testAddr, err := tronaddress.Base58ToAddress("TJRabPrwbZy45sbavfcjinPJC18kjpRTv8")
+	testAddr, err := tronaddress.StringToAddress("TJRabPrwbZy45sbavfcjinPJC18kjpRTv8")
 	require.NoError(t, err, "Failed to create test address")
 
 	testCases := []struct {

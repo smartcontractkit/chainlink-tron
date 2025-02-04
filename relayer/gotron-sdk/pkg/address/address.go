@@ -82,6 +82,27 @@ func EVMAddressToAddress(a eCommon.Address) Address {
 	return Address(append([]byte{TronBytePrefix}, a[:]...))
 }
 
+func StringToAddress(s string) (Address, error) {
+	// if evm address format (0x prefixed hex)
+	if eCommon.IsHexAddress(s) {
+		return EVMAddressToAddress(eCommon.HexToAddress(s)), nil
+	}
+
+	// if hex address format (41 prefixed hex)
+	addr, err := HexToAddress(s)
+	if err == nil {
+		return addr, nil
+	}
+
+	// if base58 address format
+	addr, err = Base58ToAddress(s)
+	if err == nil {
+		return addr, nil
+	}
+
+	return nil, fmt.Errorf("invalid address format: %s", s)
+}
+
 // String implements fmt.Stringer.
 func (a Address) String() string {
 	if len(a) == 0 {

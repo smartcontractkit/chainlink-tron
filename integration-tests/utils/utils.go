@@ -210,9 +210,9 @@ func FunctionSignatureHash(functionSignature string) string {
 	return "0x" + hex.EncodeToString(hash)
 }
 
-// Converts a Tron base58 encoded address to an Ethereum address.
+// Converts a Tron address to an Ethereum address.
 func MustConvertToEthAddress(t *testing.T, tronAddress string) common.Address {
-	tronHexAddress, err := address.Base58ToAddress(tronAddress)
+	tronHexAddress, err := address.StringToAddress(tronAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func MustMarshalParams(t *testing.T, params ...any) string {
 }
 
 func MustConvertAddress(t *testing.T, tronAddress string) address.Address {
-	a, err := address.Base58ToAddress(tronAddress)
+	a, err := address.StringToAddress(tronAddress)
 	if err != nil {
 		t.Fatal(err)
 	}

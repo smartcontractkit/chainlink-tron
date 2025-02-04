@@ -43,3 +43,29 @@ func TestAddress_Scan(t *testing.T) {
 		t.Errorf("expected an error, but got none")
 	}
 }
+
+func TestStringToAddress(t *testing.T) {
+	// valid base58
+	_, err := StringToAddress("TSvT6Bg3siokv3dbdtt9o4oM1CTXmymGn1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// valid hex
+	_, err = StringToAddress("41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3b3b3")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// valid evm address
+	_, err = StringToAddress("0x41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3b3")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// invalid address
+	_, err = StringToAddress("invalid address")
+	if err == nil {
+		t.Errorf("expected an error, but got none")
+	}
+}

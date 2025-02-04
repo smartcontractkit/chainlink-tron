@@ -204,9 +204,9 @@ func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfi
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
 	// todo: unmarshal args.RelayConfig into a struct if required
 	reader := reader.NewReader(t.client, t.lggr)
-	contractAddress, err := address.Base58ToAddress(args.ContractID)
+	contractAddress, err := address.StringToAddress(args.ContractID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", args.ContractID, err)
+		return nil, fmt.Errorf("couldn't parse contract id %s as Tron address: %w", args.ContractID, err)
 	}
 
 	configProvider, err := ocr2.NewConfigProvider(t.chainIdNum, contractAddress, reader, t.cfg, t.lggr)
@@ -233,17 +233,17 @@ func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.Plu
 func (t *TronRelayer) NewMedianProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.MedianProvider, error) {
 	// todo: unmarshal args.RelayConfig if required
 	reader := reader.NewReader(t.client, t.lggr)
-	contractAddress, err := address.Base58ToAddress(relayargs.ContractID)
+	contractAddress, err := address.StringToAddress(relayargs.ContractID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse contract id %s as base58 Tron address: %w", relayargs.ContractID, err)
+		return nil, fmt.Errorf("couldn't parse contract id %s as Tron address: %w", relayargs.ContractID, err)
 	}
 	configProvider, err := ocr2.NewConfigProvider(t.chainIdNum, contractAddress, reader, t.cfg, t.lggr)
 	if err != nil {
 		return nil, fmt.Errorf("coudln't initialize ConfigProvider: %w", err)
 	}
-	senderAddress, err := address.Base58ToAddress(pluginargs.TransmitterID)
+	senderAddress, err := address.StringToAddress(pluginargs.TransmitterID)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse transmitter id %s as base58 Tron address: %w", pluginargs.TransmitterID, err)
+		return nil, fmt.Errorf("couldn't parse transmitter id %s as Tron address: %w", pluginargs.TransmitterID, err)
 	}
 	ocr2Reader := ocr2.NewOCR2Reader(reader, t.lggr)
 	medianContract := ocr2.NewContractReader(contractAddress, ocr2Reader, t.lggr)

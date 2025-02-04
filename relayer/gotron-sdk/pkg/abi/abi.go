@@ -45,7 +45,7 @@ func Signature(method string) []byte {
 func convertToAddress(v interface{}) (eCommon.Address, error) {
 	switch v.(type) {
 	case string:
-		addr, err := address.Base58ToAddress(v.(string))
+		addr, err := address.StringToAddress(v.(string))
 		if err != nil {
 			return eCommon.Address{}, fmt.Errorf("invalid address %s: %+v", v.(string), err)
 		}
@@ -128,7 +128,7 @@ func GetPaddedParam(params []any) ([]byte, error) {
 					// Handle base58 addresses
 					updatedAddresses := []eCommon.Address{}
 					for _, addressStr := range addressStrSlice {
-						a, err := address.Base58ToAddress(addressStr)
+						a, err := address.StringToAddress(addressStr)
 						if err != nil {
 							break
 						}

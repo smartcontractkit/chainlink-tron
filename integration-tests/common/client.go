@@ -64,7 +64,7 @@ func NewChainlinkClient(env *environment.Environment, nodeName string, chainId s
 func (cc *ChainlinkClient) GetNodeAddresses() []address.Address {
 	var addresses []address.Address
 	for _, nodeKey := range cc.NodeKeys {
-		nodeAddress, err := address.Base58ToAddress(nodeKey.TXKey.Data.ID)
+		nodeAddress, err := address.StringToAddress(nodeKey.TXKey.Data.ID)
 		if err != nil {
 			panic(err)
 		}
@@ -125,7 +125,7 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 		copy(configPubKey[:], configPubKeyBytes)
 
 		// Convert TRON base58 transmitter address to hex format in tests for computing the offchain config hash
-		transmitterAddress, err := address.Base58ToAddress(key.TXKey.Data.ID)
+		transmitterAddress, err := address.StringToAddress(key.TXKey.Data.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
