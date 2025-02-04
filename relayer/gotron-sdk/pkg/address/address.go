@@ -88,16 +88,14 @@ func StringToAddress(s string) (Address, error) {
 		return EVMAddressToAddress(eCommon.HexToAddress(s)), nil
 	}
 
-	// if hex address format (41 prefixed hex)
-	addr, err := HexToAddress(s)
-	if err == nil {
-		return addr, nil
+	// if hex address format (41 prefixed hex, 21 bytes)
+	if len(s) == AddressLength*2 && s[:2] == "41" {
+		return HexToAddress(s)
 	}
 
-	// if base58 address format
-	addr, err = Base58ToAddress(s)
-	if err == nil {
-		return addr, nil
+	// if base58 address format (T prefixed)
+	if len(s) == AddressLengthBase58 && s[0] == 'T' {
+		return Base58ToAddress(s)
 	}
 
 	return nil, fmt.Errorf("invalid address format: %s", s)

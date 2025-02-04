@@ -149,7 +149,7 @@ func runOCR2Test(
 		txHash := testutils.SignAndDeployContract(t, combinedClient, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
 		// use full node client for quicker feedback
 		txInfo := testutils.WaitForTransactionInfo(t, combinedClient.Client, txHash, txnWaitTime)
-		contractAddress, err := address.HexToAddress(txInfo.ContractAddress)
+		contractAddress, err := address.StringToAddress(txInfo.ContractAddress)
 		require.NoError(t, err)
 		contractDeployed := testutils.CheckContractDeployed(t, combinedClient.Client, contractAddress)
 		require.True(t, contractDeployed, "Contract not deployed")

@@ -3,6 +3,8 @@ package address
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAddress_Scan(t *testing.T) {
@@ -46,26 +48,21 @@ func TestAddress_Scan(t *testing.T) {
 
 func TestStringToAddress(t *testing.T) {
 	// valid base58
-	_, err := StringToAddress("TSvT6Bg3siokv3dbdtt9o4oM1CTXmymGn1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	a, err := StringToAddress("T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb")
+	assert.NoError(t, err)
+	assert.Equal(t, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb", a.String())
 
 	// valid hex
-	_, err = StringToAddress("41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3b3b3")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	a, err = StringToAddress("410000000000000000000000000000000000000000")
+	assert.NoError(t, err)
+	assert.Equal(t, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb", a.String())
 
 	// valid evm address
-	_, err = StringToAddress("0x41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3b3")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	a, err = StringToAddress("0x0000000000000000000000000000000000000000")
+	assert.NoError(t, err)
+	assert.Equal(t, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb", a.String())
 
 	// invalid address
-	_, err = StringToAddress("invalid address")
-	if err == nil {
-		t.Errorf("expected an error, but got none")
-	}
+	_, err = StringToAddress("0x41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3")
+	assert.Error(t, err)
 }
