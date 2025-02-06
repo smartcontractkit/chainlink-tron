@@ -9,25 +9,36 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 )
 
-var _ FullNodeClient = &CombinedClient{}
+//go:generate mockery --name CombinedClient --output ../mocks/
+type CombinedClient interface {
+	FullNodeClient
+	TriggerConstantContractFullNode(from, contractAddress address.Address, method string, params []any) (*soliditynode.TriggerConstantContractResponse, error)
+	GetNowBlockFullNode() (*soliditynode.Block, error)
+	GetBlockByNumFullNode(num int32) (*soliditynode.Block, error)
+	GetAccountFullNode(accountAddress address.Address) (*soliditynode.GetAccountResponse, error)
+	GetTransactionInfoByIdFullNode(txhash string) (*soliditynode.TransactionInfo, error)
 
-type CombinedClient struct {
-	*fullnode.Client
-	SolidityClient *soliditynode.Client
+	FullNodeClient() *fullnode.Client
+	SolidityClient() *soliditynode.Client
 }
 
-func NewCombinedClient(fullnodeClient *fullnode.Client, solidityClient *soliditynode.Client) *CombinedClient {
-	return &CombinedClient{
+type combinedClient struct {
+	*fullnode.Client
+	solidityClient *soliditynode.Client
+}
+
+func NewCombinedClient(fullnodeClient *fullnode.Client, solidityClient *soliditynode.Client) CombinedClient {
+	return &combinedClient{
 		Client:         fullnodeClient,
-		SolidityClient: solidityClient,
+		solidityClient: solidityClient,
 	}
 }
 
-func CreateCombinedClient(fullnodeUrl, soliditynodeUrl *url.URL) (*CombinedClient, error) {
+func CreateCombinedClient(fullnodeUrl, soliditynodeUrl *url.URL) (CombinedClient, error) {
 	return CreateCombinedClientWithTimeout(fullnodeUrl, soliditynodeUrl, 15*time.Second)
 }
 
-func CreateCombinedClientWithTimeout(fullnodeUrl, soliditynodeUrl *url.URL, timeout time.Duration) (*CombinedClient, error) {
+func CreateCombinedClientWithTimeout(fullnodeUrl, soliditynodeUrl *url.URL, timeout time.Duration) (CombinedClient, error) {
 	httpClient := CreateHttpClientWithTimeout(timeout)
 	fullnodeClient := fullnode.NewClient(fullnodeUrl.String(), httpClient)
 	soliditynodeClient := soliditynode.NewClient(soliditynodeUrl.String(), httpClient)
@@ -35,29 +46,63 @@ func CreateCombinedClientWithTimeout(fullnodeUrl, soliditynodeUrl *url.URL, time
 	return NewCombinedClient(fullnodeClient, soliditynodeClient), nil
 }
 
+func (g *combinedClient) FullNodeClient() *fullnode.Client {
+	return g.Client
+}
+
+func (g *combinedClient) SolidityClient() *soliditynode.Client {
+	return g.solidityClient
+}
+
 // We manually override methods that we want to use the solidity client for (all read methods).
+// We also provide the fullnode versions of these methods for flexibility
 
-// GetAccount from BASE58 address
-func (g *CombinedClient) GetAccount(accountAddress address.Address) (*soliditynode.GetAccountResponse, error) {
-	return g.SolidityClient.GetAccount(accountAddress)
+// GetAccount from BASE58 address using solidity client
+func (g *combinedClient) GetAccount(accountAddress address.Address) (*soliditynode.GetAccountResponse, error) {
+	return g.solidityClient.GetAccount(accountAddress)
 }
 
-// GetTransactionInfoByID returns transaction receipt by ID
-func (g *CombinedClient) GetTransactionInfoById(txhash string) (*soliditynode.TransactionInfo, error) {
-	return g.SolidityClient.GetTransactionInfoById(txhash)
+// GetAccount from BASE58 address using fullnode client
+func (g *combinedClient) GetAccountFullNode(accountAddress address.Address) (*soliditynode.GetAccountResponse, error) {
+	return g.Client.GetAccount(accountAddress)
 }
 
-// TriggerConstantContract and return tx result
-func (g *CombinedClient) TriggerConstantContract(from, contractAddress address.Address, method string, params []any) (*soliditynode.TriggerConstantContractResponse, error) {
-	return g.SolidityClient.TriggerConstantContract(from, contractAddress, method, params)
+// GetTransactionInfoByID returns transaction receipt by ID using solidity client
+func (g *combinedClient) GetTransactionInfoById(txhash string) (*soliditynode.TransactionInfo, error) {
+	return g.solidityClient.GetTransactionInfoById(txhash)
 }
 
-// GetNowBlock return TIP block
-func (g *CombinedClient) GetNowBlock() (*soliditynode.Block, error) {
-	return g.SolidityClient.GetNowBlock()
+// GetTransactionInfoByID returns transaction receipt by ID using fullnode client
+func (g *combinedClient) GetTransactionInfoByIdFullNode(txhash string) (*soliditynode.TransactionInfo, error) {
+	return g.Client.GetTransactionInfoById(txhash)
 }
 
-// GetBlockByNum block from number
-func (g *CombinedClient) GetBlockByNum(num int32) (*soliditynode.Block, error) {
-	return g.SolidityClient.GetBlockByNum(num)
+// TriggerConstantContract and return tx result using solidity client
+func (g *combinedClient) TriggerConstantContract(from, contractAddress address.Address, method string, params []any) (*soliditynode.TriggerConstantContractResponse, error) {
+	return g.solidityClient.TriggerConstantContract(from, contractAddress, method, params)
+}
+
+// TriggerConstantContract and return tx result using solidity client
+func (g *combinedClient) TriggerConstantContractFullNode(from, contractAddress address.Address, method string, params []any) (*soliditynode.TriggerConstantContractResponse, error) {
+	return g.Client.TriggerConstantContract(from, contractAddress, method, params)
+}
+
+// GetNowBlock return TIP block using solidity client
+func (g *combinedClient) GetNowBlock() (*soliditynode.Block, error) {
+	return g.solidityClient.GetNowBlock()
+}
+
+// GetNowBlock return TIP block using fullnode client
+func (g *combinedClient) GetNowBlockFullNode() (*soliditynode.Block, error) {
+	return g.Client.GetNowBlock()
+}
+
+// GetBlockByNum block from number using solidity client
+func (g *combinedClient) GetBlockByNum(num int32) (*soliditynode.Block, error) {
+	return g.solidityClient.GetBlockByNum(num)
+}
+
+// GetBlockByNum block from number using fullnode client
+func (g *combinedClient) GetBlockByNumFullNode(num int32) (*soliditynode.Block, error) {
+	return g.Client.GetBlockByNum(num)
 }

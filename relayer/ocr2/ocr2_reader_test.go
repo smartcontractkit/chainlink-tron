@@ -29,13 +29,13 @@ import (
 func TestOCR2Reader(t *testing.T) {
 	testLogger, _ := logger.TestObserved(t, zapcore.DebugLevel)
 
-	fullNodeClient := mocks.NewFullNodeClient(t)
+	combinedClient := mocks.NewCombinedClient(t)
 	ocr2AggregatorAbi, err := common.LoadJSONABI(testutils.TRON_OCR2_AGGREGATOR_ABI)
 	require.NoError(t, err)
 
-	fullNodeClient.On("GetContract", mock.Anything).Maybe().Return(&fullnode.GetContractResponse{ABI: ocr2AggregatorAbi}, nil)
+	combinedClient.On("GetContract", mock.Anything).Maybe().Return(&fullnode.GetContractResponse{ABI: ocr2AggregatorAbi}, nil)
 
-	readerClient := reader.NewReader(fullNodeClient, testLogger)
+	readerClient := reader.NewReader(combinedClient, testLogger)
 	ocr2Reader := ocr2.NewOCR2Reader(readerClient, testLogger)
 
 	t.Run("LatestConfigDetails", func(t *testing.T) {
@@ -51,8 +51,8 @@ func TestOCR2Reader(t *testing.T) {
 			"bytes32", configDigest,
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			ConstantResult: []string{hex.EncodeToString(constContractRes)},
 		}, nil)
@@ -80,8 +80,8 @@ func TestOCR2Reader(t *testing.T) {
 			"uint64", strconv.FormatUint(uint64(latestTimestamp), 10), // latestTimestamp
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
+		combinedClient.On("TriggerConstantContractFullNode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		combinedClient.On("TriggerConstantContractFullNode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			ConstantResult: []string{hex.EncodeToString(constContractRes)},
 		}, nil)
@@ -109,8 +109,8 @@ func TestOCR2Reader(t *testing.T) {
 			"uint80", strconv.FormatUint(uint64(answeredInRound), 10),
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			ConstantResult: []string{hex.EncodeToString(constContractRes)},
 		}, nil)
@@ -129,8 +129,8 @@ func TestOCR2Reader(t *testing.T) {
 			"int256", availableBalance,
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			ConstantResult: []string{hex.EncodeToString(constContractRes)},
 		}, nil)
@@ -154,8 +154,8 @@ func TestOCR2Reader(t *testing.T) {
 			"uint32", strconv.FormatUint(uint64(accountingGas), 10),
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
-		fullNodeClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Unset()
+		combinedClient.On("TriggerConstantContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.TriggerConstantContractResponse{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			ConstantResult: []string{hex.EncodeToString(constContractRes)},
 		}, nil)
@@ -194,7 +194,7 @@ func TestOCR2Reader(t *testing.T) {
 		require.NoError(t, err)
 		contractAddress := []byte{0, 1, 2, 3}
 		anyParam := common.Parameter{TypeUrl: "type.googleapis.com/protocol.TriggerSmartContract", Value: common.ParameterValue{ContractAddress: hex.EncodeToString(contractAddress)}}
-		fullNodeClient.On("GetBlockByNum", mock.Anything).Return(&soliditynode.Block{
+		combinedClient.On("GetBlockByNum", mock.Anything).Return(&soliditynode.Block{
 			BlockHeader: &soliditynode.BlockHeader{
 				RawData: &soliditynode.BlockHeaderRaw{
 					Number: 12345,
@@ -208,7 +208,7 @@ func TestOCR2Reader(t *testing.T) {
 				}},
 			},
 		}, nil)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Log: []soliditynode.Log{
 				{
 					Topics: []string{relayer.GetEventTopicHash("ConfigSet(uint32,bytes32,uint64,address[],address[],uint8,bytes,uint64,bytes)")},

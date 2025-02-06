@@ -33,7 +33,7 @@ type TronRelayer struct {
 	cfg  *TOMLConfig
 	lggr logger.Logger
 
-	client         sdk.FullNodeClient
+	client         sdk.CombinedClient
 	txm            *txm.TronTxm
 	balanceMonitor services.Service
 }
@@ -85,7 +85,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 	})
 
-	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, client.SolidityClient)
+	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, client.SolidityClient())
 
 	return &TronRelayer{
 		chainId:        id,

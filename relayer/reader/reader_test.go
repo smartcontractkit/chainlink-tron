@@ -97,13 +97,13 @@ var mockBlock = &soliditynode.Block{
 func TestReader(t *testing.T) {
 	// setup
 	testLogger, _ := logger.TestObserved(t, zapcore.DebugLevel)
-	fullNodeClient := mocks.NewFullNodeClient(t)
+	combinedClient := mocks.NewCombinedClient(t)
 
 	t.Run("LatestBlockHeight", func(t *testing.T) {
-		fullNodeClient.On(
+		combinedClient.On(
 			"GetNowBlock",
 		).Return(mockBlock, nil).Once()
-		reader := reader.NewReader(fullNodeClient, testLogger)
+		reader := reader.NewReader(combinedClient, testLogger)
 
 		blockHeight, err := reader.LatestBlockHeight()
 		require.NoError(t, err)
@@ -111,20 +111,20 @@ func TestReader(t *testing.T) {
 	})
 
 	t.Run("CallContract_NoParams", func(t *testing.T) {
-		fullNodeClient.On(
+		combinedClient.On(
 			"GetContract",
 			mock.Anything, // address
 		).Return(&fullnode.GetContractResponse{
 			ABI: mockAbi,
 		}, nil).Once()
-		fullNodeClient.On(
+		combinedClient.On(
 			"TriggerConstantContract",
 			mock.Anything, // from
 			mock.Anything, // contract
 			mock.Anything, // method
 			mock.Anything, // params
 		).Return(mockConstantContractResponse, nil).Once()
-		reader := reader.NewReader(fullNodeClient, testLogger)
+		reader := reader.NewReader(combinedClient, testLogger)
 
 		res, err := reader.CallContract(address.ZeroAddress, "foo", nil)
 		require.NoError(t, err)
@@ -133,20 +133,20 @@ func TestReader(t *testing.T) {
 	})
 
 	t.Run("CallContract_CachesABI", func(t *testing.T) {
-		fullNodeClient.On(
+		combinedClient.On(
 			"GetContract",
 			mock.Anything, // address
 		).Return(&fullnode.GetContractResponse{
 			ABI: mockAbi,
 		}, nil).Once()
-		fullNodeClient.On(
+		combinedClient.On(
 			"TriggerConstantContract",
 			mock.Anything, // from
 			mock.Anything, // contract
 			mock.Anything, // method
 			mock.Anything, // params
 		).Return(mockConstantContractResponse, nil).Twice()
-		reader := reader.NewReader(fullNodeClient, testLogger)
+		reader := reader.NewReader(combinedClient, testLogger)
 
 		_, err := reader.CallContract(address.ZeroAddress, "foo", nil)
 		require.NoError(t, err)
@@ -174,13 +174,13 @@ func TestReader(t *testing.T) {
 				},
 			},
 		})
-		fullNodeClient.On(
+		combinedClient.On(
 			"GetContract",
 			mock.Anything, // address
 		).Return(&fullnode.GetContractResponse{
 			ABI: mockAbi,
 		}, nil).Once()
-		fullNodeClient.On(
+		combinedClient.On(
 			"GetBlockByNum",
 			mock.Anything, // blockNum
 		).Return(mockBlock, nil).Once()
@@ -190,7 +190,7 @@ func TestReader(t *testing.T) {
 			"uint32", "789",
 		})
 		require.NoError(t, err)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Log: []soliditynode.Log{
 				{
 					Topics: []string{relayer.GetEventTopicHash("event(uint64,uint64,uint32)")},
@@ -198,7 +198,7 @@ func TestReader(t *testing.T) {
 				},
 			},
 		}, nil)
-		reader := reader.NewReader(fullNodeClient, testLogger)
+		reader := reader.NewReader(combinedClient, testLogger)
 
 		events, err := reader.GetEventsFromBlock(mockContractAddress, "event", 1)
 		require.NoError(t, err)

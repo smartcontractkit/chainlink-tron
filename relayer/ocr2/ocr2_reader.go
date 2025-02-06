@@ -88,7 +88,9 @@ func (c *OCR2ReaderClient) LatestConfigDetails(ctx context.Context, address tron
 }
 
 func (c *OCR2ReaderClient) LatestTransmissionDetails(ctx context.Context, address tronaddress.Address) (td TransmissionDetails, err error) {
-	res, err := c.r.CallContract(address, "latestTransmissionDetails", nil)
+	// we explicitly use the full node rather than solidity node (default) to get the latest transmission details
+	// this speeds up the transmission confirmations for ocr2 rounds rather than waiting for transaction finalization which can take up to 1 minute
+	res, err := c.r.CallContractFullNode(address, "latestTransmissionDetails", nil)
 	if err != nil {
 		return td, fmt.Errorf("couldn't call the contract: %w", err)
 	}

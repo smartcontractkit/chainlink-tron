@@ -250,7 +250,7 @@ func MustConvertAddress(t *testing.T, tronAddress string) address.Address {
 }
 
 // SetupLocalStack sets up chainlink node, client, gRPC client and config for the local tests
-func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (*sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string) (sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
 	fullNodeUrl := os.Getenv("FULL_NODE_URL")
 	if fullNodeUrl == "" {
 		fullNodeUrl = fmt.Sprintf("http://%s:%s/wallet", testutils.GetTronNodeIpAddress(), testutils.FullNodePort)
@@ -285,7 +285,7 @@ func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testc
 }
 
 // SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
-func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient *sdk.CombinedClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
+func SetupTestnetStack(t *testing.T, logger zerolog.Logger, pubAddress, network string) (grpcClient sdk.CombinedClient, chainlinkClient *testcommon.ChainlinkClient, commonConfig *testcommon.Common) {
 	var fullNodeUrl, solidityNodeUrl string
 	switch network {
 	case testutils.Shasta:
@@ -310,7 +310,7 @@ func setUpTronEnvironment(
 	t *testing.T, logger zerolog.Logger, fullNodeUrl,
 	solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl,
 	genesisAddress string,
-) (*sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
+) (sdk.CombinedClient, *testcommon.ChainlinkClient, *testcommon.Common) {
 	fullNodeUrlObj, err := url.Parse(fullNodeUrl)
 	require.NoError(t, err)
 	solidityNodeUrlObj, err := url.Parse(solidityNodeUrl)

@@ -18,21 +18,22 @@ import (
 //go:generate mockery --name Reader --output ../mocks/
 type Reader interface {
 	CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
+	CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
 	LatestBlockHeight() (blockHeight uint64, err error)
 	GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
-	BaseClient() sdk.FullNodeClient
+	BaseClient() sdk.CombinedClient
 }
 
 var _ Reader = (*ReaderClient)(nil)
 
 type ReaderClient struct {
-	rpc  sdk.FullNodeClient
+	rpc  sdk.CombinedClient
 	lggr logger.Logger
 	abi  map[string]*common.JSONABI
 }
 
-func NewReader(rpc sdk.FullNodeClient, lggr logger.Logger) *ReaderClient {
+func NewReader(rpc sdk.CombinedClient, lggr logger.Logger) *ReaderClient {
 	return &ReaderClient{
 		rpc:  rpc,
 		lggr: lggr,
@@ -40,7 +41,7 @@ func NewReader(rpc sdk.FullNodeClient, lggr logger.Logger) *ReaderClient {
 	}
 }
 
-func (c *ReaderClient) BaseClient() sdk.FullNodeClient {
+func (c *ReaderClient) BaseClient() sdk.CombinedClient {
 	return c.rpc
 }
 
@@ -75,6 +76,51 @@ func (c *ReaderClient) CallContract(contractAddress address.Address, method stri
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContract(
+		/* from= */ address.ZeroAddress,
+		/* contractAddress= */ contractAddress,
+		/* method= */ methodSignature,
+		/* params= */ params,
+	)
+	if err != nil {
+		return result, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
+	}
+	if !res.Result.Result || len(res.ConstantResult) == 0 {
+		return result, fmt.Errorf("failed to call contract: res=%+v", res)
+	}
+
+	// parse return value
+	parser, err := abi.GetOutputParser(method)
+	if err != nil {
+		return result, fmt.Errorf("failed to get abi parser: %w", err)
+	}
+	result = map[string]interface{}{}
+	constantResultBytes, err := hex.DecodeString(res.ConstantResult[0])
+	if err != nil {
+		return result, fmt.Errorf("failed to decode constant result: %w", err)
+	}
+	err = parser.UnpackIntoMap(result, constantResultBytes)
+	if err != nil {
+		return result, fmt.Errorf("failed to unpack result: %w", err)
+	}
+	return
+}
+
+// Same as CallContract, but uses the fullnode client instead of the solidity client, which means it uses the non-finalized state of the chain.
+func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, method string, params []any) (result map[string]interface{}, err error) {
+	// get contract abi
+	abi, err := c.getContractABI(contractAddress)
+	if err != nil {
+		return result, fmt.Errorf("error fetching abi: %w", err)
+	}
+
+	// get method signature
+	methodSignature, err := abi.GetFunctionSignature(method)
+	if err != nil {
+		return result, fmt.Errorf("failed to get method sighash: %w", err)
+	}
+
+	// call triggerconstantcontract
+	res, err := c.rpc.TriggerConstantContractFullNode(
 		/* from= */ address.ZeroAddress,
 		/* contractAddress= */ contractAddress,
 		/* method= */ methodSignature,
