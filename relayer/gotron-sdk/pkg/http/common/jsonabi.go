@@ -94,7 +94,7 @@ func LoadJSONABI(jsonStr string) (*JSONABI, error) {
 	var entries []Entry
 	err := json.Unmarshal([]byte(jsonStr), &entries)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ABI JSON: %v", err)
+		return nil, fmt.Errorf("failed to parse ABI JSON: %w", err)
 	}
 	return &JSONABI{Entrys: entries}, nil
 }

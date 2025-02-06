@@ -93,7 +93,7 @@ func (c *contractCache) Start() error {
 	ctx, cancel := utils.ContextFromChan(c.stop)
 	defer cancel()
 	if err := c.updateConfig(ctx); err != nil {
-		c.lggr.Warnf("Failed to populate initial config: %v", err)
+		c.lggr.Warnf("Failed to populate initial config: %w", err)
 	}
 	go c.poll()
 	return nil
@@ -115,7 +115,7 @@ func (c *contractCache) poll() {
 			ctx, cancel := utils.ContextFromChan(c.stop)
 
 			if err := c.updateConfig(ctx); err != nil {
-				c.lggr.Errorf("Failed to update config: %v", err)
+				c.lggr.Errorf("Failed to update config: %w", err)
 			}
 			cancel()
 

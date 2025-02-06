@@ -193,13 +193,13 @@ func processJSONArray(input string) ([][]byte, error) {
 	var jsonArray []string
 	err := json.Unmarshal([]byte(input), &jsonArray)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse JSON array from string %+v: %v", input, err)
+		return nil, fmt.Errorf("unable to parse JSON array from string %+v: %w", input, err)
 	}
 	bytesSlice := make([][]byte, len(jsonArray))
 	for i, elem := range jsonArray {
 		bytesSlice[i], err = hex.DecodeString(strings.TrimPrefix(elem, "0x"))
 		if err != nil {
-			return nil, fmt.Errorf("error decoding byte string from element [%d] %+v: %v", i, elem, err)
+			return nil, fmt.Errorf("error decoding byte string from element [%d] %+v: %w", i, elem, err)
 		}
 	}
 	return bytesSlice, nil

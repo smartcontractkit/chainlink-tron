@@ -69,7 +69,7 @@ func (c *transmissionsCache) Start() error {
 	ctx, cancel := utils.ContextFromChan(c.stop)
 	defer cancel()
 	if err := c.updateTransmission(ctx); err != nil {
-		c.lggr.Warnf("failed to populate initial transmission details: %v", err)
+		c.lggr.Warnf("failed to populate initial transmission details: %w", err)
 	}
 	go c.poll()
 	return nil
@@ -91,7 +91,7 @@ func (c *transmissionsCache) poll() {
 			ctx, cancel := utils.ContextFromChan(c.stop)
 
 			if err := c.updateTransmission(ctx); err != nil {
-				c.lggr.Errorf("Failed to update transmission: %v", err)
+				c.lggr.Errorf("Failed to update transmission: %w", err)
 			}
 			cancel()
 

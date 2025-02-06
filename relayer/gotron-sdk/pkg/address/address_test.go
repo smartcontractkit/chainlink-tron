@@ -10,7 +10,7 @@ import (
 func TestAddress_Scan(t *testing.T) {
 	validAddress, err := Base58ToAddress("TSvT6Bg3siokv3dbdtt9o4oM1CTXmymGn1")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("unexpected error: %w", err)
 	}
 
 	// correct case
@@ -19,7 +19,7 @@ func TestAddress_Scan(t *testing.T) {
 	src := validAddress.Bytes()
 	err = a.Scan(src)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("unexpected error: %w", err)
 	}
 	if !bytes.Equal(a.Bytes(), want.Bytes()) {
 		t.Errorf("got %v, want %v", *a, want)

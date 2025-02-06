@@ -172,7 +172,7 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 	if str[0] == 'T' {
 		addr, err := Base58ToAddress(str)
 		if err != nil {
-			return fmt.Errorf("invalid base58 address: %v", err)
+			return fmt.Errorf("invalid base58 address: %w", err)
 		}
 		*a = addr
 		return nil
@@ -181,7 +181,7 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 	// Otherwise treat as hex
 	addr, err := HexToAddress(str)
 	if err != nil {
-		return fmt.Errorf("invalid Tron hex address: %v", err)
+		return fmt.Errorf("invalid Tron hex address: %w", err)
 	}
 	*a = addr
 	return nil
