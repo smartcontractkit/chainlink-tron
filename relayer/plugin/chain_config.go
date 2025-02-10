@@ -62,7 +62,8 @@ type NodeConfig struct {
 	SolidityURL *config.URL
 }
 
-func (n *NodeConfig) ValidateConfig() (err error) {
+func (n *NodeConfig) ValidateConfig() error {
+	var err error
 	if n.Name == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})
 	} else if *n.Name == "" {
@@ -74,5 +75,5 @@ func (n *NodeConfig) ValidateConfig() (err error) {
 	if n.SolidityURL == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "SolidityURL", Msg: "required for all nodes"})
 	}
-	return
+	return err
 }

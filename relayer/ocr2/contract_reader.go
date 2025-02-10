@@ -39,83 +39,81 @@ func (c *contractReader) Notify() <-chan struct{} {
 	return nil
 }
 
-func (c *contractReader) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
+func (c *contractReader) LatestConfigDetails(ctx context.Context) (uint64, types.ConfigDigest, error) {
 	resp, err := c.reader.LatestConfigDetails(ctx, c.address)
 	if err != nil {
-		return changedInBlock, configDigest, fmt.Errorf("couldn't get latest config details: %w", err)
+		return 0, types.ConfigDigest{}, fmt.Errorf("couldn't get latest config details: %w", err)
 	}
 
-	changedInBlock = resp.Block
-	configDigest = resp.Digest
+	changedInBlock := resp.Block
+	configDigest := resp.Digest
 
-	return
+	return changedInBlock, configDigest, nil
 }
 
-func (c *contractReader) LatestConfig(ctx context.Context, changedInBlock uint64) (config types.ContractConfig, err error) {
+func (c *contractReader) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
 	resp, err := c.reader.ConfigFromEventAt(ctx, c.address, changedInBlock)
 	if err != nil {
-		return config, fmt.Errorf("couldn't get latest config: %w", err)
+		return types.ContractConfig{}, fmt.Errorf("couldn't get latest config: %w", err)
 	}
 
-	config = resp.Config
-
-	return
+	return resp.Config, nil
 }
 
-func (c *contractReader) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
+func (c *contractReader) LatestBlockHeight(ctx context.Context) (uint64, error) {
 	return c.reader.BaseReader().LatestBlockHeight()
 }
 
 func (c *contractReader) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
-	configDigest types.ConfigDigest,
-	epoch uint32,
-	round uint8,
-	latestAnswer *big.Int,
-	latestTimestamp time.Time,
-	err error,
+	types.ConfigDigest,
+	uint32,
+	uint8,
+	*big.Int,
+	time.Time,
+	error,
 ) {
 	transmissionDetails, err := c.reader.LatestTransmissionDetails(ctx, c.address)
 	if err != nil {
-		err = fmt.Errorf("couldn't get transmission details: %w", err)
+		return types.ConfigDigest{}, 0, 0, nil, time.Time{}, fmt.Errorf("couldn't get transmission details: %w", err)
 	}
 
-	configDigest = transmissionDetails.Digest
-	epoch = transmissionDetails.Epoch
-	round = transmissionDetails.Round
-	latestAnswer = transmissionDetails.LatestAnswer
-	latestTimestamp = transmissionDetails.LatestTimestamp
+	configDigest := transmissionDetails.Digest
+	epoch := transmissionDetails.Epoch
+	round := transmissionDetails.Round
+	latestAnswer := transmissionDetails.LatestAnswer
+	latestTimestamp := transmissionDetails.LatestTimestamp
 
-	return
+	return configDigest, epoch, round, latestAnswer, latestTimestamp, nil
 }
 
 func (c *contractReader) LatestRoundRequested(
 	ctx context.Context,
 	lookback time.Duration,
 ) (
-	configDigest types.ConfigDigest,
-	epoch uint32,
-	round uint8,
-	err error,
+	types.ConfigDigest,
+	uint32,
+	uint8,
+	error,
 ) {
 	transmissionDetails, err := c.reader.LatestTransmissionDetails(ctx, c.address)
 	if err != nil {
 		err = fmt.Errorf("couldn't get transmission details: %w", err)
 	}
 
-	configDigest = transmissionDetails.Digest
-	epoch = transmissionDetails.Epoch
-	round = transmissionDetails.Round
+	configDigest := transmissionDetails.Digest
+	epoch := transmissionDetails.Epoch
+	round := transmissionDetails.Round
 
-	return
+	return configDigest, epoch, round, nil
 }
 
-func (c *contractReader) LatestBillingDetails(ctx context.Context) (bd BillingDetails, err error) {
-	bd, err = c.reader.BillingDetails(ctx, c.address)
+func (c *contractReader) LatestBillingDetails(ctx context.Context) (BillingDetails, error) {
+	bd, err := c.reader.BillingDetails(ctx, c.address)
 	if err != nil {
-		err = fmt.Errorf("couldn't get billing details: %w", err)
+		return BillingDetails{}, fmt.Errorf("couldn't get billing details: %w", err)
 	}
 
-	return
+	return bd, nil
 }

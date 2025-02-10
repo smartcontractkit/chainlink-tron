@@ -116,11 +116,12 @@ func (c *config) BalancePollPeriod() time.Duration {
 
 type keystore []string
 
-func (k keystore) Accounts(ctx context.Context) (ks []string, err error) {
+func (k keystore) Accounts(ctx context.Context) ([]string, error) {
+	ks := []string{}
 	for _, acc := range k {
 		ks = append(ks, acc)
 	}
-	return
+	return ks, nil
 }
 
 func (k keystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, error) {

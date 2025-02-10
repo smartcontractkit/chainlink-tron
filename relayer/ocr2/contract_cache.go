@@ -128,24 +128,24 @@ func (c *contractCache) Notify() <-chan struct{} {
 	return nil
 }
 
-func (c *contractCache) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest types.ConfigDigest, err error) {
+func (c *contractCache) LatestConfigDetails(ctx context.Context) (uint64, types.ConfigDigest, error) {
 	c.ccLock.RLock()
 	defer c.ccLock.RUnlock()
-	changedInBlock = c.contractConfig.ConfigBlock
-	configDigest = c.contractConfig.Config.ConfigDigest
-	err = c.assertConfigNotStale()
-	return
+	changedInBlock := c.contractConfig.ConfigBlock
+	configDigest := c.contractConfig.Config.ConfigDigest
+	err := c.assertConfigNotStale()
+	return changedInBlock, configDigest, err
 }
 
-func (c *contractCache) LatestConfig(ctx context.Context, changedInBlock uint64) (config types.ContractConfig, err error) {
+func (c *contractCache) LatestConfig(ctx context.Context, changedInBlock uint64) (types.ContractConfig, error) {
 	c.ccLock.RLock()
 	defer c.ccLock.RUnlock()
-	config = c.contractConfig.Config
-	err = c.assertConfigNotStale()
-	return
+	config := c.contractConfig.Config
+	err := c.assertConfigNotStale()
+	return config, err
 }
 
-func (c *contractCache) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
+func (c *contractCache) LatestBlockHeight(ctx context.Context) (uint64, error) {
 	c.ccLock.RLock()
 	defer c.ccLock.RUnlock()
 	return c.blockHeight, c.assertConfigNotStale()

@@ -83,15 +83,15 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
 	ctx context.Context,
 ) (
-	configDigest ocrtypes.ConfigDigest,
-	epoch uint32,
-	err error,
+	ocrtypes.ConfigDigest,
+	uint32,
+	error,
 ) {
-	configDigest, epoch, _, _, _, err = oc.transmissionsCache.LatestTransmissionDetails(ctx)
+	configDigest, epoch, _, _, _, err := oc.transmissionsCache.LatestTransmissionDetails(ctx)
 	if err != nil {
-		err = fmt.Errorf("couldn't fetch latest transmission details: %w", err)
+		return ocrtypes.ConfigDigest{}, 0, fmt.Errorf("couldn't fetch latest transmission details: %w", err)
 	}
-	return
+	return configDigest, epoch, nil
 }
 
 // FromAccount returns the account from which the transmitter invokes the contract

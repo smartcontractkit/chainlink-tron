@@ -19,7 +19,7 @@ import (
 type Reader interface {
 	CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
 	CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
-	LatestBlockHeight() (blockHeight uint64, err error)
+	LatestBlockHeight() (uint64, error)
 	GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
 	BaseClient() sdk.CombinedClient
@@ -61,17 +61,17 @@ func (c *ReaderClient) getContractABI(contractAddress address.Address) (*common.
 	return response.ABI, nil
 }
 
-func (c *ReaderClient) CallContract(contractAddress address.Address, method string, params []any) (result map[string]interface{}, err error) {
+func (c *ReaderClient) CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
 	// get contract abi
 	abi, err := c.getContractABI(contractAddress)
 	if err != nil {
-		return result, fmt.Errorf("error fetching abi: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("error fetching abi: %w", err)
 	}
 
 	// get method signature
 	methodSignature, err := abi.GetFunctionSignature(method)
 	if err != nil {
-		return result, fmt.Errorf("failed to get method sighash: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to get method sighash: %w", err)
 	}
 
 	// call triggerconstantcontract
@@ -82,41 +82,41 @@ func (c *ReaderClient) CallContract(contractAddress address.Address, method stri
 		/* params= */ params,
 	)
 	if err != nil {
-		return result, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
 	}
 	if !res.Result.Result || len(res.ConstantResult) == 0 {
-		return result, fmt.Errorf("failed to call contract: res=%+v", res)
+		return map[string]interface{}{}, fmt.Errorf("failed to call contract: res=%+v", res)
 	}
 
 	// parse return value
 	parser, err := abi.GetOutputParser(method)
 	if err != nil {
-		return result, fmt.Errorf("failed to get abi parser: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to get abi parser: %w", err)
 	}
-	result = map[string]interface{}{}
+	result := map[string]interface{}{}
 	constantResultBytes, err := hex.DecodeString(res.ConstantResult[0])
 	if err != nil {
-		return result, fmt.Errorf("failed to decode constant result: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to decode constant result: %w", err)
 	}
 	err = parser.UnpackIntoMap(result, constantResultBytes)
 	if err != nil {
-		return result, fmt.Errorf("failed to unpack result: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to unpack result: %w", err)
 	}
-	return
+	return result, nil
 }
 
 // Same as CallContract, but uses the fullnode client instead of the solidity client, which means it uses the non-finalized state of the chain.
-func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, method string, params []any) (result map[string]interface{}, err error) {
+func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
 	// get contract abi
 	abi, err := c.getContractABI(contractAddress)
 	if err != nil {
-		return result, fmt.Errorf("error fetching abi: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("error fetching abi: %w", err)
 	}
 
 	// get method signature
 	methodSignature, err := abi.GetFunctionSignature(method)
 	if err != nil {
-		return result, fmt.Errorf("failed to get method sighash: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to get method sighash: %w", err)
 	}
 
 	// call triggerconstantcontract
@@ -127,33 +127,33 @@ func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, met
 		/* params= */ params,
 	)
 	if err != nil {
-		return result, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
 	}
 	if !res.Result.Result || len(res.ConstantResult) == 0 {
-		return result, fmt.Errorf("failed to call contract: res=%+v", res)
+		return map[string]interface{}{}, fmt.Errorf("failed to call contract: res=%+v", res)
 	}
 
 	// parse return value
 	parser, err := abi.GetOutputParser(method)
 	if err != nil {
-		return result, fmt.Errorf("failed to get abi parser: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to get abi parser: %w", err)
 	}
-	result = map[string]interface{}{}
+	result := map[string]interface{}{}
 	constantResultBytes, err := hex.DecodeString(res.ConstantResult[0])
 	if err != nil {
-		return result, fmt.Errorf("failed to decode constant result: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to decode constant result: %w", err)
 	}
 	err = parser.UnpackIntoMap(result, constantResultBytes)
 	if err != nil {
-		return result, fmt.Errorf("failed to unpack result: %w", err)
+		return map[string]interface{}{}, fmt.Errorf("failed to unpack result: %w", err)
 	}
-	return
+	return result, nil
 }
 
-func (c *ReaderClient) LatestBlockHeight() (blockHeight uint64, err error) {
+func (c *ReaderClient) LatestBlockHeight() (uint64, error) {
 	nowBlock, err := c.rpc.GetNowBlock()
 	if err != nil {
-		return blockHeight, fmt.Errorf("couldn't get latest block: %w", err)
+		return 0, fmt.Errorf("couldn't get latest block: %w", err)
 	}
 
 	return uint64(nowBlock.BlockHeader.RawData.Number), nil

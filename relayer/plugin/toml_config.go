@@ -16,11 +16,12 @@ import (
 
 type TOMLConfigs []*TOMLConfig
 
-func (cs TOMLConfigs) ValidateConfig() (err error) {
+func (cs TOMLConfigs) ValidateConfig() error {
 	return cs.validateKeys()
 }
 
-func (cs TOMLConfigs) validateKeys() (err error) {
+func (cs TOMLConfigs) validateKeys() error {
+	var err error
 	// Unique chain IDs
 	chainIDs := config.UniqueStrings{}
 	for i, c := range cs {
@@ -49,10 +50,10 @@ func (cs TOMLConfigs) validateKeys() (err error) {
 			}
 		}
 	}
-	return
+	return err
 }
 
-func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
+func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) error {
 	if err1 := fs.validateKeys(); err1 != nil {
 		return err1
 	}
@@ -67,7 +68,7 @@ func (cs *TOMLConfigs) SetFrom(fs *TOMLConfigs) (err error) {
 			(*cs)[i].SetFrom(f)
 		}
 	}
-	return
+	return nil
 }
 
 type NodeConfigs []*NodeConfig
@@ -152,7 +153,8 @@ func setFromChain(c, f *ChainConfig) {
 	}
 }
 
-func (c *TOMLConfig) ValidateConfig() (err error) {
+func (c *TOMLConfig) ValidateConfig() error {
+	var err error
 	if c.ChainID == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "ChainID", Msg: "required for all chains"})
 	} else if *c.ChainID == "" {
@@ -167,7 +169,7 @@ func (c *TOMLConfig) ValidateConfig() (err error) {
 		}
 	}
 
-	return
+	return err
 }
 
 func (c *TOMLConfig) TOMLString() (string, error) {

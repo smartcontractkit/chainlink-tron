@@ -56,14 +56,14 @@ func FromHex(s string) ([]byte, error) {
 }
 
 // CopyBytes returns an exact copy of the provided bytes.
-func CopyBytes(b []byte) (copiedBytes []byte) {
+func CopyBytes(b []byte) []byte {
 	if b == nil {
 		return nil
 	}
-	copiedBytes = make([]byte, len(b))
+	copiedBytes := make([]byte, len(b))
 	copy(copiedBytes, b)
 
-	return
+	return copiedBytes
 }
 
 // Has0xPrefix validates str begins with '0x' or '0X'.

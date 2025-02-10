@@ -52,7 +52,8 @@ func (c *transmissionsCache) updateTransmission(ctx context.Context) error {
 	c.tdLock.Lock()
 	defer c.tdLock.Unlock()
 	c.tdLastCheckedAt = time.Now()
-	c.transmissionDetails = TransmissionDetails{
+
+	td := TransmissionDetails{
 		Digest:          digest,
 		Epoch:           epoch,
 		Round:           round,
@@ -60,7 +61,21 @@ func (c *transmissionsCache) updateTransmission(ctx context.Context) error {
 		LatestTimestamp: timestamp,
 	}
 
-	c.lggr.Debugw("transmission cache update", "details", c.transmissionDetails)
+	// If timestamp from latest transmission details is zero, skip the cache update as the transmit
+	// transaction has yet to be included in a block, although the fullnode api still returns the chain
+	// state as if it has been executed. We effectively treat such a case as if we have not yet seen
+	// the newest transmission, and instead will wait until the transmit transaction has been included
+	// in a block which usually happens within a few seconds. Note: updating the transmission cache with
+	// a zero timestamp would cause issues in OCR2, triggering the deltaC timeout.
+	if timestamp.Unix() == 0 {
+		c.lggr.Warnw("transmission cache not updated: latestTimestamp is 0", "newTransmission", td, "currentTransmission", c.transmissionDetails)
+		return nil
+	}
+
+	c.transmissionDetails = td
+
+	secondsSinceLastCacheUpdate := timestamp.Sub(c.transmissionDetails.LatestTimestamp).Seconds()
+	c.lggr.Debugw("transmission cache update", "secondsSinceLastCacheUpdate", secondsSinceLastCacheUpdate, "details", c.transmissionDetails)
 
 	return nil
 }
@@ -103,40 +118,40 @@ func (c *transmissionsCache) poll() {
 func (c *transmissionsCache) LatestTransmissionDetails(
 	ctx context.Context,
 ) (
-	configDigest types.ConfigDigest,
-	epoch uint32,
-	round uint8,
-	latestAnswer *big.Int,
-	latestTimestamp time.Time,
-	err error,
+	types.ConfigDigest,
+	uint32,
+	uint8,
+	*big.Int,
+	time.Time,
+	error,
 ) {
 	c.tdLock.RLock()
 	defer c.tdLock.RUnlock()
-	configDigest = c.transmissionDetails.Digest
-	epoch = c.transmissionDetails.Epoch
-	round = c.transmissionDetails.Round
-	latestAnswer = c.transmissionDetails.LatestAnswer
-	latestTimestamp = c.transmissionDetails.LatestTimestamp
-	err = c.assertTransmissionsNotStale()
-	return
+	configDigest := c.transmissionDetails.Digest
+	epoch := c.transmissionDetails.Epoch
+	round := c.transmissionDetails.Round
+	latestAnswer := c.transmissionDetails.LatestAnswer
+	latestTimestamp := c.transmissionDetails.LatestTimestamp
+	err := c.assertTransmissionsNotStale()
+	return configDigest, epoch, round, latestAnswer, latestTimestamp, err
 }
 
 func (c *transmissionsCache) LatestRoundRequested(
 	ctx context.Context,
 	lookback time.Duration,
 ) (
-	configDigest types.ConfigDigest,
-	epoch uint32,
-	round uint8,
-	err error,
+	types.ConfigDigest,
+	uint32,
+	uint8,
+	error,
 ) {
 	c.tdLock.RLock()
 	defer c.tdLock.RUnlock()
-	configDigest = c.transmissionDetails.Digest
-	epoch = c.transmissionDetails.Epoch
-	round = c.transmissionDetails.Round
-	err = c.assertTransmissionsNotStale()
-	return
+	configDigest := c.transmissionDetails.Digest
+	epoch := c.transmissionDetails.Epoch
+	round := c.transmissionDetails.Round
+	err := c.assertTransmissionsNotStale()
+	return configDigest, epoch, round, err
 }
 
 func (c *transmissionsCache) assertTransmissionsNotStale() error {

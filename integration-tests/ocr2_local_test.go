@@ -335,13 +335,13 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 		if current.Epoch < previous.Epoch || (current.Epoch == previous.Epoch && current.Round < previous.Round) {
 			logger.Error().Msg(fmt.Sprintf("Epoch/Round should be increasing - previous epoch %d round %d, current epoch %d round %d", previous.Epoch, previous.Round, current.Epoch, current.Round))
 		}
-		// sometimes the latest timestamp is zero if querying using the fullnode client and retrieving chain state while the latest transaction is not yet finalized
-		// this is expected so we can skip timestamp validation in this case
-		if current.LatestTimestamp.Second() != 0 && current.LatestTimestamp.Before(previous.LatestTimestamp) {
+		if current.LatestTimestamp.Before(previous.LatestTimestamp) {
 			logger.Error().Msg(fmt.Sprintf("LatestTimestamp should be increasing - previous: %s, current: %s", previous.LatestTimestamp, current.LatestTimestamp))
 		}
 		if !isSoak {
 			require.True(t, current.Epoch > previous.Epoch || (current.Epoch == previous.Epoch && current.Round > previous.Round), "Epoch/Round should be increasing")
+			require.GreaterOrEqual(t, current.LatestTimestamp, previous.LatestTimestamp, "Latest timestamp should be increasing")
+
 		}
 
 		// check latest answer is positive
