@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const DEFAULT_ENERGY_UNIT_PRICE int32 = 420
+const DEFAULT_ENERGY_UNIT_PRICE int32 = 210 // as of 2025-02-10
 
 func ParseLatestEnergyPrice(energyPricesStr string) (int32, error) {
 	energyPricesList := strings.Split(energyPricesStr, ",")
@@ -30,5 +30,5 @@ func ParseLatestEnergyPrice(energyPricesStr string) (int32, error) {
 }
 
 func CalculatePaddedFeeLimit(feeLimit int32, bumpTimes uint32) int32 {
-	return int32(float64(feeLimit) * math.Pow(1.5, float64(bumpTimes)))
+	return int32(float64(feeLimit) * math.Pow(1.5, float64(bumpTimes+1)))
 }

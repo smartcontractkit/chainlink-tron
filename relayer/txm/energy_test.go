@@ -59,10 +59,10 @@ func TestCalculatePaddedFeeLimit(t *testing.T) {
 		attempt  uint32
 		expected int32
 	}{
-		{feeLimit: 1000, attempt: 0, expected: 1000},
-		{feeLimit: 1000, attempt: 1, expected: 1500},
-		{feeLimit: 1000, attempt: 2, expected: 2250},
-		{feeLimit: 1000, attempt: 3, expected: 3375},
+		{feeLimit: 1000, attempt: 0, expected: 1500},
+		{feeLimit: 1000, attempt: 1, expected: 2250},
+		{feeLimit: 1000, attempt: 2, expected: 3375},
+		{feeLimit: 1000, attempt: 3, expected: 5062},
 	}
 
 	for _, tt := range tests {
