@@ -19,9 +19,11 @@ var _ Tracker = (*transmissionsCache)(nil)
 var _ median.MedianContract = (*transmissionsCache)(nil)
 
 type transmissionsCache struct {
-	transmissionDetails TransmissionDetails
-	tdLock              sync.RWMutex
-	tdLastCheckedAt     time.Time
+	transmissionDetails             TransmissionDetails
+	consecutiveSkippedTransmissions int
+	skippedTransmissionStartTime    time.Time
+	tdLock                          sync.RWMutex
+	tdLastCheckedAt                 time.Time
 
 	stop, done chan struct{}
 
@@ -68,13 +70,36 @@ func (c *transmissionsCache) updateTransmission(ctx context.Context) error {
 	// in a block which usually happens within a few seconds. Note: updating the transmission cache with
 	// a zero timestamp would cause issues in OCR2, triggering the deltaC timeout.
 	if timestamp.Unix() == 0 {
-		c.lggr.Warnw("transmission cache not updated: latestTimestamp is 0", "newTransmission", td, "currentTransmission", c.transmissionDetails)
+		if c.consecutiveSkippedTransmissions == 0 {
+			c.skippedTransmissionStartTime = time.Now() // start tracking time of first skipped transmission
+		}
+		secondsSinceFirstSkipped := time.Since(c.skippedTransmissionStartTime).Seconds()
+
+		c.consecutiveSkippedTransmissions++ // increment counter for logging purposes
+
+		loggerKeyValues := []interface{}{
+			"consecutiveSkippedTransmissions", c.consecutiveSkippedTransmissions,
+			"secondsSinceFirstSkipped", secondsSinceFirstSkipped,
+			"newTransmission", td,
+		}
+		if c.consecutiveSkippedTransmissions > 1 {
+			// warn if we have skipped multiple transmissions in a row
+			c.lggr.Warnw("transmission cache not updated consecutively: latestTimestamp is 0", loggerKeyValues...)
+		} else {
+			// otherwise just log as debug - single transmission skips are common
+			c.lggr.Debugw("transmission cache not updated: latestTimestamp is 0", loggerKeyValues...)
+		}
+
 		return nil
 	}
 
-	c.transmissionDetails = td
+	// timestamp is non-zero, so reset skipped transmission tracking
+	c.skippedTransmissionStartTime = time.Time{}
+	c.consecutiveSkippedTransmissions = 0
 
 	secondsSinceLastCacheUpdate := timestamp.Sub(c.transmissionDetails.LatestTimestamp).Seconds()
+	c.transmissionDetails = td
+
 	c.lggr.Debugw("transmission cache update", "secondsSinceLastCacheUpdate", secondsSinceLastCacheUpdate, "details", c.transmissionDetails)
 
 	return nil
