@@ -356,7 +356,7 @@ yarn gauntlet execute \
   },
   "contractVersion": 6,
   "decimals": 18,
-  "fromBlock": 54268518,
+  "fromBlock": <BLOCK_NUM_OF_CONFIG_SET>,
   "jobSpecOverrides": {
     "juelsPerFeeCoin": 0
   },
