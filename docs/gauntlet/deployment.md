@@ -61,13 +61,15 @@ For the `<PRIVATE_KEY>`, please reach out to Calvin Wang for a Tron Nile testnet
 
 **IMPORTANT**: when deploying contracts, the contract address returned at the very end of the `execute` stage when running a G++ operation is the real address of the deployed contract. Do not use the contract address shown at the end of the`plan` stage (before the transaction is broadcast) as G++ edits some fee parameters afterwards so the final contract address ends up being different.
 
-**NOTE**: _Tron addresses can be represented in three formats - the Tron G++ plugin supports all three types_, so you can use whichever is most convenient. By default, the G++ deployment output will return the deployed contract address in Tron hex format. To convert between address formats, e.g. to look up an address in the block explorer or update RDD, use this [online converter](https://tron-converter.com/). Here are the address formats for reference:
+**NOTE**: Tron addresses can be represented in three formats - the Tron G++ plugin supports all three types\_, so you can use whichever is most convenient. By default, the G++ deployment output will return the deployed contract address in Tron hex format. To convert between address formats, e.g. to look up an address in the block explorer or update RDD, use this [online converter](https://tron-converter.com/). Here are the address formats for reference:
 
 - _Base58_ (e.g. TVSTZkvVosqh4YHLwHmmNuqeyn967aE2iv) - this is what is most supported across the Tron ecosystem, and you will have to use this format to interact with the Tron block explorer (<https://nile.tronscan.org/>)
 
 - _Tron hex_ (e.g. 41f5c86a1c3400d0429350143322811bdd66d471fb) - this is the hex representation of Tron addresses, which often shows up in the Tron logs or api responses. They are 21 bytes long with the first byte always being 41 and no 0x prefix.
 
 - _EVM hex_ (e.g. 0xf5c86A1C3400d0429350143322811BDd66D471Fb) - this the EVM-compatible format, which is essentially the same as the Tron hex format but is 20 bytes long without the 41 prefix, and instead has an 0x prefix. We use this format in RDD due to compatibility with downstream RDD consumers (e.g. Atlas) which expect an EVM address format.
+
+- **NOTE**: All deployed addresses will be returned by G++ in the Tron hex format (41-prefixed) so make sure to convert it to the EVM-compatible hex format for RDD - <https://tron-converter.com/>. Gauntlet inputs support all three Tron address formats so there is no need to convert it in the input files.
 
 ### Deploy an Access Controller
 
@@ -126,7 +128,7 @@ yarn gauntlet execute \
 
 #### RDD
 
-- Note the address of the aggregator, it will be needed later for RDD
+- Note the address of the aggregator, it will be needed later for RDD and as an input for other contract deployments
 
 ### Deploy an Aggregator Proxy
 
@@ -300,7 +302,7 @@ yarn gauntlet execute \
 
 #### RDD
 
-- After you run this command, note the block number that contains the `set_config` transaction
+- N/A
 
 ### Update RDD
 
