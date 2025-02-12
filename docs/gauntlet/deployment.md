@@ -311,8 +311,7 @@ yarn gauntlet execute \
   - `config.reportingPluginConfig.alphaAcceptPpb` should be set to 3000000 for stablecoins
   - `config.reportingPluginConfig.alphaReportPpb` should be set to 3000000 for stablecoins
   - `ExternalAdapterRequestParams.from` should be set accordingly based on the input provided to the deploy aggregator operation
-  - `lastConfigDigest` should be updated such that it uses the value obtained from the tron explorer - view the contract in the explorer and call the `latestConfigDetails` view function to obtain the value
-  - `fromBlock` should be set to the block number which refers to the first `set_config` transaction executed on the contract
+  - `lastConfigDigest` and `fromBlock` require manual updates - view the Aggregator contract in the block explorer ([Nile testnet explorer](https://nile.tronscan.org/#/), [mainnet explorer](https://tronscan.org/) and call the `latestConfigDetails` view function to obtain the config digest and the block number at which the config was set to populate these fields.
   - `marketing.pair` should be updated accordingly
   - `marketing.path` should be updated accordingly
   - `name` should be updated accordingly
