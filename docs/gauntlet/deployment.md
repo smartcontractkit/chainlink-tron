@@ -338,7 +338,7 @@ yarn gauntlet execute \
     "deltaRound": "10s",
     "deltaStage": "20s",
     "f": 1,
-    "lastConfigDigest": "0x00018fe3c436f609a0da24b8b3bc54a3b604514300569db9660855af0a1f9c65",
+    "lastConfigDigest": <CONFIG_DIGEST>,
     "maxDurationObservation": "5s",
     "maxDurationQuery": "500ms",
     "maxDurationReport": "10s",
