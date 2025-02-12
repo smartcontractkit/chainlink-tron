@@ -99,7 +99,7 @@ Every feed is associated with one aggregator contract.
 
 - The value of the `link` field (e.g. 4100...) is actually the zero address (the 41 prefix can be replaced by 0x) - at the moment, on-chain billing is unused
 
-- The min and max answer can usually stay the same for all feeds
+- The min and max answer can stay the same for all data feeds as it is effectively deprecated and set to the widest range possible.
 
 - The `decimals` may vary depending on the feed
 
