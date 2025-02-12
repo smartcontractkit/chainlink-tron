@@ -17,6 +17,8 @@ yarn gauntlet plugins link ./packages-tron/extension-tron
 yarn gauntlet plugins link ./packages-tron/operations-data-feeds
 ```
 
+To confirm that the Tron plugins are linked correctly, you should be able to see a set of `tron/data-feeds/*` commands when running `yarn gauntlet ls`.
+
 Once the Tron plugins are linked, create a JSON config file with the following contents:
 
 ```json
