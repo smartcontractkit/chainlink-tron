@@ -61,7 +61,7 @@ For the `<PRIVATE_KEY>`, please reach out to Calvin Wang for a Tron Nile testnet
 
 **IMPORTANT**: when deploying contracts, the contract address returned at the very end of the `execute` stage when running a G++ operation is the real address of the deployed contract. Do not use the contract address shown at the end of the`plan` stage (before the transaction is broadcast) as G++ edits some fee parameters afterwards so the final contract address ends up being different.
 
-**NOTE**: _Tron addresses can be represented in three formats - the Tron G++ plugin supports all three types_, so you can use whichever is most convenient. By default, the G++ deployment output will return the deployed contract address in Tron hex format. To convert between address formats, e.g. to look up an address in the block explorer or update RDD, use this online converter. Here are the address formats for reference:
+**NOTE**: _Tron addresses can be represented in three formats - the Tron G++ plugin supports all three types_, so you can use whichever is most convenient. By default, the G++ deployment output will return the deployed contract address in Tron hex format. To convert between address formats, e.g. to look up an address in the block explorer or update RDD, use this [online converter](https://tron-converter.com/). Here are the address formats for reference:
 
 - _Base58_ (e.g. TVSTZkvVosqh4YHLwHmmNuqeyn967aE2iv) - this is what is most supported across the Tron ecosystem, and you will have to use this format to interact with the Tron block explorer (<https://nile.tronscan.org/>)
 
