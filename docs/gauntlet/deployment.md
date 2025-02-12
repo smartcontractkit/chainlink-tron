@@ -156,7 +156,7 @@ yarn gauntlet execute \
 
 #### Input
 
-- Make sure `alphaReportPpb` and `alphaAcceptPpb` are set to 3000000 for stablecoins
+- Make sure `alphaReportPpb` and `alphaAcceptPpb` are set to 3000000 for stablecoin pairs (e.g. USTD/USD) and 5000000 for non-stablecoin pairs.
 - The `configEncodingSecret` and `signerSecret` should be set accordingly for prod testnet and prod mainnet
 
 ##### For Staging
