@@ -63,13 +63,18 @@ func (c *transmissionsCache) updateTransmission(ctx context.Context) error {
 		LatestTimestamp: timestamp,
 	}
 
-	// If timestamp from latest transmission details is zero, skip the cache update as the transmit
-	// transaction has yet to be included in a block, although the fullnode api still returns the chain
-	// state as if it has been executed. We effectively treat such a case as if we have not yet seen
-	// the newest transmission, and instead will wait until the transmit transaction has been included
-	// in a block which usually happens within a few seconds. Note: updating the transmission cache with
-	// a zero timestamp would cause issues in OCR2, triggering the deltaC timeout.
-	if timestamp.Unix() == 0 {
+	// If timestamp from latest transmission details is zero but the answer is non-zero, skip the cache
+	// update as the transmit transaction has yet to be included in a block, although the fullnode api
+	// still returns the chain	// state as if it has been executed. We effectively treat such a case
+	// as if we have not yet seen the newest transmission, and instead will wait until the transmit
+	// transaction has been included in a block which usually happens within a few seconds.
+	//
+	// Note: updating the transmission cache with a zero timestamp would cause issues in OCR2,
+	// triggering the deltaC timeout.
+	//
+	// If the timestamp is zero but the answer is also zero, there has been no transmissions yet so we
+	// can safely update the cache with the config digest details.
+	if timestamp.Unix() == 0 && answer.Cmp(big.NewInt(0)) != 0 {
 		if c.consecutiveSkippedTransmissions == 0 {
 			c.skippedTransmissionStartTime = time.Now() // start tracking time of first skipped transmission
 		}
