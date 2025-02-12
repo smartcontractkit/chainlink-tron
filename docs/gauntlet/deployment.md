@@ -134,7 +134,7 @@ yarn gauntlet execute \
 
 ```json
 {
-  "aggregator": "<AGREGATOR_ADDRESS>",
+  "aggregator": "<AGGREGATOR_ADDRESS>",
   "accessController": "<ACCESS_CONTROLLER_ADDRESS>"
 }
 ```
