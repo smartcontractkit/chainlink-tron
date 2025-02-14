@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/contract"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/plugin"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
@@ -292,6 +293,11 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 
 	readerClient := reader.NewReader(combinedClient, ocrLogger)
 	ocrReader := ocr2.NewOCR2Reader(readerClient, ocrLogger)
+	contractReader := ocr2.NewContractReader(ocrAddress, ocrReader, ocrLogger)
+	ocr2Config := plugin.NewDefault()
+	transmissionsCache := ocr2.NewTransmissionsCache(ocr2Config, contractReader, ocrLogger)
+	err = transmissionsCache.Start()
+	require.NoError(t, err, "Failed to start transmissions cache")
 
 	previous := ocr2.TransmissionDetails{}
 
@@ -311,11 +317,18 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 
 		// try to fetch rounds
 		time.Sleep(ocrTransmissionFrequency)
-		current, err := ocrReader.LatestTransmissionDetails(ctx, ocrAddress)
+		configDigest, epoch, round, latestAnswer, latestTimestamp, err := transmissionsCache.LatestTransmissionDetails(ctx)
 		if err != nil {
 			logger.Error().Msg(fmt.Sprintf("Transmission Error: %+v", err))
 			t.Fatal("Failed to get latest transmission details", err)
 			continue
+		}
+		current := ocr2.TransmissionDetails{
+			Digest:          configDigest,
+			Epoch:           epoch,
+			Round:           round,
+			LatestAnswer:    latestAnswer,
+			LatestTimestamp: latestTimestamp,
 		}
 
 		// if no changes, increment stuck counter and continue
@@ -385,6 +398,10 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 	}
 	value := latestRoundData.Answer.Int64()
 	require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
+
+	// stop transmissions cache
+	err = transmissionsCache.Close()
+	require.NoError(t, err, "Failed to close transmissions cache")
 
 	return nil
 }
