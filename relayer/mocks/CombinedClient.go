@@ -10,8 +10,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	sdk "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-
 	soliditynode "github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 )
 
@@ -428,26 +426,6 @@ func (_m *CombinedClient) GetTransactionInfoByIdFullNode(txhash string) (*solidi
 	}
 
 	return r0, r1
-}
-
-// JsonRpcClient provides a mock function with no fields
-func (_m *CombinedClient) JsonRpcClient() sdk.EthClient {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for JsonRpcClient")
-	}
-
-	var r0 sdk.EthClient
-	if rf, ok := ret.Get(0).(func() sdk.EthClient); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(sdk.EthClient)
-		}
-	}
-
-	return r0
 }
 
 // SolidityClient provides a mock function with no fields
