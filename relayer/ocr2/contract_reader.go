@@ -97,14 +97,14 @@ func (c *contractReader) LatestRoundRequested(
 	uint8,
 	error,
 ) {
-	transmissionDetails, err := c.reader.LatestTransmissionDetails(ctx, c.address)
+	requestedRound, err := c.reader.LatestRoundRequested(ctx, c.address, lookback)
 	if err != nil {
-		err = fmt.Errorf("couldn't get transmission details: %w", err)
+		err = fmt.Errorf("couldn't get latestRoundRequested details: %w", err)
 	}
 
-	configDigest := transmissionDetails.Digest
-	epoch := transmissionDetails.Epoch
-	round := transmissionDetails.Round
+	configDigest := requestedRound.Digest
+	epoch := requestedRound.Epoch
+	round := requestedRound.Round
 
 	return configDigest, epoch, round, nil
 }

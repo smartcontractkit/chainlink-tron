@@ -3,7 +3,10 @@ package reader_test
 import (
 	"encoding/hex"
 	"testing"
+	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/fbsobreira/gotron-sdk/pkg/abi"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
@@ -201,6 +204,67 @@ func TestReader(t *testing.T) {
 		reader := reader.NewReader(combinedClient, testLogger)
 
 		events, err := reader.GetEventsFromBlock(mockContractAddress, "event", 1)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		require.Equal(t, uint64(123), events[0]["a"])
+		require.Equal(t, uint64(456), events[0]["b"])
+		require.Equal(t, uint32(789), events[0]["c"])
+	})
+
+	t.Run("GetEventLogs", func(t *testing.T) {
+		jsonRpcClient := mocks.NewEthClient(t)
+		mockAbi.Entrys = append(mockAbi.Entrys, common.Entry{
+			Name: "event",
+			Inputs: []common.EntryInput{
+				{
+					Name: "a",
+					Type: "uint64",
+				},
+				{
+					Name: "b",
+					Type: "uint64",
+				},
+				{
+					Name: "c",
+					Type: "uint32",
+				},
+			},
+		})
+		combinedClient.On(
+			"GetContract",
+			mock.Anything, // address
+		).Return(&fullnode.GetContractResponse{
+			ABI: mockAbi,
+		}, nil).Once()
+		combinedClient.On(
+			"GetNowBlock",
+		).Return(mockBlock, nil).Once()
+		combinedClient.On(
+			"JsonRpcClient",
+		).Return(jsonRpcClient, nil).Once()
+
+		encodedData, err := abi.GetPaddedParam([]any{
+			"uint64", "123",
+			"uint64", "456",
+			"uint32", "789",
+		})
+		require.NoError(t, err)
+		jsonRpcClient.On(
+			"FilterLogs",
+			mock.Anything, // ctx
+			mock.Anything, // filterQuery
+		).Return([]types.Log{
+			{
+				Topics: []ethcommon.Hash{ethcommon.HexToHash(relayer.GetEventTopicHash("event(uint64,uint64,uint32)"))},
+				Data:   encodedData,
+			},
+		}, nil).Once()
+
+		reader := reader.NewReader(combinedClient, testLogger)
+
+		lookback, err := time.ParseDuration("1m")
+		require.NoError(t, err)
+		events, err := reader.GetEvents(mockContractAddress, "event", lookback)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 		require.Equal(t, uint64(123), events[0]["a"])
