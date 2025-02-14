@@ -19,7 +19,6 @@ type OCR2Reader interface { //nolint:revive
 	LatestConfigDetails(context.Context, tronaddress.Address) (ContractConfigDetails, error)
 	LatestTransmissionDetails(context.Context, tronaddress.Address) (TransmissionDetails, error)
 	LatestRoundData(context.Context, tronaddress.Address) (RoundData, error)
-	LatestRoundRequested(context.Context, tronaddress.Address, time.Duration) (RequestedRound, error)
 	LinkAvailableForPayment(context.Context, tronaddress.Address) (*big.Int, error)
 	ConfigFromEventAt(context.Context, tronaddress.Address, uint64) (ContractConfig, error)
 	// NewTransmissionsFromEventsAt(context.Context, tronaddress.Address, uint64) ([]NewTransmissionEvent, error) // is this needed?
@@ -158,40 +157,6 @@ func (c *OCR2ReaderClient) LatestRoundData(ctx context.Context, address tronaddr
 		UpdatedAt: time.Unix(updatedAt.Int64(), 0),
 	}
 	return round, nil
-}
-
-func (c *OCR2ReaderClient) LatestRoundRequested(ctx context.Context, address tronaddress.Address, lookback time.Duration) (RequestedRound, error) {
-	res, err := c.r.GetEvents(address, "RoundRequested", lookback)
-	if err != nil {
-		return RequestedRound{}, fmt.Errorf("couldn't call the contract: %w", err)
-	}
-
-	if len(res) == 0 {
-		return RequestedRound{}, nil // no error on no events found
-	}
-
-	// return the latest event
-	latestRoundRequested := res[len(res)-1]
-
-	digest, ok := latestRoundRequested["configDigest"].([32]byte)
-	if !ok {
-		return RequestedRound{}, fmt.Errorf("expected digest %+v to be of type [32]byte, got %T", latestRoundRequested["digest"], latestRoundRequested["digest"])
-	}
-	epoch, ok := latestRoundRequested["epoch"].(uint32)
-	if !ok {
-		return RequestedRound{}, fmt.Errorf("expected epoch %+v to be of type uint32, got %T", latestRoundRequested["epoch"], latestRoundRequested["epoch"])
-	}
-	round, ok := latestRoundRequested["round"].(uint8)
-	if !ok {
-		return RequestedRound{}, fmt.Errorf("expected round %+v to be of type uint8, got %T", latestRoundRequested["round"], latestRoundRequested["round"])
-	}
-
-	rr := RequestedRound{
-		Digest: types.ConfigDigest(digest),
-		Epoch:  epoch,
-		Round:  round,
-	}
-	return rr, nil
 }
 
 func (c *OCR2ReaderClient) LinkAvailableForPayment(ctx context.Context, address tronaddress.Address) (*big.Int, error) {

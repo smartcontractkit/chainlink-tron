@@ -1,16 +1,10 @@
 package reader
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
-	"math/big"
-	"time"
 
-	"github.com/ethereum/go-ethereum"
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
@@ -27,7 +21,6 @@ type Reader interface {
 	CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
 	LatestBlockHeight() (uint64, error)
 	GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
-	GetEvents(contractAddress address.Address, eventName string, lookback time.Duration) ([]map[string]interface{}, error)
 
 	BaseClient() sdk.CombinedClient
 }
@@ -242,74 +235,6 @@ func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, event
 			return nil, fmt.Errorf("failed to decode event data: %w", err)
 		}
 		err = parser.UnpackIntoMap(event, dataBytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unpack event log: %w", err)
-		}
-		events = append(events, event)
-	}
-
-	return events, nil
-}
-
-func (c *ReaderClient) GetEvents(contractAddress address.Address, eventName string, lookback time.Duration) ([]map[string]interface{}, error) {
-	// get abi
-	abi, err := c.getContractABI(contractAddress)
-	if err != nil {
-		c.lggr.Error(fmt.Errorf("failed to get contract abi: %w", err))
-		return nil, err
-	}
-
-	// get event topic hash
-	eventSignature, err := abi.GetFunctionSignature(eventName)
-	if err != nil {
-		c.lggr.Error(fmt.Errorf("failed to get event signature: %w", err))
-		return nil, err
-	}
-	eventTopicHash := crypto.Keccak256([]byte(eventSignature))
-
-	// convert lookback duration to block number
-	currentBlockNumber, err := c.LatestBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block height: %w", err)
-	}
-	// Tron has block times of 3 seconds so we can estimate the number of blocks to check.
-	// If this is slightly off, it's not a big deal.
-	lookbackBlocks := uint64(lookback.Seconds() / 3)
-	fromBlockNum := big.NewInt(int64(currentBlockNumber) - int64(lookbackBlocks))
-
-	// build filter query
-	query := ethereum.FilterQuery{
-		FromBlock: fromBlockNum,
-		ToBlock:   nil, // nil toBlock means "latest"
-		Addresses: []ethcommon.Address{
-			contractAddress.EthAddress(),
-		},
-		Topics: [][]ethcommon.Hash{
-			{ethcommon.BytesToHash(eventTopicHash)},
-		},
-	}
-
-	// create a new context with a 5 second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// retrieve filtered logs
-	logs, err := c.rpc.JsonRpcClient().FilterLogs(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("jsonrpc: failed to filter logs: %w", err)
-	}
-
-	// get input parser
-	parser, err := abi.GetInputParser(eventName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get input parser for event %s: %w", eventName, err)
-	}
-
-	// parse filtered logs
-	var events = []map[string]interface{}{}
-	for _, log := range logs {
-		event := make(map[string]interface{})
-		err = parser.UnpackIntoMap(event, log.Data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack event log: %w", err)
 		}

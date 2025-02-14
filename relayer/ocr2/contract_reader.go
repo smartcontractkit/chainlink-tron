@@ -97,14 +97,9 @@ func (c *contractReader) LatestRoundRequested(
 	uint8,
 	error,
 ) {
-	requestedRound, err := c.reader.LatestRoundRequested(ctx, c.address, lookback)
-	if err != nil {
-		err = fmt.Errorf("couldn't get latestRoundRequested details: %w", err)
-	}
-
-	configDigest := requestedRound.Digest
-	epoch := requestedRound.Epoch
-	round := requestedRound.Round
+	configDigest := types.ConfigDigest{}
+	epoch := uint32(0)
+	round := uint8(0)
 
 	return configDigest, epoch, round, nil
 }

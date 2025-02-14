@@ -27,12 +27,6 @@ type TransmissionDetails struct {
 	LatestTimestamp time.Time
 }
 
-type RequestedRound struct {
-	Digest types.ConfigDigest
-	Epoch  uint32
-	Round  uint8
-}
-
 type BillingDetails struct {
 	ObservationPaymentGJuels  uint32
 	TransmissionPaymentGJuels uint32

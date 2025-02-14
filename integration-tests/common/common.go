@@ -108,7 +108,7 @@ func getTestDuration() time.Duration {
 	return t
 }
 
-func NewCommon(t *testing.T, chainID, internalFullNodeUrl, internalSolidityUrl, internalJsonRpcUrl string) *Common {
+func NewCommon(t *testing.T, chainID, internalFullNodeUrl, internalSolidityUrl string) *Common {
 	chainlinkConfig := fmt.Sprintf(`
 [[Tron]]
 Enabled = true
@@ -118,7 +118,6 @@ ChainID = '%s'
 Name = 'primary'
 URL = '%s'
 SolidityURL = '%s'
-JsonRpcURL = '%s'
 
 [Log]
 Level = 'debug'
@@ -137,7 +136,7 @@ ListenAddresses = ['0.0.0.0:6691']
 HTTPPort = 6688
 [WebServer.TLS]
 HTTPSPort = 0
-`, chainID, internalFullNodeUrl, internalSolidityUrl, internalJsonRpcUrl)
+`, chainID, internalFullNodeUrl, internalSolidityUrl)
 	log.Debug().Str("toml", chainlinkConfig).Msg("Created chainlink config")
 
 	ttl := getTTL()

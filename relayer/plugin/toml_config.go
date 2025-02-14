@@ -108,9 +108,6 @@ func setFromNode(n, f *NodeConfig) {
 	if f.SolidityURL != nil {
 		n.SolidityURL = f.SolidityURL
 	}
-	if f.JsonRpcURL != nil {
-		n.JsonRpcURL = f.JsonRpcURL
-	}
 }
 
 type TOMLConfig struct {

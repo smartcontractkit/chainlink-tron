@@ -60,7 +60,6 @@ type NodeConfig struct {
 	Name        *string
 	URL         *config.URL
 	SolidityURL *config.URL
-	JsonRpcURL  *config.URL
 }
 
 func (n *NodeConfig) ValidateConfig() error {
@@ -75,9 +74,6 @@ func (n *NodeConfig) ValidateConfig() error {
 	}
 	if n.SolidityURL == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "SolidityURL", Msg: "required for all nodes"})
-	}
-	if n.JsonRpcURL == nil {
-		err = errors.Join(err, config.ErrMissing{Name: "JsonRpcURL", Msg: "required for all nodes"})
 	}
 	return err
 }

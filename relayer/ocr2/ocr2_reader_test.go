@@ -6,10 +6,7 @@ import (
 	"encoding/hex"
 	"strconv"
 	"testing"
-	"time"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/fbsobreira/gotron-sdk/pkg/abi"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
@@ -231,43 +228,5 @@ func TestOCR2Reader(t *testing.T) {
 		require.Equal(t, onchainConfig, res.Config.OnchainConfig)
 		require.Equal(t, uint64(offchainConfigVersion), res.Config.OffchainConfigVersion)
 		require.Equal(t, offchainConfig, res.Config.OffchainConfig)
-	})
-
-	t.Run("LatestRoundRequested", func(t *testing.T) {
-		jsonRpcClient := mocks.NewEthClient(t)
-
-		nowBlock := &soliditynode.Block{
-			BlockHeader: &soliditynode.BlockHeader{
-				RawData: &soliditynode.BlockHeaderRaw{
-					Number: 100,
-				},
-			},
-		}
-		combinedClient.On(
-			"GetNowBlock",
-		).Return(nowBlock, nil).Once()
-		combinedClient.On(
-			"JsonRpcClient",
-		).Return(jsonRpcClient, nil).Once()
-		jsonRpcClient.On(
-			"FilterLogs",
-			mock.Anything, // ctx
-			mock.Anything, // filterQuery
-		).Return([]ethtypes.Log{
-			{
-				Topics: []ethcommon.Hash{ethcommon.HexToHash(relayer.GetEventTopicHash("RoundRequested(address,bytes32,uint32,uint8)"))},
-				Data:   ethcommon.Hex2Bytes("0001ba559eda78740c736d083f09899b653eb23cc8cb68a8d099d37d780cf79300000000000000000000000000000000000000000000000000000000000022c20000000000000000000000000000000000000000000000000000000000000002"),
-			},
-		}, nil).Once()
-
-		mockContractAddress := []byte{0, 1, 2, 3}
-		lookback, err := time.ParseDuration("1m")
-		require.NoError(t, err)
-
-		res, err := ocr2Reader.LatestRoundRequested(context.TODO(), mockContractAddress, lookback)
-		require.NoError(t, err)
-		require.Equal(t, "0001ba559eda78740c736d083f09899b653eb23cc8cb68a8d099d37d780cf793", res.Digest.Hex())
-		require.Equal(t, uint32(8898), res.Epoch)
-		require.Equal(t, uint8(2), res.Round)
 	})
 }
