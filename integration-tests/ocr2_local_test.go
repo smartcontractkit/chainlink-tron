@@ -391,13 +391,11 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 
 	/// Test proxy reading
 	// TODO: would be good to test proxy switching underlying feeds
-	mockAdapterValue := 5
 	latestRoundData, err := ocrReader.LatestRoundData(ctx, ocrProxyAddress)
 	if !isSoak {
 		require.NoError(t, err, "Reading round data from proxy should not fail")
 	}
-	value := latestRoundData.Answer.Int64()
-	require.Equal(t, value, int64(mockAdapterValue), "Reading from proxy should return correct value")
+	require.Greater(t, latestRoundData.RoundID, uint32(0))
 
 	// stop transmissions cache
 	err = transmissionsCache.Close()

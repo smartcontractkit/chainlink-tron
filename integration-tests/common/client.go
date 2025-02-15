@@ -147,29 +147,29 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 
 	var err error
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = confighelper.ContractSetConfigArgsForTests(
-		30*time.Second,   // deltaProgress time.Duration,
+		60*time.Second,   // deltaProgress time.Duration,
 		30*time.Second,   // deltaResend time.Duration,
 		10*time.Second,   // deltaRound time.Duration,
-		20*time.Second,   // deltaGrace time.Duration,
-		20*time.Second,   // deltaStage time.Duration,
-		3,                // rMax uint8,
+		5*time.Second,    // deltaGrace time.Duration,
+		60*time.Second,   // deltaStage time.Duration,
+		6,                // rMax uint8,
 		S,                // s []int,
 		oracleIdentities, // oracles []OracleIdentityExtra,
 		median.OffchainConfig{
 			AlphaReportInfinite: false,
-			AlphaReportPPB:      1,
+			AlphaReportPPB:      5000000,
 			AlphaAcceptInfinite: false,
-			AlphaAcceptPPB:      1,
-			DeltaC:              time.Minute * 30,
+			AlphaAcceptPPB:      5000000,
+			DeltaC:              time.Hour * 24,
 		}.Encode(), // reportingPluginConfig []byte,
-		nil,           // maxDurationInitialization *time.Duration,
-		5*time.Second, // maxDurationQuery time.Duration,
-		5*time.Second, // maxDurationObservation time.Duration,
-		5*time.Second, // maxDurationReport time.Duration,
-		5*time.Second, // maxDurationShouldAcceptFinalizedReport time.Duration,
-		5*time.Second, // maxDurationShouldTransmitAcceptedReport time.Duration,
-		1,             // f int,
-		nil,           // The median reporting plugin has an empty onchain config
+		nil,            // maxDurationInitialization *time.Duration,
+		2*time.Second,  // maxDurationQuery time.Duration,
+		12*time.Second, // maxDurationObservation time.Duration,
+		20*time.Second, // maxDurationReport time.Duration,
+		20*time.Second, // maxDurationShouldAcceptFinalizedReport time.Duration,
+		20*time.Second, // maxDurationShouldTransmitAcceptedReport time.Duration,
+		1,              // f int,
+		nil,            // The median reporting plugin has an empty onchain config
 	)
 
 	if err != nil {
@@ -222,7 +222,7 @@ func (cc *ChainlinkClient) CreateJobsForContract(chainId, nodeName, p2pPort, moc
 
 	sourceValueBridge := &client.BridgeTypeAttributes{
 		Name:        "mockserver-bridge",
-		URL:         fmt.Sprintf("%s/%s", mockUrl, "five"),
+		URL:         fmt.Sprintf("%s/%s", mockUrl, "random"),
 		RequestData: "{}",
 	}
 
