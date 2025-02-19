@@ -5,8 +5,8 @@ go 1.23.3
 toolchain go1.23.4
 
 require (
-	github.com/ethereum/go-ethereum v1.15.2
-	github.com/fbsobreira/gotron-sdk v0.0.0-20230907131216-1e824406fe8c
+	github.com/ethereum/go-ethereum v1.14.11
+	github.com/fbsobreira/gotron-sdk v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/pelletier/go-toml/v2 v2.2.0
@@ -26,6 +26,8 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.17.0 // indirect
+	github.com/btcsuite/btcd v0.22.0-beta // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
