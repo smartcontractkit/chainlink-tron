@@ -65,6 +65,11 @@ type Vote struct {
 	VoteCount   int64  `json:"vote_count,omitempty"`   // the number of votes for this super representative
 }
 
+type Asset struct {
+	Key   string `json:"key,omitempty"`
+	Value int64  `json:"value,omitempty"`
+}
+
 type GetAccountResponse struct {
 	AccountName                                  string               `json:"account_name"` // The name of the account. The account name can be modified through the wallet/updateaccount interface. The account name can only be changed once.
 	Address                                      string               `json:"address"`      // Account address
@@ -92,12 +97,12 @@ type GetAccountResponse struct {
 	OwnerPermission                              Permission           `json:"owner_permission"`         // owner permissions
 	WitnessPermission                            Permission           `json:"witness_permission"`       // witness permissions
 	ActivePermission                             []Permission         `json:"active_permission"`        // active permission
-	Asset                                        map[string]int64     `json:"asset"`                    // <string, int64>	The token id and balance of the TRC10 token in the account
-	AssetV2                                      map[string]int64     `json:"assetV2"`                  // <string, int64>	The token id and balance of the TRC10 token in the account. Note, the V2 version is used after allowing token with same name and the proposal has been activated at present.
+	Asset                                        []Asset              `json:"asset"`                    // <string, int64>	The token id and balance of the TRC10 token in the account
+	AssetV2                                      []Asset              `json:"assetV2"`                  // <string, int64>	The token id and balance of the TRC10 token in the account. Note, the V2 version is used after allowing token with same name and the proposal has been activated at present.
 	AssetIssuedName                              string               `json:"asset_issued_name"`        // The name of the TRC10 token created by the account
 	AssetIssuedId                                string               `json:"asset_issued_ID"`          // TRC10 token ID created by the account
-	FreeAssetNetUsage                            map[string]int64     `json:"free_asset_net_usage"`     // <string, int64>	The amount of free bandwidth consumed by account transferring TRC10 tokens
-	FreeAssetNetUsagev2                          map[string]int64     `json:"free_asset_net_usageV2"`   // <string, int64> The amount of free bandwidth consumed by account transferring TRC10 tokens
+	FreeAssetNetUsage                            []Asset              `json:"free_asset_net_usage"`     // <string, int64>	The amount of free bandwidth consumed by account transferring TRC10 tokens
+	FreeAssetNetUsagev2                          []Asset              `json:"free_asset_net_usageV2"`   // <string, int64> The amount of free bandwidth consumed by account transferring TRC10 tokens
 }
 
 func (tc *Client) GetAccount(accountAddress address.Address) (*GetAccountResponse, error) {
