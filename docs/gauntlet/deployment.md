@@ -2,6 +2,8 @@
 
 ## Setup
 
+**See the setup and config guide on the G++ MCM guide for more details on how to use G++ with Ledger - https://smartcontract-it.atlassian.net/wiki/spaces/DEPAUTO/pages/858095617/Tron+MCM+Gauntlet+Operations+Guide#Config**
+
 Clone the G++ repo:
 
 ```sh
@@ -55,7 +57,9 @@ Once the Tron plugins are linked, create a JSON config file with the following c
 }
 ```
 
-For the `<PRIVATE_KEY>`, please reach out to Calvin Wang for a Tron Nile testnet wallet with testnet funds.
+For the `<PRIVATE_KEY>` on Nile testnet, please reach out to Calvin Wang for a Tron Nile testnet wallet with testnet funds.
+
+If you need to use a Ledger for prod, see the linked G++ MCM guide at the top.
 
 ## Steps
 
@@ -73,7 +77,10 @@ For the `<PRIVATE_KEY>`, please reach out to Calvin Wang for a Tron Nile testnet
 
 ### Deploy an Access Controller
 
-For staging, you only need to deploy one access controller and the address can be reused. Access controllers can be configured post-deployment as required (for prod testnet?), but that isn't covered in this guide.
+- For staging, you only need to deploy one access controller and the address can be reused across all contracts.
+- For prod, we can also reuse one access controller for all aggregator proxies, but it should not be reused for aggregator billing and requester access control as well.
+- Deploy a **read access controller for aggregator proxies**, and a **write access controller for aggregator billing/requester access** (if necessary).
+- Access controllers can be configured post-deployment as required
 
 #### Input
 
@@ -85,7 +92,7 @@ For staging, you only need to deploy one access controller and the address can b
 
 ```sh
 yarn gauntlet execute \
-  -o tron/data-feeds/access-controller:deploy-write \
+  -o tron/data-feeds/access-controller:deploy-write \ # or deploy-read
   -c config.json
 ```
 
@@ -104,6 +111,8 @@ Every feed is associated with one aggregator contract.
 - The min and max answer can stay the same for all data feeds as it is effectively deprecated and set to the widest range possible.
 
 - The `decimals` may vary depending on the feed
+
+- The billing and requester access controllers can be unset (zero address) since we do not currently utilize on-chain billing for Tron, and the request round feature is unsupported. If they are set to a real access controller, it should be a write access controller that is not the same one used for the Aggregator Proxy.
 
 ```json
 {
@@ -131,6 +140,8 @@ yarn gauntlet execute \
 - Note the address of the aggregator, it will be needed later for RDD and as an input for other contract deployments
 
 ### Deploy an Aggregator Proxy
+
+The aggregator proxy should use a read access controller. This lets EOAs freely read the data from the contract, e.g. through a block explorer, but limits access from on-chain contracts.
 
 #### Input
 
@@ -303,6 +314,45 @@ yarn gauntlet execute \
 #### RDD
 
 - N/A
+
+### Configuring the Access Controller
+
+To enable reads on the Aggregator Proxy, you can either disable the access controller or leave it enabled and add access for specific addresses.
+
+#### Disable Access Control
+
+#### Input
+
+```json
+{
+  "address": <ACCESS_CONTROLLER_ADDRESS>,
+}
+```
+
+#### Command
+
+```sh
+yarn gauntlet execute -o tron/data-feeds/access-controller:disable-access-check
+ --config=config.json
+```
+
+#### Add Access Control for Address
+
+#### Input
+
+```json
+{
+  "address": <ACCESS_CONTROLLER_ADDRESS>,
+  "grantAdress": <ADDRESS_TO_GRANT_ACCESS>,
+}
+```
+
+#### Command
+
+```sh
+yarn gauntlet execute -o tron/data-feeds/access-controller:add-access
+ --config=config.json
+```
 
 ### Update RDD
 
