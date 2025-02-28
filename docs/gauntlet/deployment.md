@@ -332,8 +332,10 @@ To enable reads on the Aggregator Proxy, you can either disable the access contr
 #### Command
 
 ```sh
-yarn gauntlet execute -o tron/data-feeds/access-controller:disable-access-check
- --config=config.json
+yarn gauntlet execute \
+  -o tron/data-feeds/access-controller:disable-access-check \
+  -c config.json \
+  -i input.json
 ```
 
 #### Add Access Control for Address
@@ -350,8 +352,10 @@ yarn gauntlet execute -o tron/data-feeds/access-controller:disable-access-check
 #### Command
 
 ```sh
-yarn gauntlet execute -o tron/data-feeds/access-controller:add-access
- --config=config.json
+yarn gauntlet execute \
+  -o tron/data-feeds/access-controller:add-access \
+  -c config.json \
+  -i input.json
 ```
 
 ### Update RDD
