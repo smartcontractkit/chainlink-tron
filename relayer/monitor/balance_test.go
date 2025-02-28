@@ -56,7 +56,9 @@ func TestBalanceMonitor(t *testing.T) {
 		return 0, fmt.Errorf("address not found")
 	}
 	cfg := &config{balancePollPeriod: time.Second}
-	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, mockClient)
+	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, func() (BalanceClient, error) {
+		return mockClient, nil
+	})
 	var got []update
 	done := make(chan struct{})
 	b.updateFn = func(acc address.Address, sun int64) {

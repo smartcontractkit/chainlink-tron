@@ -25,19 +25,20 @@ type BalanceClient interface {
 
 // TODO: This chain-specific implementation should be replaced by the chain-agnostic one found at /aptos/relayer/monitor.
 // NewBalanceMonitor returns a balance monitoring services.Service which reports the TRX balance of all ks keys to prometheus.
-func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, reader BalanceClient) services.Service {
-	return newBalanceMonitor(chainID, cfg, lggr, ks, reader)
+func NewBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, newReader func() (BalanceClient, error)) services.Service {
+	return newBalanceMonitor(chainID, cfg, lggr, ks, newReader)
 }
 
-func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, reader BalanceClient) *balanceMonitor {
+func newBalanceMonitor(chainID string, cfg Config, lggr logger.Logger, ks core.Keystore, newReader func() (BalanceClient, error)) *balanceMonitor {
 	b := balanceMonitor{
-		chainID: chainID,
-		cfg:     cfg,
-		lggr:    logger.Named(lggr, "BalanceMonitor"),
-		ks:      ks,
-		reader:  reader,
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
+		chainID:   chainID,
+		cfg:       cfg,
+		lggr:      logger.Named(lggr, "BalanceMonitor"),
+		ks:        ks,
+		newReader: newReader,
+		reader:    nil,
+		stop:      make(chan struct{}),
+		done:      make(chan struct{}),
 	}
 	b.updateFn = b.updateProm
 	return &b

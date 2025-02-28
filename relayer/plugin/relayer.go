@@ -85,7 +85,9 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 	})
 
-	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, client.SolidityClient())
+	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
+		return client.SolidityClient(), nil
+	})
 
 	return &TronRelayer{
 		chainId:        id,
