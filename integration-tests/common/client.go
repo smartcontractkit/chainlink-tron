@@ -283,12 +283,26 @@ func connectChainlinkNodes(e *environment.Environment) ([]*client.ChainlinkClien
 		if err != nil {
 			return nil, err
 		}
+		healthResp, _, err := c.Health()
+		if err != nil {
+			return nil, err
+		}
+
 		log.Debug().
 			Str("URL", c.Config.URL).
 			Str("Internal IP", c.Config.InternalIP).
 			Str("Chart Name", nodeDetails.ChartName).
 			Str("Pod Name", nodeDetails.PodName).
 			Msg("Connected to Chainlink node")
+
+		for _, service := range healthResp.Data {
+			if service.Attributes.Status != "passing" {
+				log.Error().
+					Str("Service", service.Attributes.Name).
+					Str("Status", service.Attributes.Status).
+					Msg("HealthCheck")
+			}
+		}
 		clients = append(clients, c)
 	}
 	return clients, nil
