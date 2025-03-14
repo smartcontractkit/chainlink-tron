@@ -4,14 +4,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/shengdoushi/base58"
+	"github.com/mr-tron/base58"
 )
 
 const addressLength = 20
 const prefixMainnet = 0x41
 
 func Encode(input []byte) string {
-	return base58.Encode(input, base58.BitcoinAlphabet)
+	return base58.Encode(input)
 }
 
 func EncodeCheck(input []byte) string {
@@ -30,7 +30,7 @@ func EncodeCheck(input []byte) string {
 }
 
 func Decode(input string) ([]byte, error) {
-	return base58.Decode(input, base58.BitcoinAlphabet)
+	return base58.Decode(input)
 }
 
 func DecodeCheck(input string) ([]byte, error) {
