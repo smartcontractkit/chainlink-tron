@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_DecodeBase58(t *testing.T) {
+func Test_EncodeDecodeBase58(t *testing.T) {
 
 	invalidAddresses := []string{
 		"TronEnergyioE1Z3ukeRv38sYkv5Jn55bL",
@@ -27,8 +27,11 @@ func Test_DecodeBase58(t *testing.T) {
 	}
 
 	for _, addr := range validAddresses {
-		_, err := common.DecodeCheck(addr)
+		b, err := common.DecodeCheck(addr)
 		assert.Nil(t, err)
+
+		encoded := common.EncodeCheck(b)
+		assert.Equal(t, addr, encoded)
 	}
 
 }

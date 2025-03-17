@@ -39,7 +39,9 @@ func TestAddress_Scan(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected an error, but got none")
 	}
-	src = make([]byte, 22) // Створюємо байтовий масив з неправильною довжиною
+
+	// byte array with wrong length
+	src = make([]byte, 22)
 	err = a.Scan(src)
 	if err == nil {
 		t.Errorf("expected an error, but got none")
@@ -51,6 +53,8 @@ func TestStringToAddress(t *testing.T) {
 	a, err := StringToAddress("T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb")
 	assert.NoError(t, err)
 	assert.Equal(t, "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb", a.String())
+	assert.Equal(t, "0x0000000000000000000000000000000000000000", a.EthAddress().String())
+	assert.Equal(t, "410000000000000000000000000000000000000000", a.Hex())
 
 	// valid hex
 	a, err = StringToAddress("410000000000000000000000000000000000000000")
@@ -65,4 +69,5 @@ func TestStringToAddress(t *testing.T) {
 	// invalid address
 	_, err = StringToAddress("0x41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3b3")
 	assert.Error(t, err)
+	assert.ErrorContains(t, err, "invalid address format: 0x41d4f4f0b3b3d4e3b3b3b3b3b3b3b3b3b3")
 }

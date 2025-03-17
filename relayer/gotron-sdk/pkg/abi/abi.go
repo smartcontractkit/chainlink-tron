@@ -33,11 +33,11 @@ func LoadFromJSON(jString string) ([]Param, error) {
 	return data, nil
 }
 
-// Signature of a method
-func Signature(method string) []byte {
-	// hash method
+// Selector of a function from its signature, e.g. transfer(address,uint256)
+func Selector(functionSignature string) []byte {
+	// hash functionSignature
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write([]byte(method))
+	hasher.Write([]byte(functionSignature))
 	b := hasher.Sum(nil)
 	return b[:4]
 }
@@ -96,6 +96,11 @@ func convertToInt(ty eABI.Type, v interface{}) interface{} {
 
 // GetPaddedParam from struct
 func GetPaddedParam(params []any) ([]byte, error) {
+	// check params len is even
+	if len(params)%2 == 1 {
+		return nil, fmt.Errorf("expected even number of params, got %d", len(params))
+	}
+
 	values := make([]interface{}, 0)
 	arguments := eABI.Arguments{}
 
@@ -253,14 +258,11 @@ func Pack(method string, params []any) ([]byte, error) {
 	if params == nil {
 		params = []any{}
 	}
-	signature := Signature(method)
-	if len(params)%2 == 1 {
-		return nil, fmt.Errorf("expected even number of params, got %d", len(params))
-	}
+	selector := Selector(method)
 	pBytes, err := GetPaddedParam(params)
 	if err != nil {
 		return nil, err
 	}
-	signature = append(signature, pBytes...)
-	return signature, nil
+	selector = append(selector, pBytes...)
+	return selector, nil
 }

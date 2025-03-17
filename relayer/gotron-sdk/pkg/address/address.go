@@ -16,7 +16,7 @@ import (
 const (
 	// HashLength is the expected length of the hash
 	HashLength = 32
-	// AddressLength is the expected length of the address
+	// AddressLength is the expected byte length of the address
 	AddressLength = 21
 	// AddressLengthBase58 is the expected length of the address in base58format
 	AddressLengthBase58 = 34
@@ -37,9 +37,9 @@ func (a Address) Bytes() []byte {
 	return a[:]
 }
 
-// Hex get bytes from address in string
+// Hex gets Tron hex representation of the address (21 byte, 41-prefixed)
 func (a Address) Hex() string {
-	return common.ToHex(a[:])
+	return common.BytesToHexString(a[:])[2:]
 }
 
 // BigToAddress returns Address with byte values of b.
