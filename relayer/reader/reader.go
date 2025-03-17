@@ -187,7 +187,7 @@ func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, event
 		return nil, err
 	}
 
-	contractAddressHex := contractAddress.Hex()[2:]
+	contractAddressHex := contractAddress.Hex()
 
 	// iterate over transactions
 	eventLogs := []soliditynode.Log{}
