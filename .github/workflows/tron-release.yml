@@ -14,7 +14,7 @@ on:
 
   push:
     paths:
-      - tron/**
+      - **
     branches:
       - main
       - develop
@@ -52,7 +52,7 @@ jobs:
           aws-lambda-url: ${{ secrets.GATI_LAMBDA_FOUNDATIONS_URL }}
           aws-region: ${{ secrets.QA_AWS_REGION }}
 
-      - name: Check out chainlink-internal-integrations
+      - name: Check out repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -220,8 +220,8 @@ jobs:
         uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
         id: build-image
         with:
-          context: ${{ github.workspace }}/tron
-          file: ${{ github.workspace }}/tron/Dockerfile
+          context: ${{ github.workspace }}
+          file: ${{ github.workspace }}/Dockerfile
           build-args: |
             BASE_IMAGE=${{ env.CL_ECR }}:${{ env.CORE_REF }}
           tags: ${{ env.TRON_ECR }}:${{ env.IMAGE_TAG }}

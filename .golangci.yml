@@ -23,7 +23,7 @@ linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
   goimports:
-    local-prefixes: github.com/smartcontractkit/chainlink-internal-integrations
+    local-prefixes: github.com/smartcontractkit/chainlink-tron
   golint:
     min-confidence: 1.0
   gosec:

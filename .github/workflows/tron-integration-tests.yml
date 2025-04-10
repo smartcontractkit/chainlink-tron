@@ -91,7 +91,7 @@ jobs:
           cd temp/chainlink
           docker buildx build --build-arg COMMIT_SHA=$(git rev-parse HEAD) -t local_chainlink -f core/chainlink.Dockerfile .
 
-      - name: Check out chainlink-internal-integrations
+      - name: Check out repo
         uses: actions/checkout@v4
 
       - name: Build chainlink-tron image
@@ -109,5 +109,5 @@ jobs:
           CORE_IMAGE: ${{ env.CL_ECR }}:tron.${{ github.sha }}
           TEST_LOG_LEVEL: debug
         run: |
-          cd tron/integration-tests
+          cd integration-tests
           TEST_LOG_LEVEL=${{env.TEST_LOG_LEVEL}} CORE_IMAGE=${{env.CORE_IMAGE}} go test -v -tags=integration -count=1 -timeout 30m -run TestOCRLocal ./ocr2_local_test.go
