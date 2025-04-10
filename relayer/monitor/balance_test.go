@@ -17,8 +17,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 )
 
 func TestBalanceMonitor(t *testing.T) {

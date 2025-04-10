@@ -45,7 +45,7 @@ func StartTronNode(genesisAddress string) error {
 		return fmt.Errorf("failed to find Git root: %+w", err)
 	}
 
-	scriptPath := filepath.Join(gitRoot, "tron/scripts/java-tron.sh")
+	scriptPath := filepath.Join(gitRoot, "scripts/java-tron.sh")
 	cmd := exec.Command(scriptPath, genesisAddress)
 
 	output, err := cmd.CombinedOutput()
@@ -67,7 +67,7 @@ func StopTronNode() error {
 		return fmt.Errorf("failed to find Git root: %+w", err)
 	}
 
-	scriptPath := filepath.Join(gitRoot, "tron/scripts/java-tron.down.sh")
+	scriptPath := filepath.Join(gitRoot, "scripts/java-tron.down.sh")
 	cmd := exec.Command(scriptPath)
 
 	output, err := cmd.CombinedOutput()

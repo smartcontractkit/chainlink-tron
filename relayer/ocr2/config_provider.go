@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
 )
 
 var _ commontypes.ConfigProvider = (*configProvider)(nil)

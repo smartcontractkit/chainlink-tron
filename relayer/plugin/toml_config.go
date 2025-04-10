@@ -11,7 +11,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 )
 
 type TOMLConfigs []*TOMLConfig
