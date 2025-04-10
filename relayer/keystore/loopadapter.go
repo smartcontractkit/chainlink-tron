@@ -13,6 +13,11 @@ type LoopKeystoreAdapter struct {
 	ks keys.Store
 }
 
+// Creates a new LoopKeystoreAdapter which allows the EVM keystore to be used by the Tron TXM
+func NewLoopKeystoreAdapter(ks keys.Store) *LoopKeystoreAdapter {
+	return &LoopKeystoreAdapter{ks: ks}
+}
+
 // Accounts returns the list of enabled addresses from the keystore
 func (l *LoopKeystoreAdapter) Accounts(ctx context.Context) (accounts []string, err error) {
 	enabledAddresses, err := l.ks.EnabledAddresses(ctx)
