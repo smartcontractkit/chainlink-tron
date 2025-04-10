@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=local_chainlink
+ARG BASE_IMAGE=smartcontract/chainlink:2.22.0
 
 FROM golang:1.23.3-bullseye as buildplugins
 RUN go version

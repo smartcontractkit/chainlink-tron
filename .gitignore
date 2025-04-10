@@ -3,3 +3,5 @@ node_modules
 .env
 .local-mock-server
 
+# Keep some docs local
+docs/local/
