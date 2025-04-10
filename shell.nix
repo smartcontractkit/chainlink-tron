@@ -1,11 +1,32 @@
-{ stdenv, pkgs, lib }:
+{
+  stdenv,
+  pkgs,
+  lib,
+}:
 # juno requires building with clang, not gcc
-(pkgs.mkShell.override { stdenv = pkgs.clangStdenv; }) {
-  buildInputs = with pkgs; [
-    go_1_21
-    gopls
-    delve
-    (golangci-lint.override { buildGoModule = buildGo121Module; })
-    gotools
-  ];
+pkgs.mkShell {
+  buildInputs = with pkgs;
+    [
+      # nix tooling
+      alejandra
+
+      # Go 1.23 + tools
+      go_1_23
+      gopls
+      delve
+      golangci-lint
+      gotools
+      gomod2nix
+      # Official golang implementation of the Ethereum protocol (e.g., geth, abigen, rlpdump, etc.)
+      go-ethereum
+
+      # Extra tools
+      git
+      python3
+      postgresql_15
+      jq
+    ]
+    ++ lib.optionals stdenv.hostPlatform.isDarwin [
+      libiconv
+    ];
 }

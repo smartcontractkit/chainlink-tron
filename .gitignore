@@ -3,3 +3,11 @@ node_modules
 .env
 .local-mock-server
 
+# Keep some docs local
+docs/local/**
+
+# Nix package build out-link - any 'result' folder in the tree
+**/result
+
+# Nix packaged script (impure builds) default output - any '.build' folder in the tree
+**/.build
