@@ -7,12 +7,14 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 )
 
-type loopKeystoreAdapter struct {
+// LoopKeystoreAdapter is an adapter that allows the EVM keystore to be used by the Tron TXM
+// It handles the conversion between tron addresses and evm addresses whilst delegating the signing to the EVM keystore
+type LoopKeystoreAdapter struct {
 	ks keys.Store
 }
 
 // Accounts returns the list of enabled addresses from the keystore
-func (l *loopKeystoreAdapter) Accounts(ctx context.Context) (accounts []string, err error) {
+func (l *LoopKeystoreAdapter) Accounts(ctx context.Context) (accounts []string, err error) {
 	enabledAddresses, err := l.ks.EnabledAddresses(ctx)
 	if err != nil {
 		return nil, err
@@ -24,7 +26,7 @@ func (l *loopKeystoreAdapter) Accounts(ctx context.Context) (accounts []string, 
 	return accounts, nil
 }
 
-func (l *loopKeystoreAdapter) Sign(ctx context.Context, account string, data []byte) (signed []byte, err error) {
+func (l *LoopKeystoreAdapter) Sign(ctx context.Context, account string, data []byte) (signed []byte, err error) {
 	// We'll need to convert the tron address to an evm address to sign the data
 	tronAddr, err := tronsdk.Base58ToAddress(account)
 	if err != nil {
