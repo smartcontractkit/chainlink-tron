@@ -12,6 +12,8 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -273,6 +275,14 @@ func SetupLocalStack(t *testing.T, logger zerolog.Logger, genesisAddress string)
 	require.NoError(t, err, "Could not start java-tron container")
 	logger.Info().Str("fullNodeUrl", fullNodeUrl).Str("solidityNodeUrl", solidityNodeUrl).Msg("TRON node config")
 
+	// TODO [tron-ccip]: hooking up a geth node for testing
+	logger.Info().Msg("[tron-ccip] Starting Ethereum node container...")
+	gitRoot, err := testutils.FindGitRoot()
+	require.NoError(t, err, "Failed to find Git root")
+	scriptPathGeth := filepath.Join(gitRoot, "aptos/scripts/geth.sh")
+	err = exec.Command(scriptPathGeth).Run()
+	require.NoError(t, err, "Could not start Ethereum node")
+
 	return setUpTronEnvironment(t, logger, fullNodeUrl, solidityNodeUrl, internalFullNodeUrl, internalSolidityNodeUrl, genesisAddress)
 }
 
@@ -282,6 +292,14 @@ func TeardownLocalStack(t *testing.T, logger zerolog.Logger, commonConfig *testc
 	logger.Info().Msg("Tearing down java-tron container...")
 	err := testutils.StopTronNode()
 	require.NoError(t, err, "Could not tear down java-tron container")
+
+	// TODO [tron-ccip]: hooking up a geth node for testing
+	logger.Info().Msg("[tron-ccip] Starting Ethereum node container...")
+	gitRoot, err := testutils.FindGitRoot()
+	require.NoError(t, err, "Failed to find Git root")
+	scriptPathGeth := filepath.Join(gitRoot, "aptos/scripts/geth.down.sh")
+	err = exec.Command(scriptPathGeth).Run()
+	require.NoError(t, err, "Could not stop Ethereum node")
 }
 
 // SetupTestnetStack sets up chainlink node, client, gRPC client and config for the testnet tests
