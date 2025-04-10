@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.Duration) {

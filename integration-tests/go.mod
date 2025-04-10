@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests
+module github.com/smartcontractkit/chainlink-tron/integration-tests
 
 go 1.23.3
 
@@ -11,7 +11,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-common v0.4.2-0.20250121141917-62443f4b3c30
-	github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-testing-framework v1.31.7
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240704133622-41f9428c3aa8
 	github.com/smartcontractkit/chainlink/v2 v2.20.0
@@ -388,7 +388,7 @@ replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
 	// using the most updated relayer version
-	github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer => ../relayer
+	github.com/smartcontractkit/chainlink-tron/relayer => ../relayer
 
 	github.com/sourcegraph/sourcegraph/lib => github.com/sourcegraph/sourcegraph-public-snapshot/lib v0.0.0-20240822153003-c864f15af264
 

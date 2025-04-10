@@ -6,7 +6,7 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
 )
 
 func TestGetFunctionSignature_Simple(t *testing.T) {

@@ -19,11 +19,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 )
 
 func TestOCR2Reader(t *testing.T) {

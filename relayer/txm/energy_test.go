@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/stretchr/testify/assert"
 )
 

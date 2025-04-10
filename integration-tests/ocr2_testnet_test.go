@@ -12,8 +12,8 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/integration-tests/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 )
 
 // TestOCR2Shasta runs e2e tests for OCR2 Datafeedds contracts on Shasta testnet

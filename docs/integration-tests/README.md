@@ -12,7 +12,7 @@
 Then, build the core node with the tron relayer:
 
 ```shell
-   cd chainlink-internal-integrations/tron
+   cd chainlink-tron
    docker buildx build --build-arg BASE_IMAGE=chainlink-develop:latest -t chainlink-tron -f ./Dockerfile .
 ```
 
@@ -21,7 +21,7 @@ Otherwise, you can skip these steps and it will default to the core container ve
 2. Make sure you are in the Tron integration tests directory
 
 ```shell
-   cd chainlink-internal-integrations/tron/integration_tests
+   cd chainlink-tron/integration_tests
 ```
 
 3. Run the e2e test:
