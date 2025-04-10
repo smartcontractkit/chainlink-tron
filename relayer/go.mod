@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer
+module github.com/smartcontractkit/chainlink-tron/relayer
 
 go 1.23.3
 
@@ -87,7 +87,6 @@ require (
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.2.0 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
-	github.com/shengdoushi/base58 v1.0.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect

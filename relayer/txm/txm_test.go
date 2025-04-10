@@ -16,10 +16,10 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	trontxm "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
+	trontxm "github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

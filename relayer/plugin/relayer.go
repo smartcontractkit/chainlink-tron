@@ -17,11 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/monitor"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/monitor"
+	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 type TronRelayer struct {

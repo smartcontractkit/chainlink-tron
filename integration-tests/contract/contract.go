@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 )
 
 // BasePath represents the base directory where JSON files are stored

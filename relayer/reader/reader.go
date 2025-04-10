@@ -11,8 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
 
 //go:generate mockery --name Reader --output ../mocks/

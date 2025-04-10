@@ -19,15 +19,15 @@ import (
 	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/contract"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/utils"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/plugin"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/integration-tests/common"
+	"github.com/smartcontractkit/chainlink-tron/integration-tests/contract"
+	"github.com/smartcontractkit/chainlink-tron/integration-tests/utils"
+	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/plugin"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 func TestOCRLocal(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
 )
 
 // Config defines the monitor configuration.

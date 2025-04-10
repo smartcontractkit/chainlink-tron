@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	tronplugin "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/plugin"
+	tronplugin "github.com/smartcontractkit/chainlink-tron/relayer/plugin"
 )
 
 const (
