@@ -17,6 +17,12 @@ import (
 
 var _ Tracker = (*transmissionsCache)(nil)
 var _ median.MedianContract = (*transmissionsCache)(nil)
+var _ TransmissionsCache = (*transmissionsCache)(nil)
+
+type TransmissionsCache interface {
+	LatestTransmissionDetails(ctx context.Context) (types.ConfigDigest, uint32, uint8, *big.Int, time.Time, error)
+	LatestRoundRequested(ctx context.Context, lookback time.Duration) (types.ConfigDigest, uint32, uint8, error)
+}
 
 type transmissionsCache struct {
 	transmissionDetails             TransmissionDetails
