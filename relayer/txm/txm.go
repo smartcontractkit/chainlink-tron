@@ -43,6 +43,14 @@ type TronTxm struct {
 	Stop          chan struct{}
 }
 
+type TronTxmRequest struct {
+	IdempotencyKey  *string
+	FromAddress     address.Address
+	ContractAddress address.Address
+	Method          string
+	Params          []any
+}
+
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
 	return &TronTxm{
 		Logger:                logger.Named(lgr, "TronTxm"),
@@ -93,23 +101,23 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress address.Address, method string, params ...any) error {
-	if _, err := t.Keystore.Sign(context.Background(), fromAddress.String(), nil); err != nil {
+func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
+	if _, err := t.Keystore.Sign(context.Background(), request.FromAddress.String(), nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	if len(params)%2 == 1 {
+	if len(request.Params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
-	for i := 0; i < len(params); i += 2 {
-		paramType := params[i]
+	for i := 0; i < len(request.Params); i += 2 {
+		paramType := request.Params[i]
 		_, ok := paramType.(string)
 		if !ok {
 			return fmt.Errorf("non-string param type")
 		}
 	}
 
-	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: params, Attempt: 1}
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1}
 
 	select {
 	case t.BroadcastChan <- tx:

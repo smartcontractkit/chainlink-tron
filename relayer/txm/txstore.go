@@ -18,13 +18,26 @@ type UnconfirmedTx struct {
 type TxStore struct {
 	lock sync.RWMutex
 
-	unconfirmedTxes map[string]*UnconfirmedTx
+	idempotencyKeyMap map[string]interface{}
+	unconfirmedTxes   map[string]*UnconfirmedTx
 }
 
 func NewTxStore() *TxStore {
 	return &TxStore{
 		unconfirmedTxes: map[string]*UnconfirmedTx{},
 	}
+}
+
+func (s *TxStore) AddIdempotencyKey(key string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if _, exists := s.idempotencyKeyMap[key]; exists {
+		return fmt.Errorf("idempotency key already exists: %s", key)
+	}
+
+	s.idempotencyKeyMap[key] = struct{}{}
+	return nil
 }
 
 func (s *TxStore) AddUnconfirmed(hash string, expirationMs int64, tx *TronTx) error {
