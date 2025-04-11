@@ -23,8 +23,6 @@ type ContractTransmitter interface {
 
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
-type ReportToEthMetadata func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
-
 func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error) {
 	return nil, nil
 }
@@ -32,7 +30,7 @@ func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Ha
 type transmitterOps struct {
 	excludeSigs       bool
 	ethereumKeystore  bool
-	reportToEvmTxMeta ReportToEthMetadata
+	reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
 }
 
 type contractTransmitter struct {
@@ -78,7 +76,7 @@ func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
 	return oc
 }
 
-func (oc *contractTransmitter) WithReportToEthMetadata(reportToEvmTxMeta ReportToEthMetadata) *contractTransmitter {
+func (oc *contractTransmitter) WithReportToEthMetadata(reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)) *contractTransmitter {
 	oc.transmitterOptions.reportToEvmTxMeta = reportToEvmTxMeta
 	return oc
 }
