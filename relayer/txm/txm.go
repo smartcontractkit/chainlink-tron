@@ -411,5 +411,5 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
 	// TODO: Just for debugging
-	return triggerResponse.EnergyUsed * 100, nil
+	return triggerResponse.EnergyUsed * 5, nil
 }
