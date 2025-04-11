@@ -13,10 +13,12 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
@@ -48,7 +50,7 @@ type TronTxmRequest struct {
 	ContractAddress address.Address
 	Method          string
 	Params          []any
-	Meta            *TronTxMeta
+	Meta            *txmgrtypes.TxMeta[gethcommon.Address, gethcommon.Hash]
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {

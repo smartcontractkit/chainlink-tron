@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -21,10 +23,13 @@ type ContractTransmitter interface {
 
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
+type ReportToEthMetadata func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
+type OCRTransmitterOption func(transmitter *transmitterOps)
+
 type transmitterOps struct {
-	excludeSigs            bool
-	ethereumKeystore       bool
-	transactionIdempotency bool
+	excludeSigs       bool
+	ethereumKeystore  bool
+	reportToEvmTxMeta ReportToEthMetadata
 }
 
 type contractTransmitter struct {
@@ -51,16 +56,15 @@ func NewOCRContractTransmitter(
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
 		transmitterOptions: &transmitterOps{
-			excludeSigs:            false,
-			ethereumKeystore:       false,
-			transactionIdempotency: false,
+			excludeSigs:      false,
+			ethereumKeystore: false,
 		},
 	}
 }
-
-func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
-	oc.transmitterOptions.excludeSigs = true
-	return oc
+func WithExcludeSignatures() OCRTransmitterOption {
+	return func(ct *transmitterOps) {
+		ct.excludeSigs = true
+	}
 }
 
 func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
@@ -68,9 +72,12 @@ func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
 	return oc
 }
 
-func (oc *contractTransmitter) WithTransactionIdempotency() *contractTransmitter {
-	oc.transmitterOptions.transactionIdempotency = true
-	return oc
+func WithReportToEthMetadata(reportToEvmTxMeta ReportToEthMetadata) OCRTransmitterOption {
+	return func(ct *transmitterOps) {
+		if reportToEvmTxMeta != nil {
+			ct.reportToEvmTxMeta = reportToEvmTxMeta
+		}
+	}
 }
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
@@ -107,12 +114,17 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		"bytes32", vs,
 	}
 
+	txMeta, err := oc.transmitterOptions.reportToEvmTxMeta(report)
+	if err != nil {
+		oc.lggr.Warnw("failed to generate tx metadata for report", "err", err)
+	}
+
 	request := &txm.TronTxmRequest{
 		FromAddress:     oc.senderAddress,
 		ContractAddress: oc.contractAddress,
 		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
 		Params:          params,
-		Meta:            &txm.TronTxMeta{},
+		Meta:            txMeta,
 	}
 	return oc.txm.Enqueue(request)
 }
