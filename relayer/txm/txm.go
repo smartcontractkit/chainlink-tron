@@ -13,10 +13,12 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
@@ -41,6 +43,14 @@ type TronTxm struct {
 	Starter       utils.StartStopOnce
 	Done          sync.WaitGroup
 	Stop          chan struct{}
+}
+
+type TronTxmRequest struct {
+	FromAddress     address.Address
+	ContractAddress address.Address
+	Method          string
+	Params          []any
+	Meta            *txmgrtypes.TxMeta[gethcommon.Address, gethcommon.Hash]
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
@@ -93,23 +103,30 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress address.Address, method string, params ...any) error {
-	if _, err := t.Keystore.Sign(context.Background(), fromAddress.String(), nil); err != nil {
+func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
+	if _, err := t.Keystore.Sign(context.Background(), request.FromAddress.String(), nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	if len(params)%2 == 1 {
+	if len(request.Params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
-	for i := 0; i < len(params); i += 2 {
-		paramType := params[i]
+
+	for i := 0; i < len(request.Params); i += 2 {
+		paramType := request.Params[i]
 		_, ok := paramType.(string)
 		if !ok {
 			return fmt.Errorf("non-string param type")
 		}
 	}
 
-	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: params, Attempt: 1}
+	// Construct the transaction
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, Meta: request.Meta}
+
+	// If the transaction should not be enqueued, we'll skip it and return an error if present
+	if shouldEnqueue, err := t.shouldEnqueue(tx); !shouldEnqueue || err != nil {
+		return err
+	}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -179,7 +196,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullno
 	}
 
 	feeLimit := energyUnitPrice * int32(energyUsed)
-	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
+	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes, t.Config.EnergyMultiplier)
 
 	t.Logger.Debugw("Trigger smart contract", "energyBumpTimes", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
@@ -403,4 +420,52 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
 	return triggerResponse.EnergyUsed, nil
+}
+
+// Performs a pre-enqueuing check to determine if the transaction should be enqueued.
+// If the transaction should not be enqueued, we'll skip it and return an error if present.
+func (t *TronTxm) shouldEnqueue(tx *TronTx) (bool, error) {
+	// We should always honour transactions if we don't have any information about them.
+	// In an ideal world, the txm would have a hook into an external status checker and we can use that to determine if we should enqueue to prevent duplicate transactions.
+	if tx.Meta == nil || t.Config.StatusChecker == nil {
+		return true, nil
+	}
+
+	// If the transaction requires an idempotency key, we'll construct it and check if it already exists.
+	if t.doesTransactionRequireIdempotencyKey(tx) {
+		messageId := tx.Meta.MessageIDs[0]
+		_, count, err := t.Config.StatusChecker.CheckMessageStatus(context.Background(), messageId)
+		if err != nil {
+			t.Logger.Errorw("failed to check message status, skipped OCR transmission", "error", err)
+			return false, err
+		}
+
+		idempotencyKey := fmt.Sprintf("%s-%d", messageId, count+1)
+		txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
+		exists, err := txStore.DoesIdempotencyKeyExist(idempotencyKey)
+		if err != nil {
+			t.Logger.Errorw("failed to check if idempotency key exists, skipped OCR transmission", "error", err)
+			return false, err
+		}
+
+		if exists {
+			t.Logger.Debugw("skipped OCR transmission, idempotency key already exists", "idempotencyKey", idempotencyKey)
+			return false, nil
+		}
+	}
+
+	// If the transaction does not require an idempotency key or the idempotency key does not exist, we should enqueue the transaction.
+	return true, nil
+}
+
+func (t *TronTxm) doesTransactionRequireIdempotencyKey(tx *TronTx) bool {
+	// Txns that require an idempotency key are ones that have a single message ID and a status checker has been set.
+	// This behaviour only happens for CCIP Exec messages.
+	if tx.Meta != nil && t.Config.StatusChecker != nil {
+		if len(tx.Meta.MessageIDs) == 1 {
+			return true
+		}
+	}
+
+	return false
 }

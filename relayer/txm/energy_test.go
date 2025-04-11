@@ -54,6 +54,8 @@ func TestParseLatestEnergyPrice(t *testing.T) {
 }
 
 func TestCalculatePaddedFeeLimit(t *testing.T) {
+	var DEFAULT_ENERGY_MULTIPLIER = 1.5
+
 	tests := []struct {
 		feeLimit int32
 		attempt  uint32
@@ -67,7 +69,7 @@ func TestCalculatePaddedFeeLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("FeeLimit: "+fmt.Sprint(tt.feeLimit)+", Attempt: "+fmt.Sprint(tt.attempt), func(t *testing.T) {
-			result := txm.CalculatePaddedFeeLimit(tt.feeLimit, tt.attempt)
+			result := txm.CalculatePaddedFeeLimit(tt.feeLimit, tt.attempt, DEFAULT_ENERGY_MULTIPLIER)
 			if result != tt.expected {
 				t.Errorf("calculatePaddedFeeLimit(%d, %d) = %d, want %d", tt.feeLimit, tt.attempt, result, tt.expected)
 			}

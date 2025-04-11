@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -21,29 +23,62 @@ type ContractTransmitter interface {
 
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
+func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error) {
+	return nil, nil
+}
+
+type transmitterOps struct {
+	excludeSigs       bool
+	ethereumKeystore  bool
+	reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
+}
+
 type contractTransmitter struct {
-	transmissionsCache *transmissionsCache
+	transmissionsCache TransmissionsCache
 	contractAddress    address.Address
 	senderAddress      address.Address
 	txm                *txm.TronTxm
 	lggr               logger.Logger
+	transmitterOptions *transmitterOps
 }
 
 func NewOCRContractTransmitter(
 	ctx context.Context,
-	transmissionsCache *transmissionsCache,
+	transmissionsCache TransmissionsCache,
 	contractAddress address.Address,
 	senderAddress address.Address,
 	txm *txm.TronTxm,
 	lggr logger.Logger,
 ) *contractTransmitter {
-	return &contractTransmitter{
+	newContractTransmitter := &contractTransmitter{
 		contractAddress:    contractAddress,
 		txm:                txm,
 		senderAddress:      senderAddress,
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
+		transmitterOptions: &transmitterOps{
+			reportToEvmTxMeta: reportToEvmTxMetaNoop,
+			excludeSigs:       false,
+			ethereumKeystore:  false,
+		},
 	}
+
+	return newContractTransmitter
+}
+
+func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
+	oc.transmitterOptions.excludeSigs = true
+	return oc
+}
+
+func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
+	oc.transmitterOptions.ethereumKeystore = true
+	return oc
+}
+
+func (oc *contractTransmitter) WithReportToEthMetadata(reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)) *contractTransmitter {
+	oc.transmitterOptions.reportToEvmTxMeta = reportToEvmTxMeta
+	return oc
 }
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
@@ -61,9 +96,12 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		if err != nil {
 			panic("eventTransmit(ev): error in SplitSignature")
 		}
-		rs = append(rs, r)
-		ss = append(ss, s)
-		vs[i] = v
+
+		if !oc.transmitterOptions.excludeSigs {
+			rs = append(rs, r)
+			ss = append(ss, s)
+			vs[i] = v
+		}
 	}
 
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress)
@@ -77,7 +115,19 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		"bytes32", vs,
 	}
 
-	return oc.txm.Enqueue(oc.senderAddress, oc.contractAddress, "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
+	txMeta, err := oc.transmitterOptions.reportToEvmTxMeta(report)
+	if err != nil {
+		oc.lggr.Warnw("failed to generate tx metadata for report", "err", err)
+	}
+
+	request := &txm.TronTxmRequest{
+		FromAddress:     oc.senderAddress,
+		ContractAddress: oc.contractAddress,
+		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
+		Params:          params,
+		Meta:            txMeta,
+	}
+	return oc.txm.Enqueue(request)
 }
 
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
@@ -96,6 +146,10 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
 
 // FromAccount returns the account from which the transmitter invokes the contract
 func (oc *contractTransmitter) FromAccount(ctx context.Context) (ocrtypes.Account, error) {
+	if oc.transmitterOptions.ethereumKeystore {
+		return ocrtypes.Account(oc.senderAddress.EthAddress().String()), nil
+	}
+
 	return ocrtypes.Account(oc.senderAddress.String()), nil
 }
 
