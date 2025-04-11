@@ -120,12 +120,13 @@ func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
 		}
 	}
 
-	if request.Meta != nil {
-		println("MessageIDs: ", request.Meta.MessageIDs)
-		println("SequencerNumbers: ", request.Meta.SeqNumbers)
-	}
-
+	// Construct the transaction
 	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, Meta: request.Meta}
+
+	// If the transaction should not be enqueued, we'll skip it and return an error if present
+	if shouldEnqueue, err := t.shouldEnqueue(tx); !shouldEnqueue || err != nil {
+		return err
+	}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -419,4 +420,52 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
 	return triggerResponse.EnergyUsed, nil
+}
+
+// Performs a pre-enqueuing check to determine if the transaction should be enqueued.
+// If the transaction should not be enqueued, we'll skip it and return an error if present.
+func (t *TronTxm) shouldEnqueue(tx *TronTx) (bool, error) {
+	// We should always honour transactions if we don't have any information about them.
+	// In an ideal world, the txm would have a hook into an external status checker and we can use that to determine if we should enqueue to prevent duplicate transactions.
+	if tx.Meta == nil || t.Config.StatusChecker == nil {
+		return true, nil
+	}
+
+	// If the transaction requires an idempotency key, we'll construct it and check if it already exists.
+	if t.doesTransactionRequireIdempotencyKey(tx) {
+		messageId := tx.Meta.MessageIDs[0]
+		_, count, err := t.Config.StatusChecker.CheckMessageStatus(context.Background(), messageId)
+		if err != nil {
+			t.Logger.Errorw("failed to check message status, skipped OCR transmission", "error", err)
+			return false, err
+		}
+
+		idempotencyKey := fmt.Sprintf("%s-%d", messageId, count+1)
+		txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
+		exists, err := txStore.DoesIdempotencyKeyExist(idempotencyKey)
+		if err != nil {
+			t.Logger.Errorw("failed to check if idempotency key exists, skipped OCR transmission", "error", err)
+			return false, err
+		}
+
+		if exists {
+			t.Logger.Debugw("skipped OCR transmission, idempotency key already exists", "idempotencyKey", idempotencyKey)
+			return false, nil
+		}
+	}
+
+	// If the transaction does not require an idempotency key or the idempotency key does not exist, we should enqueue the transaction.
+	return true, nil
+}
+
+func (t *TronTxm) doesTransactionRequireIdempotencyKey(tx *TronTx) bool {
+	// Txns that require an idempotency key are ones that have a single message ID and a status checker has been set.
+	// This behaviour only happens for CCIP Exec messages.
+	if tx.Meta != nil && t.Config.StatusChecker != nil {
+		if len(tx.Meta.MessageIDs) == 1 {
+			return true
+		}
+	}
+
+	return false
 }

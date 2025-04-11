@@ -40,6 +40,14 @@ func (s *TxStore) AddIdempotencyKey(key string) error {
 	return nil
 }
 
+func (s *TxStore) DoesIdempotencyKeyExist(key string) (bool, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	_, ok := s.idempotencyKeyMap[key]
+	return ok, nil
+}
+
 func (s *TxStore) AddUnconfirmed(hash string, expirationMs int64, tx *TronTx) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
