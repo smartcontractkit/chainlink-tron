@@ -24,7 +24,6 @@ type ContractTransmitter interface {
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
 type ReportToEthMetadata func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
-type OCRTransmitterOption func(transmitter *transmitterOps)
 
 func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error) {
 	return nil, nil
@@ -52,7 +51,6 @@ func NewOCRContractTransmitter(
 	senderAddress address.Address,
 	txm *txm.TronTxm,
 	lggr logger.Logger,
-	opts ...OCRTransmitterOption,
 ) *contractTransmitter {
 	newContractTransmitter := &contractTransmitter{
 		contractAddress:    contractAddress,
@@ -67,16 +65,12 @@ func NewOCRContractTransmitter(
 		},
 	}
 
-	for _, opt := range opts {
-		opt(newContractTransmitter.transmitterOptions)
-	}
-
 	return newContractTransmitter
 }
-func WithExcludeSignatures() OCRTransmitterOption {
-	return func(ct *transmitterOps) {
-		ct.excludeSigs = true
-	}
+
+func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
+	oc.transmitterOptions.excludeSigs = true
+	return oc
 }
 
 func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
@@ -84,12 +78,9 @@ func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
 	return oc
 }
 
-func WithReportToEthMetadata(reportToEvmTxMeta ReportToEthMetadata) OCRTransmitterOption {
-	return func(ct *transmitterOps) {
-		if reportToEvmTxMeta != nil {
-			ct.reportToEvmTxMeta = reportToEvmTxMeta
-		}
-	}
+func (oc *contractTransmitter) WithReportToEthMetadata(reportToEvmTxMeta ReportToEthMetadata) *contractTransmitter {
+	oc.transmitterOptions.reportToEvmTxMeta = reportToEvmTxMeta
+	return oc
 }
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
