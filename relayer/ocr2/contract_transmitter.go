@@ -26,6 +26,10 @@ var _ ContractTransmitter = (*contractTransmitter)(nil)
 type ReportToEthMetadata func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
 type OCRTransmitterOption func(transmitter *transmitterOps)
 
+func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error) {
+	return nil, nil
+}
+
 type transmitterOps struct {
 	excludeSigs       bool
 	ethereumKeystore  bool
@@ -48,18 +52,26 @@ func NewOCRContractTransmitter(
 	senderAddress address.Address,
 	txm *txm.TronTxm,
 	lggr logger.Logger,
+	opts ...OCRTransmitterOption,
 ) *contractTransmitter {
-	return &contractTransmitter{
+	newContractTransmitter := &contractTransmitter{
 		contractAddress:    contractAddress,
 		txm:                txm,
 		senderAddress:      senderAddress,
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
 		transmitterOptions: &transmitterOps{
-			excludeSigs:      false,
-			ethereumKeystore: false,
+			reportToEvmTxMeta: reportToEvmTxMetaNoop,
+			excludeSigs:       false,
+			ethereumKeystore:  false,
 		},
 	}
+
+	for _, opt := range opts {
+		opt(newContractTransmitter.transmitterOptions)
+	}
+
+	return newContractTransmitter
 }
 func WithExcludeSignatures() OCRTransmitterOption {
 	return func(ct *transmitterOps) {
