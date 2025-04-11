@@ -29,6 +29,6 @@ func ParseLatestEnergyPrice(energyPricesStr string) (int32, error) {
 	return int32(energyUnitPrice), nil
 }
 
-func CalculatePaddedFeeLimit(feeLimit int32, bumpTimes uint32) int32 {
-	return int32(float64(feeLimit) * math.Pow(1.5, float64(bumpTimes+1)))
+func CalculatePaddedFeeLimit(feeLimit int32, bumpTimes uint32, multiplier float64) int32 {
+	return int32(float64(feeLimit) * math.Pow(multiplier, float64(bumpTimes+1)))
 }

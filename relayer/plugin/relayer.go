@@ -83,6 +83,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		// TODO: stop changing uint64 fields here to uint?
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
+		EnergyMultiplier:  1.5, // TODO: This was the exisiting value for DF, longer term this should be a config option
 	})
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {

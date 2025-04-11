@@ -44,11 +44,11 @@ type TronTxm struct {
 }
 
 type TronTxmRequest struct {
-	IdempotencyKey  *string
 	FromAddress     address.Address
 	ContractAddress address.Address
 	Method          string
 	Params          []any
+	Meta            *TronTxMeta
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
@@ -117,7 +117,7 @@ func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
 		}
 	}
 
-	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1}
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, Meta: request.Meta}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -187,7 +187,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullno
 	}
 
 	feeLimit := energyUnitPrice * int32(energyUsed)
-	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
+	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes, t.Config.EnergyMultiplier)
 
 	t.Logger.Debugw("Trigger smart contract", "energyBumpTimes", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
@@ -410,6 +410,5 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 
 	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
-	// TODO: Just for debugging
-	return triggerResponse.EnergyUsed * 5, nil
+	return triggerResponse.EnergyUsed, nil
 }
