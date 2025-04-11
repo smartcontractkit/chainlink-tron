@@ -112,6 +112,7 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		ContractAddress: oc.contractAddress,
 		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
 		Params:          params,
+		Meta:            &txm.TronTxMeta{},
 	}
 	return oc.txm.Enqueue(request)
 }
