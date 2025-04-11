@@ -22,9 +22,9 @@ type ContractTransmitter interface {
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
 type transmitterOps struct {
-	excludeSigs      bool
-	ethereumKeystore bool
-	isCCIPExec       bool
+	excludeSigs            bool
+	ethereumKeystore       bool
+	transactionIdempotency bool
 }
 
 type contractTransmitter struct {
@@ -51,9 +51,9 @@ func NewOCRContractTransmitter(
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
 		transmitterOptions: &transmitterOps{
-			excludeSigs:      false,
-			ethereumKeystore: false,
-			isCCIPExec:       false,
+			excludeSigs:            false,
+			ethereumKeystore:       false,
+			transactionIdempotency: false,
 		},
 	}
 }
@@ -68,8 +68,8 @@ func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
 	return oc
 }
 
-func (oc *contractTransmitter) WithCCIPExec() *contractTransmitter {
-	oc.transmitterOptions.isCCIPExec = true
+func (oc *contractTransmitter) WithTransactionIdempotency() *contractTransmitter {
+	oc.transmitterOptions.transactionIdempotency = true
 	return oc
 }
 
