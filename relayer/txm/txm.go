@@ -111,12 +111,18 @@ func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
 	if len(request.Params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
+
 	for i := 0; i < len(request.Params); i += 2 {
 		paramType := request.Params[i]
 		_, ok := paramType.(string)
 		if !ok {
 			return fmt.Errorf("non-string param type")
 		}
+	}
+
+	if request.Meta != nil {
+		println("MessageIDs: ", request.Meta.MessageIDs)
+		println("SequencerNumbers: ", request.Meta.SeqNumbers)
 	}
 
 	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, Meta: request.Meta}
