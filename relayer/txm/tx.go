@@ -1,7 +1,9 @@
 package txm
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 )
 
 type TronTx struct {
@@ -12,9 +14,5 @@ type TronTx struct {
 	Attempt         uint64
 	OutOfTimeErrors uint64
 	EnergyBumpTimes uint32
-	Meta            *TronTxMeta
-}
-
-type TronTxMeta struct {
-	IdempotencyKey *string
+	Meta            *txmgrtypes.TxMeta[common.Address, common.Hash]
 }
