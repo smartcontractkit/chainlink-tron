@@ -46,6 +46,7 @@ type TronTxm struct {
 }
 
 type TronTxmRequest struct {
+	Id              string
 	FromAddress     address.Address
 	ContractAddress address.Address
 	Method          string
