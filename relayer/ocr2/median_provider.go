@@ -34,11 +34,11 @@ func NewMedianProvider(
 ) *medianProvider {
 	lggr = logger.Named(lggr, "MedianProvider")
 	cache := NewTransmissionsCache(cfg, medianContract, lggr)
-	transmitter := NewOCRContractTransmitter(ctx, cache, contractAddress, senderAddress, txm, lggr)
+	//transmitter := NewOCRContractTransmitter(ctx, cache, contractAddress, senderAddress, txm, lggr)
 
 	return &medianProvider{
-		configProvider:     configProvider,
-		transmitter:        transmitter,
+		configProvider: configProvider,
+		//transmitter:        transmitter,
 		transmissionsCache: cache,
 		reportCodec:        evmreportcodec.ReportCodec{},
 	}
