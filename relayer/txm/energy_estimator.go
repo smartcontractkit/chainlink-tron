@@ -26,9 +26,9 @@ type EnergyEstimator interface {
 	CalculateFeeLimit(tx *TronTx) (int64, error)
 }
 
-// basicEnergyEstimator is a basic implementation of the EnergyEstimator interface.
-// It estimates the energy used by a transaction using the EstimateEnergy method and
-// calculates the fee limit for a transaction using the CalculateFeeLimit method.
+// basicEnergyEstimator is a basic implementation of an EnergyEstimator.
+// It estimates the energy used by a transaction calling the full node's API `/estimateEnergy`
+// However, if this fails or the node doesn't support it. it will fallback to simulating the transaction and getting the energy used from the response.
 // It also caches the energy unit price and updates it every minute.
 type basicEnergyEstimator struct {
 	*services.StateMachine
@@ -51,7 +51,7 @@ func NewBasicEnergyEstimator(lggr logger.Logger, client sdk.FullNodeClient, esti
 		client:                client,
 		estimateEnergyEnabled: estimateEnergyEnabled,
 		chGetEnergyUnitPrice:  make(chan struct{}),
-		chStop:                make(chan struct{}),
+		chStop:                make(services.StopChan),
 		done:                  sync.WaitGroup{},
 	}
 }
@@ -137,7 +137,6 @@ func (e *basicEnergyEstimator) Name() string {
 
 func (e *basicEnergyEstimator) Start(ctx context.Context) error {
 	return e.StartOnce("BasicEnergyEstimator", func() error {
-		defer e.done.Done()
 		ctx, cancel := e.chStop.NewCtx()
 		defer cancel()
 
