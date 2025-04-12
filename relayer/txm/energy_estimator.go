@@ -31,7 +31,7 @@ type EnergyEstimator interface {
 // However, if this fails or the node doesn't support it. it will fallback to simulating the transaction and getting the energy used from the response.
 // It also caches the energy unit price and updates it every minute.
 type basicEnergyEstimator struct {
-	*services.StateMachine
+	services.StateMachine
 	lggr                  logger.Logger
 	client                sdk.FullNodeClient
 	estimateEnergyEnabled bool
@@ -47,6 +47,7 @@ type basicEnergyEstimator struct {
 
 func NewBasicEnergyEstimator(lggr logger.Logger, client sdk.FullNodeClient, estimateEnergyEnabled bool) *basicEnergyEstimator {
 	return &basicEnergyEstimator{
+		StateMachine:          services.StateMachine{},
 		lggr:                  lggr,
 		client:                client,
 		estimateEnergyEnabled: estimateEnergyEnabled,
@@ -74,8 +75,8 @@ func (e *basicEnergyEstimator) CalculateFeeLimit(tx *TronTx) (int64, error) {
 
 // GetEnergyUnitPrice returns the energy unit price from the cache
 func (e *basicEnergyEstimator) GetEnergyUnitPrice() (int64, error) {
-	e.RLock()
-	defer e.RUnlock()
+	e.StateMachine.RLock()
+	defer e.StateMachine.RUnlock()
 
 	if e.energyUnitPrice == 0 {
 		e.lggr.Warnw("Energy unit price not set, using default value", "default", DEFAULT_ENERGY_UNIT_PRICE)
