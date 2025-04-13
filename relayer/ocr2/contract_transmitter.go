@@ -37,7 +37,7 @@ type contractTransmitter struct {
 	transmissionsCache TransmissionsCache
 	contractAddress    address.Address
 	senderAddress      address.Address
-	txm                *txm.Txm
+	txm                *txm.TronTxm
 	lggr               logger.Logger
 	transmitterOptions *transmitterOps
 }
@@ -47,7 +47,7 @@ func NewOCRContractTransmitter(
 	transmissionsCache TransmissionsCache,
 	contractAddress address.Address,
 	senderAddress address.Address,
-	txm *txm.Txm,
+	txm *txm.TronTxm,
 	lggr logger.Logger,
 ) *contractTransmitter {
 	newContractTransmitter := &contractTransmitter{
