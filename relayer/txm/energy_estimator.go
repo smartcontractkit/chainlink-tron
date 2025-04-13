@@ -138,12 +138,8 @@ func (e *basicEnergyEstimator) Name() string {
 
 func (e *basicEnergyEstimator) Start(ctx context.Context) error {
 	return e.StartOnce("BasicEnergyEstimator", func() error {
-		ctx, cancel := e.chStop.NewCtx()
-		defer cancel()
-
 		e.done.Add(1)
 		go e.getEnergyUnitPriceTicker(ctx, services.NewTicker(time.Minute))
-
 		return nil
 	})
 }
