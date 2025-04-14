@@ -2,18 +2,15 @@ package txm
 
 import (
 	"context"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type TronTxmConfig struct {
-	BroadcastChanSize     uint
-	ConfirmPollSecs       uint
-	EnergyMultiplier      float64
-	EstimateEnergyEnabled bool
-	TxRetentionSecs       time.Duration
-	StatusChecker         CCIPTransactionStatusChecker
+	BroadcastChanSize uint
+	ConfirmPollSecs   uint
+	EnergyMultiplier  float64
+	StatusChecker     CCIPTransactionStatusChecker
 }
 
 // CCIPTransactionStatusChecker is an interface that defines the method for checking the status of a transaction.
