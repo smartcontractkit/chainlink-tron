@@ -108,6 +108,12 @@ func NewAccountStore() *AccountStore {
 	}
 }
 
+func (c *AccountStore) GetAllTxStores() []*TxStore {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return maps.Values(c.store)
+}
+
 func (c *AccountStore) GetTxStore(fromAddress string) *TxStore {
 	c.lock.Lock()
 	defer c.lock.Unlock()

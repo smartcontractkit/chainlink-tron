@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 
@@ -136,6 +137,26 @@ func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
 	}
 
 	return nil
+}
+
+// Checks if a transaction exists in the txm. a really not optimal solution but works around the constraints of the current implementation.
+// Used for the status checker to determine if a transaction has already been enqueued.
+// NOTE: Please do NOT rely on this function for anything else, the transaction statuses are not reliable as the Tron TXM does not track all statuses but simply the ones that haven't been confirmed.
+func (t *TronTxm) DoesTransactionExist(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
+	txStores := t.AccountStore.GetAllTxStores()
+
+	for _, txStore := range txStores {
+		transactionExists, err := txStore.DoesIdempotencyKeyExist(transactionID)
+		if err != nil {
+			return types.Unknown, err
+		}
+
+		if transactionExists {
+			return types.Unconfirmed, nil
+		}
+	}
+
+	return types.Unknown, nil
 }
 
 func (t *TronTxm) broadcastLoop() {
@@ -464,6 +485,7 @@ func (t *TronTxm) doesTransactionRequireIdempotencyKey(tx *TronTx) bool {
 	// This behaviour only happens for CCIP Exec messages.
 	if tx.Meta != nil && t.Config.StatusChecker != nil {
 		if len(tx.Meta.MessageIDs) == 1 {
+			t.Logger.Debugw("transaction requires idempotency key", "tx", tx)
 			return true
 		}
 	}
