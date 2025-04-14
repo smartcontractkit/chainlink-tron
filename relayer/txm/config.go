@@ -10,7 +10,7 @@ type TronTxmConfig struct {
 	BroadcastChanSize uint
 	ConfirmPollSecs   uint
 	EnergyMultiplier  float64
-	StatusChecker     CCIPTransactionStatusChecker
+	StatusChecker     bool
 }
 
 // CCIPTransactionStatusChecker is an interface that defines the method for checking the status of a transaction.
