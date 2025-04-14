@@ -151,6 +151,7 @@ func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
 func (t *TronTxm) DoesTransactionExist(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
 	txStores := t.AccountStore.GetAllTxStores()
 
+	// Check if the transaction exists in any of the tx stores
 	for _, txStore := range txStores {
 		transactionExists, err := txStore.DoesIdempotencyKeyExist(transactionID)
 		if err != nil {
@@ -162,7 +163,7 @@ func (t *TronTxm) DoesTransactionExist(ctx context.Context, transactionID string
 		}
 	}
 
-	return types.Unknown, nil
+	return types.Unknown, fmt.Errorf("transaction does not exist")
 }
 
 func (t *TronTxm) broadcastLoop() {
