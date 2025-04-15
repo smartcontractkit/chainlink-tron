@@ -481,6 +481,13 @@ func (t *TronTxm) shouldEnqueue(tx *TronTx) (bool, error) {
 			t.Logger.Debugw("skipped OCR transmission, idempotency key already exists", "idempotencyKey", idempotencyKey)
 			return false, nil
 		}
+
+		// Add the idempotency key to the tx store
+		err = txStore.AddIdempotencyKey(idempotencyKey)
+		if err != nil {
+			t.Logger.Errorw("failed to add idempotency key to tx store, skipped OCR transmission", "error", err)
+			return false, err
+		}
 	}
 
 	// If the transaction does not require an idempotency key or the idempotency key does not exist, we should enqueue the transaction.
