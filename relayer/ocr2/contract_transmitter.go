@@ -50,7 +50,7 @@ func NewOCRContractTransmitter(
 	txm *txm.TronTxm,
 	lggr logger.Logger,
 ) *contractTransmitter {
-	newContractTransmitter := &contractTransmitter{
+	return &contractTransmitter{
 		contractAddress:    contractAddress,
 		txm:                txm,
 		senderAddress:      senderAddress,
@@ -62,8 +62,6 @@ func NewOCRContractTransmitter(
 			ethereumKeystore:  false,
 		},
 	}
-
-	return newContractTransmitter
 }
 
 func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
