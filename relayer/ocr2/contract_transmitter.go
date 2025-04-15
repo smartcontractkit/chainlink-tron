@@ -118,14 +118,13 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		oc.lggr.Warnw("failed to generate tx metadata for report", "err", err)
 	}
 
-	request := &txm.TronTxmRequest{
+	return oc.txm.Enqueue(txm.TronTxmRequest{
 		FromAddress:     oc.senderAddress,
 		ContractAddress: oc.contractAddress,
 		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
 		Params:          params,
 		Meta:            txMeta,
-	}
-	return oc.txm.Enqueue(request)
+	})
 }
 
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
