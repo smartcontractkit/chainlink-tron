@@ -111,7 +111,7 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(request *TronTxmRequest) error {
+func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 	if _, err := t.Keystore.Sign(context.Background(), request.FromAddress.String(), nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}

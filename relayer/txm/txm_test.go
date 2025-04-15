@@ -101,7 +101,7 @@ func TestTxm(t *testing.T) {
 
 	t.Run("Invalid input params", func(t *testing.T) {
 		txm, _, _ := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(&trontxm.TronTxmRequest{
+		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
 			ContractAddress: genesisAddress,
 			Method:          "foo()",
@@ -113,7 +113,7 @@ func TestTxm(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(&trontxm.TronTxmRequest{
+		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
 			ContractAddress: genesisAddress,
 			Method:          "foo()",
@@ -136,7 +136,7 @@ func TestTxm(t *testing.T) {
 		}, fmt.Errorf("some err"))
 
 		txm, _, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(&trontxm.TronTxmRequest{
+		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
 			ContractAddress: genesisAddress,
 			Method:          "foo()",
@@ -161,7 +161,7 @@ func TestTxm(t *testing.T) {
 			Message: "block unsolid",
 		}, fmt.Errorf("some err"))
 		txm, _, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(&trontxm.TronTxmRequest{
+		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
 			ContractAddress: genesisAddress,
 			Method:          "foo()",
@@ -186,7 +186,7 @@ func TestTxm(t *testing.T) {
 			Message: "some error",
 		}, fmt.Errorf("some err"))
 		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(&trontxm.TronTxmRequest{
+		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
 			ContractAddress: genesisAddress,
 			Method:          "foo()",
