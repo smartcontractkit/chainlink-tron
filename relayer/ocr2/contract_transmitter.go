@@ -5,12 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -23,14 +21,9 @@ type ContractTransmitter interface {
 
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
-func reportToEvmTxMetaNoop([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error) {
-	return nil, nil
-}
-
 type transmitterOps struct {
-	excludeSigs       bool
-	ethereumKeystore  bool
-	reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)
+	excludeSigs      bool
+	ethereumKeystore bool
 }
 
 type contractTransmitter struct {
@@ -57,9 +50,8 @@ func NewOCRContractTransmitter(
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
 		transmitterOptions: &transmitterOps{
-			reportToEvmTxMeta: reportToEvmTxMetaNoop,
-			excludeSigs:       false,
-			ethereumKeystore:  false,
+			excludeSigs:      false,
+			ethereumKeystore: false,
 		},
 	}
 }
@@ -71,11 +63,6 @@ func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
 
 func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
 	oc.transmitterOptions.ethereumKeystore = true
-	return oc
-}
-
-func (oc *contractTransmitter) WithReportToEthMetadata(reportToEvmTxMeta func([]byte) (*txmgrtypes.TxMeta[common.Address, common.Hash], error)) *contractTransmitter {
-	oc.transmitterOptions.reportToEvmTxMeta = reportToEvmTxMeta
 	return oc
 }
 
@@ -113,17 +100,11 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		"bytes32", vs,
 	}
 
-	txMeta, err := oc.transmitterOptions.reportToEvmTxMeta(report)
-	if err != nil {
-		oc.lggr.Warnw("failed to generate tx metadata for report", "err", err)
-	}
-
 	return oc.txm.Enqueue(txm.TronTxmRequest{
 		FromAddress:     oc.senderAddress,
 		ContractAddress: oc.contractAddress,
 		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
 		Params:          params,
-		Meta:            txMeta,
 	})
 }
 

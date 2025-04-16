@@ -13,13 +13,10 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
@@ -38,7 +35,6 @@ type TronTxm struct {
 	Config                TronTxmConfig
 	EstimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	StatusChecker CCIPTransactionStatusChecker
 	Client        sdk.FullNodeClient
 	BroadcastChan chan *TronTx
 	AccountStore  *AccountStore
@@ -48,12 +44,10 @@ type TronTxm struct {
 }
 
 type TronTxmRequest struct {
-	Id              string
 	FromAddress     address.Address
 	ContractAddress address.Address
 	Method          string
 	Params          []any
-	Meta            *txmgrtypes.TxMeta[gethcommon.Address, gethcommon.Hash]
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
@@ -66,10 +60,6 @@ func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, c
 		BroadcastChan:         make(chan *TronTx, config.BroadcastChanSize),
 		AccountStore:          NewAccountStore(),
 		Stop:                  make(chan struct{}),
-	}
-
-	if config.StatusChecker {
-		txm.StatusChecker = NewTxmStatusChecker(txm.DoesTransactionExist)
 	}
 
 	return txm
@@ -129,12 +119,7 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 	}
 
 	// Construct the transaction
-	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, Meta: request.Meta}
-
-	// If the transaction should not be enqueued, we'll skip it and return an error if present
-	if shouldEnqueue, err := t.shouldEnqueue(tx); !shouldEnqueue || err != nil {
-		return err
-	}
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -143,27 +128,6 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 	}
 
 	return nil
-}
-
-// Checks if a transaction exists in the txm. a really not optimal solution but works around the constraints of the current implementation.
-// Used for the status checker to determine if a transaction has already been enqueued.
-// NOTE: Please do NOT rely on this function for anything else, the transaction statuses are not reliable as the Tron TXM does not track all statuses but simply the ones that haven't been confirmed.
-func (t *TronTxm) DoesTransactionExist(ctx context.Context, transactionID string) (types.TransactionStatus, error) {
-	txStores := t.AccountStore.GetAllTxStores()
-
-	// Check if the transaction exists in any of the tx stores
-	for _, txStore := range txStores {
-		transactionExists, err := txStore.DoesIdempotencyKeyExist(transactionID)
-		if err != nil {
-			return types.Unknown, err
-		}
-
-		if transactionExists {
-			return types.Unconfirmed, nil
-		}
-	}
-
-	return types.Unknown, fmt.Errorf("transaction does not exist")
 }
 
 func (t *TronTxm) broadcastLoop() {
@@ -449,60 +413,4 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	t.Logger.Debugw("Estimated energy using TriggerConstantContract Method", "energyUsed", triggerResponse.EnergyUsed, "energyPenalty", triggerResponse.EnergyPenalty, "tx", tx)
 
 	return triggerResponse.EnergyUsed, nil
-}
-
-// Performs a pre-enqueuing check to determine if the transaction should be enqueued.
-// If the transaction should not be enqueued, we'll skip it and return an error if present.
-func (t *TronTxm) shouldEnqueue(tx *TronTx) (bool, error) {
-	// We should always honour transactions if we don't have any information about them.
-	// In an ideal world, the txm would have a hook into an external status checker and we can use that to determine if we should enqueue to prevent duplicate transactions.
-	if tx.Meta == nil || t.StatusChecker == nil {
-		return true, nil
-	}
-
-	// If the transaction requires an idempotency key, we'll construct it and check if it already exists.
-	if t.doesTransactionRequireIdempotencyKey(tx) {
-		messageId := tx.Meta.MessageIDs[0]
-		_, count, err := t.StatusChecker.CheckMessageStatus(context.Background(), messageId)
-		if err != nil {
-			t.Logger.Errorw("failed to check message status, skipped OCR transmission", "error", err)
-			return false, err
-		}
-
-		idempotencyKey := fmt.Sprintf("%s-%d", messageId, count+1)
-		txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
-		exists, err := txStore.DoesIdempotencyKeyExist(idempotencyKey)
-		if err != nil {
-			t.Logger.Errorw("failed to check if idempotency key exists, skipped OCR transmission", "error", err)
-			return false, err
-		}
-
-		if exists {
-			t.Logger.Debugw("skipped OCR transmission, idempotency key already exists", "idempotencyKey", idempotencyKey)
-			return false, nil
-		}
-
-		// Add the idempotency key to the tx store
-		err = txStore.AddIdempotencyKey(idempotencyKey)
-		if err != nil {
-			t.Logger.Errorw("failed to add idempotency key to tx store, skipped OCR transmission", "error", err)
-			return false, err
-		}
-	}
-
-	// If the transaction does not require an idempotency key or the idempotency key does not exist, we should enqueue the transaction.
-	return true, nil
-}
-
-func (t *TronTxm) doesTransactionRequireIdempotencyKey(tx *TronTx) bool {
-	// Txns that require an idempotency key are ones that have a single message ID and a status checker has been set.
-	// This behaviour only happens for CCIP Exec messages.
-	if tx.Meta != nil && t.StatusChecker != nil {
-		if len(tx.Meta.MessageIDs) == 1 {
-			t.Logger.Debugw("transaction requires idempotency key", "tx", tx)
-			return true
-		}
-	}
-
-	return false
 }
