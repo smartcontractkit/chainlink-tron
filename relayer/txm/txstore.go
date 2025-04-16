@@ -24,7 +24,8 @@ type TxStore struct {
 
 func NewTxStore() *TxStore {
 	return &TxStore{
-		unconfirmedTxes: map[string]*UnconfirmedTx{},
+		unconfirmedTxes:   map[string]*UnconfirmedTx{},
+		idempotencyKeyMap: map[string]interface{}{},
 	}
 }
 
