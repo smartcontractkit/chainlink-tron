@@ -1,0 +1,7 @@
+tronctl
+tonctl-docs
+bin
+.idea/
+*.key
+scripts/*
+.DS_Store
