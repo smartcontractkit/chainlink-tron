@@ -56,12 +56,14 @@ func NewOCRContractTransmitter(
 	}
 }
 
-func (oc *contractTransmitter) WithExcludeSignatures() *contractTransmitter {
+// WithExcludeSignatures ensures that the signatures are not included in the transmitted payload
+func (oc *contractTransmitter) WithExcludeSignatures() ContractTransmitter {
 	oc.transmitterOptions.excludeSigs = true
 	return oc
 }
 
-func (oc *contractTransmitter) WithEthereumKeystore() *contractTransmitter {
+// WithEthereumKeystore ensures all addresses that are exposed from the transmitter are EVM addresses as opposed to TRON addresses
+func (oc *contractTransmitter) WithEthereumKeystore() ContractTransmitter {
 	oc.transmitterOptions.ethereumKeystore = true
 	return oc
 }
