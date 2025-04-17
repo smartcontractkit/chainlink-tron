@@ -58,6 +58,7 @@ func TestTxmLocal(t *testing.T) {
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		// EnergyMultiplier is set to 1.5 by default
 	}
 
 	runTxmTest(t, logger, fullnodeClient, config, keystore, genesisAddress, 10)

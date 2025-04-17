@@ -7,6 +7,10 @@ on:
       - main
       - next
   pull_request:
+    branches:
+      - '*'
+    paths:
+      - 'relayer/**'
 
 jobs:
   detect-changes:

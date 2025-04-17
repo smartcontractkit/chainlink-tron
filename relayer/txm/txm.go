@@ -27,6 +27,7 @@ const (
 	MAX_RETRY_ATTEMPTS           = 5
 	MAX_BROADCAST_RETRY_DURATION = 30 * time.Second
 	BROADCAST_DELAY_DURATION     = 2 * time.Second
+	DEFAULT_ENERGY_MULTIPLIER    = 1.5
 )
 
 type TronTxm struct {
@@ -62,7 +63,17 @@ func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, c
 		Stop:                  make(chan struct{}),
 	}
 
+	// Set defaults for missing config values
+	txm.setDefaults()
+
 	return txm
+}
+
+func (t *TronTxm) setDefaults() {
+	if t.Config.EnergyMultiplier == 0 || t.Config.EnergyMultiplier < 1.0 {
+		t.Logger.Warnw("Energy multiplier is not set, using default value", "default", DEFAULT_ENERGY_MULTIPLIER)
+		t.Config.EnergyMultiplier = DEFAULT_ENERGY_MULTIPLIER
+	}
 }
 
 func (t *TronTxm) Name() string {
