@@ -7,6 +7,8 @@ on:
       - main
       - next
   pull_request:
+    branches:
+      - '*'
 
 jobs:
   detect-changes:
