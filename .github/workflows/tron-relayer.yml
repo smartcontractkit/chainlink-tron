@@ -22,7 +22,7 @@ jobs:
       - uses: ./.github/actions/changes
         id: c
         with:
-          folder: tron
+          folder: relayer
 
   test:
     name: Integration Tests
