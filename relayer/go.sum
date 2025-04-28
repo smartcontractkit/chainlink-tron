@@ -379,8 +379,8 @@ github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp
 github.com/shopspring/decimal v1.4.0/go.mod h1:gawqmDU56v4yIKSwfBSFip1HdCCXN8/+DMd9qYNcwME=
 github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMBDgk/93Q=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418172423-6b24a042d134 h1:4CdrrMDzdo9lf1oUi3rGKuprV11TmyUpVMM7fyPsqJA=
-github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418172423-6b24a042d134/go.mod h1:vHs/mPpAztdKJtzRKLnmLinmpS78fBh9sAuyKqQrQ+I=
+github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425195105-d9eabb4a4519 h1:FMQVnelIaY4MZwYjKJDnTfoKJ1d6y4xZY6SpORGFlDo=
+github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425195105-d9eabb4a4519/go.mod h1:vHs/mPpAztdKJtzRKLnmLinmpS78fBh9sAuyKqQrQ+I=
 github.com/smartcontractkit/chainlink-evm v0.0.0-20250418155716-b70a99cec060 h1:5dnr4CLdbzGBXgWhWdzGzaEdJ3Ky70lY0oRCDsoDTu8=
 github.com/smartcontractkit/chainlink-evm v0.0.0-20250418155716-b70a99cec060/go.mod h1:fAS8SDyCxiCIRujq7v3D1ISGCrDyuXxd9zOEjQllJL8=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=

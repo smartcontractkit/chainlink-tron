@@ -262,3 +262,7 @@ func (t *TronRelayer) LatestHead(ctx context.Context) (types.Head, error) {
 func (t *TronRelayer) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
 	return errors.New("TODO")
 }
+
+func (t *TronRelayer) AsEVMRelayer() (loop.EVMRelayer, error) {
+	return nil, errors.New("unimplemented")
+}

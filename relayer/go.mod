@@ -12,7 +12,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250418172423-6b24a042d134
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425195105-d9eabb4a4519
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250418155716-b70a99cec060
 	github.com/smartcontractkit/libocr v0.0.0-20250328171017-609ec10a5510
 	github.com/stretchr/testify v1.10.0
@@ -135,10 +135,5 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace (
-	// original author is not maintaining the repo anymore
-	github.com/fbsobreira/gotron-sdk => ./gotron-sdk
-
-	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
-	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
-)
+// original author is not maintaining the repo anymore
+replace github.com/fbsobreira/gotron-sdk => ./gotron-sdk

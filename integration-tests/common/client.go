@@ -18,8 +18,8 @@ import (
 	"golang.org/x/crypto/curve25519"
 	"gopkg.in/guregu/null.v4"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
+	client "github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
@@ -161,7 +161,7 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 			AlphaAcceptInfinite: false,
 			AlphaAcceptPPB:      5000000,
 			DeltaC:              time.Hour * 24,
-		}.Encode(), // reportingPluginConfig []byte,
+		}.Encode(),     // reportingPluginConfig []byte,
 		nil,            // maxDurationInitialization *time.Duration,
 		2*time.Second,  // maxDurationQuery time.Duration,
 		12*time.Second, // maxDurationObservation time.Duration,

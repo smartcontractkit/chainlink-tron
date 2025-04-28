@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -20,8 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 	trontxm "github.com/smartcontractkit/chainlink-tron/relayer/txm"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 var keystore *testutils.TestKeystore
