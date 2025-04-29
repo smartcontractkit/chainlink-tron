@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 func TestParseLatestEnergyPrice(t *testing.T) {
