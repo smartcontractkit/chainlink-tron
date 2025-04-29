@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-tron/relayer/config"
 
 	tronplugin "github.com/smartcontractkit/chainlink-tron/relayer/plugin"
 )
@@ -52,14 +53,14 @@ type pluginRelayer struct {
 
 var _ loop.PluginRelayer = &pluginRelayer{}
 
-func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
-	d := toml.NewDecoder(strings.NewReader(config))
+func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
+	d := toml.NewDecoder(strings.NewReader(configTOML))
 	d.DisallowUnknownFields()
 
-	var cfg tronplugin.TOMLConfig
+	var cfg config.TOMLConfig
 
 	if err := d.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
+		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, configTOML)
 	}
 
 	if err := cfg.ValidateConfig(); err != nil {

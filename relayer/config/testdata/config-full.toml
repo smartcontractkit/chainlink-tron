@@ -1,0 +1,14 @@
+ChainID = 'fake'
+Enabled = false
+BalancePollPeriod = '1h0m0s'
+BroadcastChanSize = 99
+ConfirmPollPeriod = '42ms'
+OCR2CachePollPeriod = '1m40s'
+OCR2CacheTTL = '15m0s'
+RetentionPeriod = '0s'
+ReapInterval = '1m0s'
+
+[[Nodes]]
+Name = 'node'
+URL = 'https://example.com/tron'
+SolidityURL = 'http://example.com/solidity'
