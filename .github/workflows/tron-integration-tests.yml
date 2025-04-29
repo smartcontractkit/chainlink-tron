@@ -23,7 +23,7 @@ jobs:
       - uses: ./.github/actions/changes
         id: c
         with:
-          folder: tron
+          folder: .
   integration_tests_docker:
     name: Run Docker Integration Tests
     runs-on: ubuntu-latest-32cores-128GB

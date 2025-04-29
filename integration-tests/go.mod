@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/rs/zerolog v1.33.0
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250425195105-d9eabb4a4519
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250430133340-d04a3b64e331
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.1
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250422175525-b7575d96bd4d
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250428183335-14ac746cbe81
@@ -194,6 +194,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/linxGnu/grocksdb v1.9.3 // indirect
