@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -16,12 +18,10 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	trontxm "github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
+	trontxm "github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 var keystore *testutils.TestKeystore
@@ -101,14 +101,24 @@ func TestTxm(t *testing.T) {
 
 	t.Run("Invalid input params", func(t *testing.T) {
 		txm, _, _ := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()", "param1")
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{"param1"},
+		})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "odd number of params")
 	})
 
 	t.Run("Success", func(t *testing.T) {
 		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
 		require.NoError(t, err)
 
 		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
@@ -126,7 +136,12 @@ func TestTxm(t *testing.T) {
 		}, fmt.Errorf("some err"))
 
 		txm, _, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
 		require.NoError(t, err)
 
 		waitForMaxRetryDuration()
@@ -146,7 +161,12 @@ func TestTxm(t *testing.T) {
 			Message: "block unsolid",
 		}, fmt.Errorf("some err"))
 		txm, _, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
 		require.NoError(t, err)
 
 		waitForMaxRetryDuration()
@@ -166,7 +186,12 @@ func TestTxm(t *testing.T) {
 			Message: "some error",
 		}, fmt.Errorf("some err"))
 		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
-		err := txm.Enqueue(genesisAddress, genesisAddress, "foo()")
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
 		require.NoError(t, err)
 
 		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)

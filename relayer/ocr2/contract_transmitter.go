@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -21,17 +21,23 @@ type ContractTransmitter interface {
 
 var _ ContractTransmitter = (*contractTransmitter)(nil)
 
+type transmitterOps struct {
+	excludeSigs      bool
+	ethereumKeystore bool
+}
+
 type contractTransmitter struct {
-	transmissionsCache *transmissionsCache
+	transmissionsCache TransmissionsCache
 	contractAddress    address.Address
 	senderAddress      address.Address
 	txm                *txm.TronTxm
 	lggr               logger.Logger
+	transmitterOptions *transmitterOps
 }
 
 func NewOCRContractTransmitter(
 	ctx context.Context,
-	transmissionsCache *transmissionsCache,
+	transmissionsCache TransmissionsCache,
 	contractAddress address.Address,
 	senderAddress address.Address,
 	txm *txm.TronTxm,
@@ -43,7 +49,23 @@ func NewOCRContractTransmitter(
 		senderAddress:      senderAddress,
 		transmissionsCache: transmissionsCache,
 		lggr:               logger.Named(lggr, "OCRContractTransmitter"),
+		transmitterOptions: &transmitterOps{
+			excludeSigs:      false,
+			ethereumKeystore: false,
+		},
 	}
+}
+
+// WithExcludeSignatures ensures that the signatures are not included in the transmitted payload
+func (oc *contractTransmitter) WithExcludeSignatures() ContractTransmitter {
+	oc.transmitterOptions.excludeSigs = true
+	return oc
+}
+
+// WithEthereumKeystore ensures all addresses that are exposed from the transmitter are EVM addresses as opposed to TRON addresses
+func (oc *contractTransmitter) WithEthereumKeystore() ContractTransmitter {
+	oc.transmitterOptions.ethereumKeystore = true
+	return oc
 }
 
 // Transmit sends the report to the on-chain smart contract's Transmit method.
@@ -61,9 +83,12 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		if err != nil {
 			panic("eventTransmit(ev): error in SplitSignature")
 		}
-		rs = append(rs, r)
-		ss = append(ss, s)
-		vs[i] = v
+
+		if !oc.transmitterOptions.excludeSigs {
+			rs = append(rs, r)
+			ss = append(ss, s)
+			vs[i] = v
+		}
 	}
 
 	oc.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(report), "rawReportCtx", rawReportCtx, "contractAddress", oc.contractAddress)
@@ -77,7 +102,12 @@ func (oc *contractTransmitter) Transmit(ctx context.Context, reportCtx ocrtypes.
 		"bytes32", vs,
 	}
 
-	return oc.txm.Enqueue(oc.senderAddress, oc.contractAddress, "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)", params...)
+	return oc.txm.Enqueue(txm.TronTxmRequest{
+		FromAddress:     oc.senderAddress,
+		ContractAddress: oc.contractAddress,
+		Method:          "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)",
+		Params:          params,
+	})
 }
 
 func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
@@ -96,6 +126,10 @@ func (oc *contractTransmitter) LatestConfigDigestAndEpoch(
 
 // FromAccount returns the account from which the transmitter invokes the contract
 func (oc *contractTransmitter) FromAccount(ctx context.Context) (ocrtypes.Account, error) {
+	if oc.transmitterOptions.ethereumKeystore {
+		return ocrtypes.Account(oc.senderAddress.EthAddress().String()), nil
+	}
+
 	return ocrtypes.Account(oc.senderAddress.String()), nil
 }
 

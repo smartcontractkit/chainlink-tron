@@ -1,0 +1,238 @@
+name: Tron Release Workflow
+
+on:
+  workflow_dispatch: # workflow_dispatch will be removed eventually. Keeping it for testing purposes.
+    inputs:
+      version:
+        description: "Semantic version for the Docker image (e.g., 1.0.0). The workflow will then append '-tron' to the version."
+      core_ref:
+        description: "Core ref for the Docker build" # As default is will use DEFAULT_CORE_REF
+      prerelease:
+        description: "Set to true for prerelease, false for production release." # As default is will use PRERELEASE
+      use_qa_ecr:
+        description: "Set to true to use QA ECR, false (default) to use 'stable' public ECR." # As default is will use public ECR
+
+  push:
+    paths:
+      - **
+    branches:
+      - main
+      - develop
+      - next
+      - integration/*
+
+concurrency:
+  group: tron-release-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  QA_CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/chainlink
+  PUBLIC_CL_ECR: "public.ecr.aws/chainlink/chainlink"
+  TRON_ECR: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/chainlink-internal-integrations-tron
+  DEFAULT_QA_CORE_REF: "develop"
+  DEFAULT_PUBLIC_CORE_REF: "2.20.0"
+  PRERELEASE: true
+  SKIP_IMAGE_BUILD: false
+
+jobs:
+  build-push:
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    environment: integration
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup GitHub Token
+        uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.2.1
+        with:
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN_CII_RELEASE }}
+          aws-lambda-url: ${{ secrets.GATI_LAMBDA_FOUNDATIONS_URL }}
+          aws-region: ${{ secrets.QA_AWS_REGION }}
+
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify AWS CLI
+        run: |
+          aws --version
+          aws sts get-caller-identity
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD_PUBLISH_ECR }}
+          role-duration-seconds: 3600
+          mask-aws-account-id: true
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+        with:
+          mask-password: "true"
+          registries: "${{ secrets.AWS_ACCOUNT_ID_PROD}},${{ secrets.QA_AWS_ACCOUNT_NUMBER }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@0d103c3126aa41d772a8362f6aa67afac040f80c # v3.1.0
+
+      - name: Get Latest Version from ECR
+        run: |
+          echo "Fetching latest version from ECR..."
+          # Get the list of image tags and extract version numbers
+          TAGS=$(aws ecr list-images \
+            --repository-name chainlink-internal-integrations-tron | \
+          jq -r '.imageIds[].imageTag')
+
+          # Look for matching versions
+          MATCHING_VERSIONS=$(echo "$TAGS" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.[0-9]+\.[0-9]+-tron$' || true)
+
+          if [ -z "$MATCHING_VERSIONS" ]; then
+            echo "No matching versions found in ECR, using initial version"
+            NEXT_VERSION="v2.19.0-0.0.1"
+          else
+            # Get the latest version
+            LATEST_VERSION=$(echo "$MATCHING_VERSIONS" | sort -V | tail -n 1)
+            echo "Found latest version: ${LATEST_VERSION}"
+
+            # Extract the version components
+            if [[ $LATEST_VERSION =~ v([0-9]+)\.([0-9]+)\.([0-9]+)-([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+              MAJOR="${BASH_REMATCH[1]}"
+              MINOR="${BASH_REMATCH[2]}"
+              PATCH="${BASH_REMATCH[3]}"
+              TRON_MAJOR="${BASH_REMATCH[4]}"
+              TRON_MINOR="${BASH_REMATCH[5]}"
+              TRON_PATCH="${BASH_REMATCH[6]}"
+
+              # Increment the Tron patch version
+              TRON_PATCH=$((TRON_PATCH + 1))
+
+              # Construct the new version
+              NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}-${TRON_MAJOR}.${TRON_MINOR}.${TRON_PATCH}"
+            else
+              echo "Warning: Latest version ${LATEST_VERSION} didn't match expected pattern"
+              NEXT_VERSION="v2.19.0-0.0.1"
+            fi
+          fi
+
+          echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
+          echo "Next version will be: ${NEXT_VERSION}"
+
+      - name: Compute Docker Tag
+        id: compute-docker-tag
+        run: |
+          BRANCH_NAME=${{ github.ref_name }}
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+
+          if [[ -n "$INPUT_VERSION" ]]; then
+            IMAGE_TAG="${INPUT_VERSION}-tron"
+          elif [[ "$BRANCH_NAME" == "main" ]]; then
+            IMAGE_TAG="${{ env.NEXT_VERSION }}-tron"
+          elif [[ "$BRANCH_NAME" == "develop" ]]; then
+            IMAGE_TAG="${{ env.NEXT_VERSION }}-develop-${SHORT_HASH}-tron"
+          elif [[ "$BRANCH_NAME" == integration/* ]]; then
+            INTEGRATION_NAME=${BRANCH_NAME#integration/}
+            IMAGE_TAG="${{ env.NEXT_VERSION }}-${INTEGRATION_NAME}-${SHORT_HASH}-tron"
+          else
+            echo "Branch '$BRANCH_NAME' does not match expected patterns"
+            exit 0
+          fi
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "Determined image tag: $IMAGE_TAG"
+
+      - name: Check if Tron image already exists
+        id: check-ecr-tag
+        run: |
+          IMAGE_TAG="${{ env.IMAGE_TAG }}"
+          echo "Checking if image tag $IMAGE_TAG already exists..."
+
+          if aws ecr describe-images \
+            --repository-name chainlink-internal-integrations-tron \
+            --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Image tag $IMAGE_TAG already exists in ECR. Skipping image build and push."
+            SKIP_IMAGE_BUILD=true
+          else
+            echo "Image tag does not exist, proceeding with build and push."
+            SKIP_IMAGE_BUILD=false
+          fi
+
+          echo "SKIP_IMAGE_BUILD=$SKIP_IMAGE_BUILD" >> $GITHUB_ENV
+
+      - name: Determine if Prerelease
+        if: env.SKIP_IMAGE_BUILD == 'false'
+        id: determine-prerelease
+        run: |
+          if [[ -n "${{ github.event.inputs.prerelease }}" ]]; then
+            PRERELEASE=${{ github.event.inputs.prerelease }}
+            echo "Using provided prerelease value: $PRERELEASE"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            PRERELEASE=false
+            echo "Branch 'main' detected. Setting prerelease=false"
+          else
+            PRERELEASE=true
+            echo "Defaulting to prerelease=true"
+          fi
+
+          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
+
+      - name: Determine Chainlink ECR and CORE_REF
+        if: env.SKIP_IMAGE_BUILD == 'false'
+        id: determine-tron-cl-ecr
+        run: |
+          USE_QA_ECR=false
+          if [[ -n "${{ github.event.inputs.use_qa_ecr }}" ]]; then
+            echo "Using provided USE_QA_ECR value: ${{ github.event.inputs.use_qa_ecr }}"
+            USE_QA_ECR=${{ github.event.inputs.use_qa_ecr }}
+          else
+            echo "Defaulting to USE_QA_ECR=false"
+            USE_QA_ECR=false
+          fi
+
+          if [[ "$USE_QA_ECR" == "true" ]]; then
+            CL_ECR=${{ env.QA_CL_ECR }}
+            echo "Using chainlink image from QA ECR: $CL_ECR"
+          else
+            CL_ECR=${{ env.PUBLIC_CL_ECR }}
+            echo "Using chainlink image from public ECR: $CL_ECR"
+          fi
+
+          if [[ -n "${{ github.event.inputs.core_ref }}" ]]; then
+            CORE_REF=${{ github.event.inputs.core_ref }}
+            echo "CORE_REF provided as input: $CORE_REF"
+          elif [[ "$USE_QA_ECR" == "true" ]]; then
+            CORE_REF=${{ env.DEFAULT_QA_CORE_REF }}
+            echo "No CORE_REF provided as input. Using default QA CORE_REF: $CORE_REF"
+          else
+            CORE_REF=${{ env.DEFAULT_PUBLIC_CORE_REF }}
+            echo "No CORE_REF provided as input. Using default public CORE_REF: $CORE_REF"
+          fi
+
+          echo "CL_ECR=$CL_ECR" >> $GITHUB_ENV
+          echo "CORE_REF=$CORE_REF" >> $GITHUB_ENV
+
+      - name: Build and Push
+        if: env.SKIP_IMAGE_BUILD == 'false'
+        uses: docker/build-push-action@4a13e500e55cf31b7a5d59a38ab2040ab0f42f56 # v5.1.0
+        id: build-image
+        with:
+          context: ${{ github.workspace }}
+          file: ${{ github.workspace }}/Dockerfile
+          build-args: |
+            BASE_IMAGE=${{ env.CL_ECR }}:${{ env.CORE_REF }}
+          tags: ${{ env.TRON_ECR }}:${{ env.IMAGE_TAG }}
+          push: true
+
+      - name: Create a Release
+        if: env.SKIP_IMAGE_BUILD == 'false'
+        uses: elgohr/Github-Release-Action@c5ea99036abb741a89f8bf1f2cd7fba845e3313a # v5 https://github.com/elgohr/Github-Release-Action/releases/tag/v5
+        env:
+          GH_ENTERPRISE_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
+        with:
+          title: Tron Release ${{ env.IMAGE_TAG }}
+          tag: ${{ env.IMAGE_TAG }}
+          prerelease: ${{ env.PRERELEASE }}

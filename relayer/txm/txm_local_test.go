@@ -19,9 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 func TestTxmLocal(t *testing.T) {
@@ -58,6 +58,7 @@ func TestTxmLocal(t *testing.T) {
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		// EnergyMultiplier is set to 1.5 by default
 	}
 
 	runTxmTest(t, logger, fullnodeClient, config, keystore, genesisAddress, 10)
@@ -74,14 +75,25 @@ func runTxmTest(t *testing.T, logger logger.Logger, fullnodeClient *fullnode.Cli
 	expectedValue := 0
 
 	for i := 0; i < iterations; i++ {
-		err = txmgr.Enqueue(fromAddress, contractAddress, "increment()")
+		err = txmgr.Enqueue(txm.TronTxmRequest{
+			FromAddress:     fromAddress,
+			ContractAddress: contractAddress,
+			Method:          "increment()",
+			Params:          []any{},
+		})
 		require.NoError(t, err)
 		expectedValue += 1
 
-		err = txmgr.Enqueue(fromAddress, contractAddress,
-			"increment_mult(uint256,uint256)",
-			"uint256", "5",
-			"uint256", "7",
+		err = txmgr.Enqueue(
+			txm.TronTxmRequest{
+				FromAddress:     fromAddress,
+				ContractAddress: contractAddress,
+				Method:          "increment_mult(uint256,uint256)",
+				Params: []any{
+					"uint256", "5",
+					"uint256", "7",
+				},
+			},
 		)
 		require.NoError(t, err)
 		expectedValue += 5 * 7

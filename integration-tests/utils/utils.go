@@ -22,9 +22,9 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median"
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median/evmreportcodec"
 
-	testcommon "github.com/smartcontractkit/chainlink-internal-integrations/tron/integration-tests/common"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/testutils"
+	testcommon "github.com/smartcontractkit/chainlink-tron/integration-tests/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
 )
 
 // Constants for e2e tests

@@ -15,9 +15,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/mocks"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
 )
 
 var mockAbi = &common.JSONABI{

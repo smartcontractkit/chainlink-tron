@@ -17,11 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/monitor"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/ocr2"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/reader"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/txm"
+	"github.com/smartcontractkit/chainlink-tron/relayer/monitor"
+	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 )
 
 type TronRelayer struct {
@@ -83,6 +83,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		// TODO: stop changing uint64 fields here to uint?
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
+		EnergyMultiplier:  1.5, // TODO: This was the exisiting value for DF, longer term this should be a config option
 	})
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
@@ -256,4 +257,12 @@ func (t *TronRelayer) NewMedianProvider(ctx context.Context, relayargs types.Rel
 
 func (t *TronRelayer) LatestHead(ctx context.Context) (types.Head, error) {
 	return types.Head{}, errors.New("TODO")
+}
+
+func (t *TronRelayer) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
+	return errors.New("TODO")
+}
+
+func (t *TronRelayer) AsEVMRelayer() (loop.EVMRelayer, error) {
+	return nil, errors.New("unimplemented")
 }

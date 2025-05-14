@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
-	"github.com/smartcontractkit/chainlink-internal-integrations/tron/relayer/sdk"
+	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
 
 var _ services.Service = &TronTxm{}
@@ -27,6 +27,7 @@ const (
 	MAX_RETRY_ATTEMPTS           = 5
 	MAX_BROADCAST_RETRY_DURATION = 30 * time.Second
 	BROADCAST_DELAY_DURATION     = 2 * time.Second
+	DEFAULT_ENERGY_MULTIPLIER    = 1.5
 )
 
 type TronTxm struct {
@@ -43,17 +44,35 @@ type TronTxm struct {
 	Stop          chan struct{}
 }
 
+type TronTxmRequest struct {
+	FromAddress     address.Address
+	ContractAddress address.Address
+	Method          string
+	Params          []any
+}
+
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
-	return &TronTxm{
+	txm := &TronTxm{
 		Logger:                logger.Named(lgr, "TronTxm"),
 		Keystore:              keystore,
 		Config:                config,
 		EstimateEnergyEnabled: true,
+		Client:                client,
+		BroadcastChan:         make(chan *TronTx, config.BroadcastChanSize),
+		AccountStore:          NewAccountStore(),
+		Stop:                  make(chan struct{}),
+	}
 
-		Client:        client,
-		BroadcastChan: make(chan *TronTx, config.BroadcastChanSize),
-		AccountStore:  NewAccountStore(),
-		Stop:          make(chan struct{}),
+	// Set defaults for missing config values
+	txm.setDefaults()
+
+	return txm
+}
+
+func (t *TronTxm) setDefaults() {
+	if t.Config.EnergyMultiplier == 0 || t.Config.EnergyMultiplier < 1.0 {
+		t.Logger.Warnw("Energy multiplier is not set, using default value", "default", DEFAULT_ENERGY_MULTIPLIER)
+		t.Config.EnergyMultiplier = DEFAULT_ENERGY_MULTIPLIER
 	}
 }
 
@@ -93,23 +112,25 @@ func (t *TronTxm) Close() error {
 // Enqueues a transaction for broadcasting.
 // Each item in the params array should be a map with a single key-value pair, where
 // the key is the ABI type.
-func (t *TronTxm) Enqueue(fromAddress, contractAddress address.Address, method string, params ...any) error {
-	if _, err := t.Keystore.Sign(context.Background(), fromAddress.String(), nil); err != nil {
+func (t *TronTxm) Enqueue(request TronTxmRequest) error {
+	if _, err := t.Keystore.Sign(context.Background(), request.FromAddress.String(), nil); err != nil {
 		return fmt.Errorf("failed to sign: %+w", err)
 	}
 
-	if len(params)%2 == 1 {
+	if len(request.Params)%2 == 1 {
 		return fmt.Errorf("odd number of params")
 	}
-	for i := 0; i < len(params); i += 2 {
-		paramType := params[i]
+
+	for i := 0; i < len(request.Params); i += 2 {
+		paramType := request.Params[i]
 		_, ok := paramType.(string)
 		if !ok {
 			return fmt.Errorf("non-string param type")
 		}
 	}
 
-	tx := &TronTx{FromAddress: fromAddress, ContractAddress: contractAddress, Method: method, Params: params, Attempt: 1}
+	// Construct the transaction
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -179,7 +200,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullno
 	}
 
 	feeLimit := energyUnitPrice * int32(energyUsed)
-	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes)
+	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes, t.Config.EnergyMultiplier)
 
 	t.Logger.Debugw("Trigger smart contract", "energyBumpTimes", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
