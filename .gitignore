@@ -1,6 +1,34 @@
-node_modules
+# Code editor local settings
 
+## VS Code
+.vscode/*
+.history/
+*.vsix
+
+## IDEA files
+.idea
+
+## VIM
+Session.vim
+.vim/
+
+## Other editors
+.nvim/
+.emacs/
+.helix/
+
+# Keep some docs local
+docs/local/**
+
+# Nix package build out-link - any 'result' folder in the tree
+**/result
+
+# Nix packaged script (impure builds) default output - any '.build' folder in the tree
+**/.build
+
+# Root node tools
+node_modules/
+
+# Misc
 .env
 .local-mock-server
-
-.idea

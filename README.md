@@ -1,5 +1,3 @@
-# Chainlink Tron Documentation
-
-## Quick Start
+# Chainlink Tron
 
 For more information, see the [Chainlink Tron Documentation](./docs/).
