@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-tron/relayer/config"
 	"github.com/smartcontractkit/chainlink-tron/relayer/monitor"
 	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
@@ -30,7 +31,7 @@ type TronRelayer struct {
 	chainId    string
 	chainIdNum *big.Int
 
-	cfg  *TOMLConfig
+	cfg  *config.TOMLConfig
 	lggr logger.Logger
 
 	client         sdk.CombinedClient
@@ -40,7 +41,7 @@ type TronRelayer struct {
 
 var _ loop.Relayer = &TronRelayer{}
 
-func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
+func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
 	id := *cfg.ChainID
 
 	var idNum *big.Int
@@ -182,7 +183,7 @@ func (t *TronRelayer) listNodeStatuses(start, end int) ([]types.NodeStatus, int,
 	return stats, total, nil
 }
 
-func nodeStatus(n *NodeConfig, id string) (types.NodeStatus, error) {
+func nodeStatus(n *config.NodeConfig, id string) (types.NodeStatus, error) {
 	// TODO: why does marshalling the config tell us the node status?
 	var s types.NodeStatus
 	s.ChainID = id
@@ -263,6 +264,6 @@ func (t *TronRelayer) Replay(ctx context.Context, fromBlock string, args map[str
 	return errors.New("TODO")
 }
 
-func (t *TronRelayer) AsEVMRelayer() (loop.EVMRelayer, error) {
+func (t *TronRelayer) EVM() (types.EVMService, error) {
 	return nil, errors.New("unimplemented")
 }
