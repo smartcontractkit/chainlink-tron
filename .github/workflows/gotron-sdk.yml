@@ -18,7 +18,7 @@ jobs:
       - uses: ./.github/actions/changes
         id: c
         with:
-          folder: tron
+          folder: tron/gotron-sdk
 
   test:
     name: Unit Tests

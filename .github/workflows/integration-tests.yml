@@ -14,21 +14,9 @@ concurrency:
 env:
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      found: ${{ steps.c.outputs.found }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/changes
-        id: c
-        with:
-          folder: tron
   integration_tests_docker:
     name: Run Docker Integration Tests
     runs-on: ubuntu-latest-32cores-128GB
-    needs: [detect-changes]
-    if: needs.detect-changes.outputs.found == 'true'
     environment: integration
     permissions:
       id-token: write
