@@ -20,10 +20,14 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Run build
-        run: nix develop -c cd relayer && go build -v ./...
+        run: |
+          pushd relayer
+          nix develop -c go build -v ./...
 
       - name: Run tests
-        run: nix develop -c cd relayer && go test -v -count=1 -p=1 -tags=integration ./...
+        run: |
+          pushd relayer
+          nix develop -c go test -v -count=1 -p=1 -tags=integration ./...
   build-pkgs:
     name: Build and package (Nix and Docker)
     runs-on: ubuntu-latest
