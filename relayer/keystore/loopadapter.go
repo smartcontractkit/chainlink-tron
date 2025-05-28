@@ -4,21 +4,28 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	tronsdk "github.com/fbsobreira/gotron-sdk/pkg/address"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 )
 
 var _ core.Keystore = (*loopKeystoreAdapter)(nil)
 
+// KeysStore captures two methods from [github.com/smartcontractkit/chainlink-evm/pkg/keys.Store] to avoid importing.
+type KeysStore interface {
+	EnabledAddresses(ctx context.Context) (addresses []common.Address, err error)
+	Sign(ctx context.Context, address common.Address, bytes []byte) ([]byte, error)
+}
+
 // LoopKeystoreAdapter is an adapter that allows the EVM keystore to be used by the Tron TXM
 // It handles the conversion between tron addresses and evm addresses whilst delegating the signing to the EVM keystore
 type loopKeystoreAdapter struct {
-	ks keys.Store
+	ks KeysStore
 }
 
 // Creates a new LoopKeystoreAdapter which allows the EVM keystore to be used by the Tron TXM
-func NewLoopKeystoreAdapter(ks keys.Store) core.Keystore {
+func NewLoopKeystoreAdapter(ks KeysStore) core.Keystore {
 	return &loopKeystoreAdapter{ks: ks}
 }
 
@@ -43,5 +50,5 @@ func (l *loopKeystoreAdapter) Sign(ctx context.Context, account string, data []b
 	}
 
 	addr := tronAddr.EthAddress()
-	return l.ks.SignRawUnhashedBytes(ctx, addr, data)
+	return l.ks.Sign(ctx, addr, data)
 }
