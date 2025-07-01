@@ -211,7 +211,6 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullno
 		tx.Params,
 		paddedFeeLimit,
 		/* tAmount= (TRX amount) */ 0)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to call TriggerSmartContract: %+w", err)
 	}
@@ -265,7 +264,6 @@ func (t *TronTxm) broadcastTx(tx *common.Transaction) (*fullnode.BroadcastRespon
 				// do not retry on other broadcast errors. the error message and code is encoded in `err`.
 				return nil, err
 			}
-
 		}
 	}
 	if err != nil {
@@ -389,6 +387,9 @@ func (t *TronTxm) InflightCount() (int, int) {
 }
 
 func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
+	if t.Config.FixedEnergyValue != 0 {
+		return t.Config.FixedEnergyValue, nil
+	}
 
 	if t.EstimateEnergyEnabled {
 		estimateEnergyMessage, err := t.GetClient().EstimateEnergy(
@@ -413,7 +414,6 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
 	triggerResponse, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
-
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
 	}
