@@ -95,7 +95,7 @@ func TestTxm(t *testing.T) {
 
 	fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 		Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-		BlockNumber: 123,
+		BlockNumber: 12345,
 	}, nil)
 	keystore = testutils.NewTestKeystore(genesisAddress.String(), genesisPrivateKey)
 

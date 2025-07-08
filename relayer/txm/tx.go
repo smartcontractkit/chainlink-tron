@@ -1,6 +1,8 @@
 package txm
 
 import (
+	"time"
+
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 )
 
@@ -12,4 +14,7 @@ type TronTx struct {
 	Attempt         uint64
 	OutOfTimeErrors uint64
 	EnergyBumpTimes uint32
+	ID              string // idempotency key
+	State           TxState
+	CreateTs        time.Time
 }

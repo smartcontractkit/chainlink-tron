@@ -12,10 +12,12 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
+	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
@@ -49,6 +51,7 @@ type TronTxmRequest struct {
 	ContractAddress address.Address
 	Method          string
 	Params          []any
+	ID              string
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
@@ -97,6 +100,8 @@ func (t *TronTxm) Start(ctx context.Context) error {
 		t.Done.Add(2) // waitgroup: broadcast loop and confirm loop
 		go t.broadcastLoop()
 		go t.confirmLoop()
+		go t.reapLoop()
+
 		return nil
 	})
 }
@@ -129,8 +134,18 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 		}
 	}
 
+	if request.ID == "" {
+		request.ID = uuid.New().String()
+	} else {
+		// don’t enqueue twice for the same key
+		txStore := t.AccountStore.GetTxStore(request.FromAddress.String())
+		if txStore.Has(request.ID) {
+			return fmt.Errorf("transaction with ID %s already exists", request.ID)
+		}
+	}
+
 	// Construct the transaction
-	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1}
+	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, ID: request.ID, CreateTs: time.Now()}
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -153,6 +168,7 @@ func (t *TronTxm) broadcastLoop() {
 		case tx := <-t.BroadcastChan:
 			triggerResponse, err := t.TriggerSmartContract(ctx, tx)
 			if err != nil {
+				// TODO: is it ok to leave this transaction unmarked as fatal?
 				t.Logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx)
 				continue
 			}
@@ -162,18 +178,19 @@ func (t *TronTxm) broadcastLoop() {
 
 			// RefBlockNum is optional and does not seem in use anymore.
 			t.Logger.Debugw("created transaction", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
+			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
+			txStore.OnPending(txHash, coreTx.RawData.Expiration, tx)
 
 			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
 			if err != nil {
 				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "triggerResponse", triggerResponse)
+				txStore.OnFatalError(tx.ID)
 				continue
 			}
 
 			t.Logger.Infow("transaction broadcasted", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit)
 
-			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
-			txStore.AddUnconfirmed(txHash, coreTx.RawData.Expiration, tx)
-
+			txStore.OnBroadcasted(tx.ID)
 		case <-t.Stop:
 			t.Logger.Debugw("broadcastLoop: stopped")
 			return
@@ -289,10 +306,10 @@ func (t *TronTxm) confirmLoop() {
 			start := time.Now()
 
 			t.checkUnconfirmed()
+			t.checkFinalized()
 
 			remaining := pollDuration - time.Since(start)
 			tick = time.After(utils.WithJitter(remaining.Abs()))
-
 		case <-t.Stop:
 			t.Logger.Debugw("confirmLoop: stopped")
 			return
@@ -315,20 +332,17 @@ func (t *TronTxm) checkUnconfirmed() {
 		timestampMs := nowBlock.BlockHeader.RawData.Timestamp
 		for _, unconfirmedTx := range unconfirmedTxs {
 			txInfo, err := t.GetClient().GetTransactionInfoById(unconfirmedTx.Hash)
+			txStore := t.AccountStore.GetTxStore(fromAddress)
+
 			if err != nil {
 				// if the transaction has expired and we still can't find the hash, rebroadcast.
 				if unconfirmedTx.ExpirationMs < timestampMs {
-					err = t.AccountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
-					if err != nil {
-						t.Logger.Errorw("could not confirm expired transaction locally", "error", err)
-						continue
-					}
 					t.Logger.Debugw("transaction missing after expiry", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "timestampMs", timestampMs, "expirationMs", unconfirmedTx.ExpirationMs)
-					t.maybeRetry(unconfirmedTx, false, false)
+					t.maybeRetry(unconfirmedTx, false, false, txStore)
 				}
 				continue
 			}
-			err = t.AccountStore.GetTxStore(fromAddress).Confirm(unconfirmedTx.Hash)
+			err = txStore.OnConfirmed(unconfirmedTx.Tx.ID)
 			if err != nil {
 				t.Logger.Errorw("could not confirm transaction locally", "error", err)
 				continue
@@ -338,15 +352,15 @@ func (t *TronTxm) checkUnconfirmed() {
 			switch contractResult {
 			case soliditynode.TransactionResultOutOfEnergy:
 				t.Logger.Errorw("transaction failed due to out of energy", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
-				t.maybeRetry(unconfirmedTx, true, false)
+				t.maybeRetry(unconfirmedTx, true, false, txStore)
 				continue
 			case soliditynode.TransactionResultOutOfTime:
 				t.Logger.Errorw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
-				t.maybeRetry(unconfirmedTx, false, true)
+				t.maybeRetry(unconfirmedTx, false, true, txStore)
 				continue
 			case soliditynode.TransactionResultUnknown:
 				t.Logger.Errorw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber)
-				t.maybeRetry(unconfirmedTx, false, false)
+				t.maybeRetry(unconfirmedTx, false, false, txStore)
 				continue
 			}
 			t.Logger.Infow("confirmed transaction", "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult)
@@ -354,14 +368,17 @@ func (t *TronTxm) checkUnconfirmed() {
 	}
 }
 
-func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOutOfTimeError bool) {
+func (t *TronTxm) maybeRetry(unconfirmedTx *PendingTx, bumpEnergy bool, isOutOfTimeError bool, txStore *TxStore) {
 	tx := unconfirmedTx.Tx
+	txStore.OnErrored(tx.ID)
 	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
 		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
+		txStore.OnFatalError(tx.ID)
 		return
 	}
 	if tx.OutOfTimeErrors >= 2 {
 		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
+		txStore.OnFatalError(tx.ID)
 		return
 	}
 
@@ -373,13 +390,116 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *UnconfirmedTx, bumpEnergy bool, isOu
 		tx.OutOfTimeErrors += 1
 	}
 
-	t.Logger.Infow("retrying transaction", "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
+	// TODO: add ID to logger everywhere
+	t.Logger.Infow("retrying transaction", "txID", tx.ID, "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
 
 	select {
+	// TODO: do we need to retry here or mark as fatal?
 	case t.BroadcastChan <- tx:
 	default:
 		t.Logger.Errorw("failed to enqueue retry transaction", "previousTxHash", unconfirmedTx.Hash)
 	}
+}
+
+func (t *TronTxm) checkFinalized() {
+	// Fetch current head
+	nowBlk, err := t.GetClient().GetNowBlock()
+	if err != nil {
+		t.Logger.Errorw("could not get latest block for finalization", "error", err)
+		return
+	}
+	currentHeight := nowBlk.BlockHeader.RawData.Number
+
+	// Iterate over all accounts
+	for acc := range t.AccountStore.store {
+		store := t.AccountStore.GetTxStore(acc)
+		// copy under lock
+		store.lock.RLock()
+		pts := make([]*PendingTx, 0, len(store.confirmedTxs))
+		for _, pt := range store.confirmedTxs {
+			pts = append(pts, pt)
+		}
+		store.lock.RUnlock()
+
+		for _, pt := range pts {
+			// lookup the tx to make sure it's still included
+			txInfo, err := t.GetClient().GetTransactionInfoById(pt.Hash)
+			if err != nil {
+				t.Logger.Warnw("tx missing after reorg, moving back to unconfirmed", "txID", pt.Tx.ID)
+				if derr := store.OnReorg(pt.Tx.ID); derr != nil {
+					t.Logger.Errorw("failed to OnReorg tx", "txID", pt.Tx.ID, "error", derr)
+				}
+				t.BroadcastChan <- pt.Tx // rebroadcast the tx
+				continue
+			}
+
+			// check finality
+			depth := currentHeight - txInfo.BlockNumber
+			if depth < 0 {
+				t.Logger.Warnf("RPC Lagging! Negative depth for tx %s, currentHeight: %d, txBlockNumber: %d", pt.Tx.ID, currentHeight, txInfo.BlockNumber)
+				continue
+			}
+
+			convertedDepth := uint64(depth)
+			if convertedDepth >= t.Config.FinalityDepth {
+				if err := store.OnFinalized(pt.Tx.ID); err != nil {
+					t.Logger.Errorw("failed to finalize tx", "txID", pt.Tx.ID, "error", err)
+				} else {
+					t.Logger.Infow("finalized transaction", "txID", pt.Tx.ID, "depth", depth)
+				}
+			}
+		}
+	}
+}
+
+func (t *TronTxm) reapLoop() {
+	defer t.Done.Done()
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
+			for acc := range t.AccountStore.store {
+				store := t.AccountStore.GetTxStore(acc)
+				store.lock.Lock()
+				for id, ft := range store.finishedTxs {
+					if ft.Tx.CreateTs.Before(cutoff) {
+						delete(store.finishedTxs, id)
+					}
+				}
+				store.lock.Unlock()
+			}
+		case <-t.Stop:
+			return
+		}
+	}
+}
+
+// GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
+func (t *TronTxm) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
+	for acc := range t.AccountStore.store {
+		store := t.AccountStore.GetTxStore(acc)
+		state, exists := store.GetStatus(transactionID)
+		if exists {
+			switch state {
+			case Pending:
+				return commontypes.Pending, nil
+			case Confirmed:
+				return commontypes.Unconfirmed, nil
+			case Finalized:
+				return commontypes.Finalized, nil
+			case Errored:
+				return commontypes.Failed, nil
+			case FatallyErrored:
+				return commontypes.Fatal, nil
+			default:
+				return commontypes.Unknown, fmt.Errorf("found unknown transaction state for id %s", transactionID)
+			}
+		}
+	}
+	return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s", transactionID)
+
 }
 
 func (t *TronTxm) InflightCount() (int, int) {

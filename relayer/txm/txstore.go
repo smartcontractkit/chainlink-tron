@@ -8,34 +8,60 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type UnconfirmedTx struct {
+type TxState int
+
+const (
+	Pending TxState = iota
+	Errored
+	FatallyErrored
+	Broadcasted
+	Confirmed
+	Finalized
+)
+
+type PendingTx struct {
 	Hash         string
 	ExpirationMs int64
 	Tx           *TronTx
+}
+
+// Errored or Finalized transactions
+type FinishedTx struct {
+	Hash string
+	Tx   *TronTx
 }
 
 // TxStore tracks broadcast & unconfirmed txs per account address per chain id
 type TxStore struct {
 	lock sync.RWMutex
 
-	unconfirmedTxes map[string]*UnconfirmedTx
+	hashToId       map[string]string // map tx hash to idempotency key (tx.ID)
+	unconfirmedTxs map[string]*PendingTx
+	confirmedTxs   map[string]*PendingTx
+	finishedTxs    map[string]*FinishedTx
 }
 
 func NewTxStore() *TxStore {
 	return &TxStore{
-		unconfirmedTxes: map[string]*UnconfirmedTx{},
+		hashToId:       map[string]string{},
+		unconfirmedTxs: map[string]*PendingTx{},
+		confirmedTxs:   map[string]*PendingTx{},
+		finishedTxs:    map[string]*FinishedTx{},
 	}
 }
 
-func (s *TxStore) AddUnconfirmed(hash string, expirationMs int64, tx *TronTx) error {
+func (s *TxStore) OnPending(hash string, expirationMs int64, tx *TronTx) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, exists := s.unconfirmedTxes[hash]; exists {
-		return fmt.Errorf("hash already exists: %s", hash)
+	if _, exists := s.hashToId[hash]; exists {
+		return fmt.Errorf("hash already exists: %s", tx.ID)
 	}
 
-	s.unconfirmedTxes[hash] = &UnconfirmedTx{
+	s.hashToId[hash] = tx.ID
+	tx.State = Pending
+
+	s.unconfirmedTxs[tx.ID] = &PendingTx{
 		Hash:         hash,
 		ExpirationMs: expirationMs,
 		Tx:           tx,
@@ -44,22 +70,119 @@ func (s *TxStore) AddUnconfirmed(hash string, expirationMs int64, tx *TronTx) er
 	return nil
 }
 
-func (s *TxStore) Confirm(hash string) error {
+func (s *TxStore) OnBroadcasted(id string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if _, exists := s.unconfirmedTxes[hash]; !exists {
-		return fmt.Errorf("no such unconfirmed hash: %s", hash)
+	tx, exists := s.unconfirmedTxs[id]
+	if !exists {
+		return fmt.Errorf("no such unconfirmed id: %s", id)
 	}
-	delete(s.unconfirmedTxes, hash)
+	tx.Tx.State = Broadcasted
+
 	return nil
 }
 
-func (s *TxStore) GetUnconfirmed() []*UnconfirmedTx {
+func (s *TxStore) OnConfirmed(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	tx, exists := s.unconfirmedTxs[id]
+	if !exists {
+		return fmt.Errorf("no such unconfirmed id: %s", id)
+	}
+	delete(s.unconfirmedTxs, id)
+
+	tx.Tx.State = Confirmed
+	s.confirmedTxs[id] = tx
+
+	return nil
+}
+
+func (s *TxStore) OnErrored(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	pt, exists := s.unconfirmedTxs[id]
+	if !exists {
+		return fmt.Errorf("no such unconfirmed id: %s", id)
+	}
+	delete(s.hashToId, pt.Hash)
+
+	pt.Tx.State = Errored
+	return nil
+}
+
+func (s *TxStore) OnFatalError(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	var pt *PendingTx
+	if _, unconfirmedExists := s.unconfirmedTxs[id]; !unconfirmedExists {
+		if _, confirmedExists := s.confirmedTxs[id]; !confirmedExists {
+			return fmt.Errorf("no such unconfirmed or confirmed id: %s", id)
+		} else {
+			pt = s.confirmedTxs[id]
+			delete(s.confirmedTxs, id)
+		}
+	} else {
+		pt = s.unconfirmedTxs[id]
+		delete(s.unconfirmedTxs, id)
+	}
+	delete(s.hashToId, pt.Hash)
+
+	pt.Tx.State = FatallyErrored
+	s.finishedTxs[id] = &FinishedTx{
+		Hash: pt.Hash,
+		Tx:   pt.Tx,
+	}
+	return nil
+}
+
+// OnReorg moves a previously-confirmed tx back to unconfirmed if it's been
+// dropped by a chain reorg.
+func (s *TxStore) OnReorg(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	pt, exists := s.confirmedTxs[id]
+	if !exists {
+		return fmt.Errorf("no such confirmed id: %s", id)
+	}
+	// remove from confirmed
+	delete(s.confirmedTxs, id)
+
+	// mark it as broadcasted again and re-queue
+	// TODO: Should we be rebroadcasting here?
+	pt.Tx.State = Broadcasted
+	s.unconfirmedTxs[id] = pt
+	return nil
+}
+
+func (s *TxStore) OnFinalized(id string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	pt, exists := s.confirmedTxs[id]
+	if !exists {
+		return fmt.Errorf("no such confirmed id: %s", id)
+	}
+	delete(s.confirmedTxs, id)
+	delete(s.hashToId, pt.Hash)
+
+	pt.Tx.State = Finalized
+	s.finishedTxs[id] = &FinishedTx{
+		Hash: pt.Hash,
+		Tx:   pt.Tx,
+	}
+	return nil
+}
+
+func (s *TxStore) GetUnconfirmed() []*PendingTx {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	unconfirmed := maps.Values(s.unconfirmedTxes)
+	unconfirmed := maps.Values(s.unconfirmedTxs)
 
 	sort.Slice(unconfirmed, func(i, j int) bool {
 		a := unconfirmed[i]
@@ -70,10 +193,19 @@ func (s *TxStore) GetUnconfirmed() []*UnconfirmedTx {
 	return unconfirmed
 }
 
+func (s *TxStore) Has(id string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	_, inUn := s.unconfirmedTxs[id]
+	_, inCf := s.confirmedTxs[id]
+	_, inF := s.finishedTxs[id]
+	return inUn || inCf || inF
+}
+
 func (s *TxStore) InflightCount() int {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return len(s.unconfirmedTxes)
+	return len(s.unconfirmedTxs)
 }
 
 type AccountStore struct {
@@ -98,6 +230,22 @@ func (c *AccountStore) GetTxStore(fromAddress string) *TxStore {
 	return store
 }
 
+// GetStatus returns (state, exists)
+func (s *TxStore) GetStatus(id string) (TxState, bool) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	if pt, ok := s.unconfirmedTxs[id]; ok {
+		return pt.Tx.State, true
+	}
+	if pt, ok := s.confirmedTxs[id]; ok {
+		return pt.Tx.State, true
+	}
+	if ft, ok := s.finishedTxs[id]; ok {
+		return ft.Tx.State, true
+	}
+	return 0, false
+}
+
 func (c *AccountStore) GetTotalInflightCount() int {
 	// use read lock for methods that read underlying data
 	c.lock.RLock()
@@ -111,12 +259,12 @@ func (c *AccountStore) GetTotalInflightCount() int {
 	return count
 }
 
-func (c *AccountStore) GetAllUnconfirmed() map[string][]*UnconfirmedTx {
+func (c *AccountStore) GetAllUnconfirmed() map[string][]*PendingTx {
 	// use read lock for methods that read underlying data
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	allUnconfirmed := map[string][]*UnconfirmedTx{}
+	allUnconfirmed := map[string][]*PendingTx{}
 	for fromAddressStr, store := range c.store {
 		allUnconfirmed[fromAddressStr] = store.GetUnconfirmed()
 	}
