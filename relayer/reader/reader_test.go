@@ -2,6 +2,9 @@ package reader_test
 
 import (
 	"encoding/hex"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"net/http"
 	"testing"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/abi"
@@ -207,4 +210,24 @@ func TestReader(t *testing.T) {
 		require.Equal(t, uint64(456), events[0]["b"])
 		require.Equal(t, uint32(789), events[0]["c"])
 	})
+}
+
+func TestTriggerConstantContract2(t *testing.T) {
+	httpClient := &http.Client{}
+
+	soliditynodeClient := fullnode.NewClient("https://api.trongrid.io/wallet", httpClient)
+	from, err := address.StringToAddress("TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g")
+	assert.NoError(t, err)
+	contractAddr, err := address.StringToAddress("TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")
+	assert.NoError(t, err)
+	method := "name()"
+	data := []any{}
+
+	res, err := soliditynodeClient.TriggerConstantContract(from, contractAddr, method, data)
+	spew.Dump(res)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Equal(t, 1, len(res.ConstantResult))
+	assert.Equal(t, 1, len(res.Transaction.RawData.Contract))
+	assert.Equal(t, "TriggerSmartContract", res.Transaction.RawData.Contract[0].Type)
 }

@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -29,8 +30,9 @@ func TestGetTransactionInfoById(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
-	res, err := soliditynodeClient.GetTransactionInfoById("abcde")
+	res, err := soliditynodeClient.GetTransactionInfoById(ctx, "abcde")
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, int64(32880248), res.BlockNumber)
@@ -46,8 +48,9 @@ func TestGetTransactionInfoById_NonExistent(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
-	_, err := soliditynodeClient.GetTransactionInfoById("abcde")
+	_, err := soliditynodeClient.GetTransactionInfoById(ctx, "abcde")
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "transaction not found")
 }

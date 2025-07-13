@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -18,10 +19,11 @@ func TestGetAccount(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
 	addr, err := address.StringToAddress("TVSTZkvVosqh4YHLwHmmNuqeyn967aE2iv")
 	assert.NoError(t, err)
-	res, err := soliditynodeClient.GetAccount(addr)
+	res, err := soliditynodeClient.GetAccount(ctx, addr)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "TVSTZkvVosqh4YHLwHmmNuqeyn967aE2iv", res.Address)

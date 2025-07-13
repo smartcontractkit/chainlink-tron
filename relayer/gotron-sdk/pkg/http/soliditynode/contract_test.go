@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -62,7 +63,8 @@ func TestTriggerConstantContract(t *testing.T) {
 	method := "test()"
 	data := []any{}
 
-	res, err := soliditynodeClient.TriggerConstantContract(from, contractAddr, method, data)
+	ctx := context.Background()
+	res, err := soliditynodeClient.TriggerConstantContract(ctx, from, contractAddr, method, data)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, 1, len(res.ConstantResult))
@@ -84,6 +86,7 @@ func TestEstimateEnergy(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
 	from, err := address.StringToAddress("TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g")
 	assert.NoError(t, err)
@@ -92,7 +95,7 @@ func TestEstimateEnergy(t *testing.T) {
 	method := "test()"
 	data := []any{}
 
-	res, err := soliditynodeClient.EstimateEnergy(from, contractAddr, method, data, 0)
+	res, err := soliditynodeClient.EstimateEnergy(ctx, from, contractAddr, method, data, 0)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, true, res.Result.Result)

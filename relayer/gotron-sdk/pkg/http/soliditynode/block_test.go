@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,8 @@ func TestGetNowBlock(t *testing.T) {
 	defer testServer.Close()
 
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
-	res, err := soliditynodeClient.GetNowBlock()
+	ctx := context.Background()
+	res, err := soliditynodeClient.GetNowBlock(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, int64(52799248), res.BlockHeader.RawData.Number)
@@ -44,9 +46,9 @@ func TestGetBlockByNum(t *testing.T) {
 		fmt.Fprint(w, blockResponse)
 	}))
 	defer testServer.Close()
-
+	ctx := context.Background()
 	soliditynodeClient := NewClient(testServer.URL, httpClient)
-	res, err := soliditynodeClient.GetBlockByNum(52799248)
+	res, err := soliditynodeClient.GetBlockByNum(ctx, 52799248)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, int64(52799248), res.BlockHeader.RawData.Number)

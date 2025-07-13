@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"errors"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
@@ -28,9 +29,9 @@ type Block struct {
 	BlockHeader  *BlockHeader                 `json:"block_header,omitempty"`
 }
 
-func (tc *Client) GetNowBlock() (*Block, error) {
+func (tc *Client) GetNowBlock(ctx context.Context) (*Block, error) {
 	block := Block{}
-	err := tc.Get("/getnowblock", &block)
+	err := tc.Get(ctx, "/getnowblock", &block)
 	if err != nil {
 		return nil, err
 	}
@@ -45,9 +46,9 @@ type GetBlockByNumRequest struct {
 	Num int32 `json:"num"` // defined as int32 in https://developers.tron.network/reference/wallet-getblockbynum
 }
 
-func (tc *Client) GetBlockByNum(num int32) (*Block, error) {
+func (tc *Client) GetBlockByNum(ctx context.Context, num int32) (*Block, error) {
 	block := Block{}
-	err := tc.Post("/getblockbynum",
+	err := tc.Post(ctx, "/getblockbynum",
 		&GetBlockByNumRequest{
 			Num: num,
 		}, &block)

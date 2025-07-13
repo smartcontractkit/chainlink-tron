@@ -96,7 +96,7 @@ func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
 		t.Done.Add(2) // waitgroup: broadcast loop and confirm loop
 		go t.broadcastLoop()
-		go t.confirmLoop()
+		go t.confirmLoop(ctx)
 		return nil
 	})
 }
@@ -182,14 +182,14 @@ func (t *TronTxm) broadcastLoop() {
 }
 
 func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullnode.TriggerSmartContractResponse, error) {
-	energyUsed, err := t.estimateEnergy(tx)
+	energyUsed, err := t.estimateEnergy(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate energy: %+w", err)
 	}
 
 	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
 
-	if energyPrices, err := t.GetClient().GetEnergyPrices(); err == nil {
+	if energyPrices, err := t.GetClient().GetEnergyPrices(ctx); err == nil {
 		if parsedPrice, err := ParseLatestEnergyPrice(energyPrices.Prices); err == nil {
 			energyUnitPrice = parsedPrice
 		} else {
@@ -205,6 +205,7 @@ func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullno
 	t.Logger.Debugw("Trigger smart contract", "energyBumpTimes", tx.EnergyBumpTimes, "energyUnitPrice", energyUnitPrice, "feeLimit", feeLimit, "paddedFeeLimit", paddedFeeLimit)
 
 	txExtention, err := t.GetClient().TriggerSmartContract(
+		ctx,
 		tx.FromAddress,
 		tx.ContractAddress,
 		tx.Method,
@@ -233,7 +234,7 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress address.Addr
 
 	// the broadcast response code and error message is already checked by the full node client's BroadcastTranssaction function,
 	// and embedded inside `err`.
-	broadcastResponse, err := t.broadcastTx(coreTx)
+	broadcastResponse, err := t.broadcastTx(ctx, coreTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to broadcast transaction: %+w", err)
 	}
@@ -241,13 +242,13 @@ func (t *TronTxm) SignAndBroadcast(ctx context.Context, fromAddress address.Addr
 	return broadcastResponse, nil
 }
 
-func (t *TronTxm) broadcastTx(tx *common.Transaction) (*fullnode.BroadcastResponse, error) {
+func (t *TronTxm) broadcastTx(ctx context.Context, tx *common.Transaction) (*fullnode.BroadcastResponse, error) {
 	var broadcastResponse *fullnode.BroadcastResponse
 	var err error
 	startTime := time.Now()
 	attempt := 1
 	for time.Since(startTime) < MAX_BROADCAST_RETRY_DURATION {
-		broadcastResponse, err = t.GetClient().BroadcastTransaction(tx)
+		broadcastResponse, err = t.GetClient().BroadcastTransaction(ctx, tx)
 		if err == nil {
 			break
 		}
@@ -272,7 +273,7 @@ func (t *TronTxm) broadcastTx(tx *common.Transaction) (*fullnode.BroadcastRespon
 	return broadcastResponse, nil
 }
 
-func (t *TronTxm) confirmLoop() {
+func (t *TronTxm) confirmLoop(ctx context.Context) {
 	defer t.Done.Done()
 
 	_, cancel := utils.ContextFromChan(t.Stop)
@@ -288,7 +289,7 @@ func (t *TronTxm) confirmLoop() {
 		case <-tick:
 			start := time.Now()
 
-			t.checkUnconfirmed()
+			t.checkUnconfirmed(ctx)
 
 			remaining := pollDuration - time.Since(start)
 			tick = time.After(utils.WithJitter(remaining.Abs()))
@@ -300,10 +301,10 @@ func (t *TronTxm) confirmLoop() {
 	}
 }
 
-func (t *TronTxm) checkUnconfirmed() {
+func (t *TronTxm) checkUnconfirmed(ctx context.Context) {
 	allUnconfirmedTxs := t.AccountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
-		nowBlock, err := t.GetClient().GetNowBlock()
+		nowBlock, err := t.GetClient().GetNowBlock(ctx)
 		if err != nil {
 			t.Logger.Errorw("could not get latest block", "error", err)
 			continue
@@ -314,7 +315,7 @@ func (t *TronTxm) checkUnconfirmed() {
 		}
 		timestampMs := nowBlock.BlockHeader.RawData.Timestamp
 		for _, unconfirmedTx := range unconfirmedTxs {
-			txInfo, err := t.GetClient().GetTransactionInfoById(unconfirmedTx.Hash)
+			txInfo, err := t.GetClient().GetTransactionInfoById(ctx, unconfirmedTx.Hash)
 			if err != nil {
 				// if the transaction has expired and we still can't find the hash, rebroadcast.
 				if unconfirmedTx.ExpirationMs < timestampMs {
@@ -386,13 +387,14 @@ func (t *TronTxm) InflightCount() (int, int) {
 	return len(t.BroadcastChan), t.AccountStore.GetTotalInflightCount()
 }
 
-func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
+func (t *TronTxm) estimateEnergy(ctx context.Context, tx *TronTx) (int64, error) {
 	if t.Config.FixedEnergyValue != 0 {
 		return t.Config.FixedEnergyValue, nil
 	}
 
 	if t.EstimateEnergyEnabled {
 		estimateEnergyMessage, err := t.GetClient().EstimateEnergy(
+			ctx,
 			tx.FromAddress,
 			tx.ContractAddress,
 			tx.Method,
@@ -413,7 +415,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	}
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
-	triggerResponse, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
+	triggerResponse, err := t.GetClient().TriggerConstantContract(ctx, tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
 	}

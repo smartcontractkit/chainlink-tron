@@ -35,7 +35,8 @@ func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.D
 }
 
 func SignAndDeployContract(t *testing.T, fullnodeClient sdk.FullNodeClient, keystore loop.Keystore, fromAddress address.Address, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
-	deployResponse, err := fullnodeClient.DeployContract(
+	ctx := context.Background()
+	deployResponse, err := fullnodeClient.DeployContract(ctx,
 		fromAddress, contractName, abiJson, codeHex, 0, 100, feeLimit, params)
 	require.NoError(t, err)
 
@@ -47,22 +48,24 @@ func SignAndDeployContract(t *testing.T, fullnodeClient sdk.FullNodeClient, keys
 	require.NoError(t, err)
 	tx.AddSignatureBytes(signature)
 
-	broadcastResponse, err := fullnodeClient.BroadcastTransaction(tx)
+	broadcastResponse, err := fullnodeClient.BroadcastTransaction(ctx, tx)
 	require.NoError(t, err)
 
 	return broadcastResponse.TxID
 }
 
 func CheckContractDeployed(t *testing.T, fullnodeClient sdk.FullNodeClient, address address.Address) (contractDeployed bool) {
-	_, err := fullnodeClient.GetContract(address)
+	ctx := context.Background()
+	_, err := fullnodeClient.GetContract(ctx, address)
 	require.NoError(t, err)
 
 	return true // require call above stops execution if false
 }
 
 func WaitForTransactionInfo(t *testing.T, client sdk.FullNodeClient, txHash string, waitSecs int) *soliditynode.TransactionInfo {
+	ctx := context.Background()
 	for i := 1; i <= waitSecs; i++ {
-		txInfo, err := client.GetTransactionInfoById(txHash)
+		txInfo, err := client.GetTransactionInfoById(ctx, txHash)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue

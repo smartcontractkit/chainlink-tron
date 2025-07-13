@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"errors"
 )
 
@@ -77,9 +78,9 @@ type GetTransactionInfoByIDRequest struct {
 	Value string `json:"value"` // Transaction hash, i.e. transaction id
 }
 
-func (tc *Client) GetTransactionInfoById(txhash string) (*TransactionInfo, error) {
+func (tc *Client) GetTransactionInfoById(ctx context.Context, txhash string) (*TransactionInfo, error) {
 	transactionInfo := TransactionInfo{}
-	err := tc.Post("/gettransactioninfobyid",
+	err := tc.Post(ctx, "/gettransactioninfobyid",
 		&GetTransactionInfoByIDRequest{
 			Value: txhash,
 		}, &transactionInfo)

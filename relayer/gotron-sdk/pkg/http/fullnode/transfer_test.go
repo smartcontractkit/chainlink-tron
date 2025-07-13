@@ -1,6 +1,7 @@
 package fullnode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -42,6 +43,7 @@ func TestTransfer(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	fullnodeClient := NewClient(testServer.URL, httpClient)
 	from, err := address.StringToAddress("TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g")
 	assert.NoError(t, err)
@@ -49,7 +51,7 @@ func TestTransfer(t *testing.T) {
 	assert.NoError(t, err)
 	amount := int64(1000)
 
-	res, err := fullnodeClient.Transfer(from, to, amount)
+	res, err := fullnodeClient.Transfer(ctx, from, to, amount)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, 1, len(res.RawData.Contract))

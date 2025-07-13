@@ -1,6 +1,7 @@
 package fullnode
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -83,10 +84,11 @@ func TestDeployContract(t *testing.T) {
 	}))
 	defer testServer.Close()
 
+	ctx := context.Background()
 	fullnodeClient := NewClient(testServer.URL, httpClient)
 	owner, err := address.StringToAddress("TVSTZkvVosqh4YHLwHmmNuqeyn967aE2iv")
 	assert.NoError(t, err)
-	res, err := fullnodeClient.DeployContract(owner, "test", "[]", "0x1234", 0, 0, 0, nil)
+	res, err := fullnodeClient.DeployContract(ctx, owner, "test", "[]", "0x1234", 0, 0, 0, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.Equal(t, "41306d7f39ffc367edb1dee2a9782847e1579795a0", res.ContractAddress)

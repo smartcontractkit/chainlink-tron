@@ -2,6 +2,7 @@ package soliditynode
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,7 +21,7 @@ func NewClient(baseURL string, client *http.Client) *Client {
 	}
 }
 
-func (tc *Client) request(method string, path string, reqBody interface{}, responseBody interface{}) error {
+func (tc *Client) request(ctx context.Context, method string, path string, reqBody interface{}, responseBody interface{}) error {
 	endpoint := tc.BaseURL + path
 
 	var req *http.Request
@@ -33,13 +34,13 @@ func (tc *Client) request(method string, path string, reqBody interface{}, respo
 			return fmt.Errorf("failed to marshal JSON request body (%s %s): %w", method, endpoint, err)
 		}
 
-		req, err = http.NewRequest(method, endpoint, bytes.NewBuffer(jsonbytes))
+		req, err = http.NewRequestWithContext(ctx, method, endpoint, bytes.NewBuffer(jsonbytes))
 		if err != nil {
 			return fmt.Errorf("failed to create new HTTP request with body (%s %s): %w", method, endpoint, err)
 		}
 	} else {
 		var err error
-		req, err = http.NewRequest(method, endpoint, nil)
+		req, err = http.NewRequestWithContext(ctx, method, endpoint, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create new HTTP request (%s %s): %w", method, endpoint, err)
 		}
@@ -89,10 +90,10 @@ func (tc *Client) request(method string, path string, reqBody interface{}, respo
 
 }
 
-func (tc *Client) Post(endpoint string, reqBody, responseBody interface{}) error {
-	return tc.request("POST", endpoint, reqBody, responseBody)
+func (tc *Client) Post(ctx context.Context, endpoint string, reqBody, responseBody interface{}) error {
+	return tc.request(ctx, http.MethodPost, endpoint, reqBody, responseBody)
 }
 
-func (tc *Client) Get(endpoint string, responseBody interface{}) error {
-	return tc.request("GET", endpoint, nil, responseBody)
+func (tc *Client) Get(ctx context.Context, endpoint string, responseBody interface{}) error {
+	return tc.request(ctx, http.MethodGet, endpoint, nil, responseBody)
 }

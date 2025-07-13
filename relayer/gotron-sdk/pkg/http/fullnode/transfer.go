@@ -1,6 +1,7 @@
 package fullnode
 
 import (
+	"context"
 	"errors"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -14,9 +15,9 @@ type CreateTransactionRequest struct {
 	Visible      bool   `json:"visible"`
 }
 
-func (tc *Client) Transfer(fromAddress address.Address, toAddress address.Address, amount int64) (*common.Transaction, error) {
+func (tc *Client) Transfer(ctx context.Context, fromAddress address.Address, toAddress address.Address, amount int64) (*common.Transaction, error) {
 	tx := common.Transaction{}
-	err := tc.Post("/createtransaction",
+	err := tc.Post(ctx, "/createtransaction",
 		&CreateTransactionRequest{
 			OwnerAddress: fromAddress.String(),
 			ToAddress:    toAddress.String(),

@@ -20,7 +20,7 @@ type Config interface {
 }
 
 type BalanceClient interface {
-	GetAccount(accountAddress address.Address) (*soliditynode.GetAccountResponse, error)
+	GetAccount(ctx context.Context, accountAddress address.Address) (*soliditynode.GetAccountResponse, error)
 }
 
 // TODO: This chain-specific implementation should be replaced by the chain-agnostic one found at /aptos/relayer/monitor.
@@ -141,7 +141,7 @@ func (b *balanceMonitor) updateBalances(ctx context.Context) {
 			continue
 		}
 
-		response, err := reader.GetAccount(addr)
+		response, err := reader.GetAccount(ctx, addr)
 		if err != nil {
 			b.lggr.Warnw("Failed to get account info, account may have no funds", "account", addr.String(), "err", err)
 			continue

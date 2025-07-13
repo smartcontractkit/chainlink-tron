@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 )
 
@@ -105,9 +106,9 @@ type GetAccountResponse struct {
 	FreeAssetNetUsagev2                          []Asset              `json:"free_asset_net_usageV2"`   // <string, int64> The amount of free bandwidth consumed by account transferring TRC10 tokens
 }
 
-func (tc *Client) GetAccount(accountAddress address.Address) (*GetAccountResponse, error) {
+func (tc *Client) GetAccount(ctx context.Context, accountAddress address.Address) (*GetAccountResponse, error) {
 	getAccountResponse := GetAccountResponse{}
-	err := tc.Post("/getaccount", &GetAccountRequest{
+	err := tc.Post(ctx, "/getaccount", &GetAccountRequest{
 		Address: accountAddress.String(),
 		Visible: true,
 	}, &getAccountResponse)

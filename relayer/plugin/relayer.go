@@ -65,7 +65,8 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	}
 
 	// check client chain id matches config chain id
-	blockInfo, err := client.GetBlockByNum(0)
+	ctx := context.Background()
+	blockInfo, err := client.GetBlockByNum(ctx, 0)
 	if err != nil {
 		return nil, fmt.Errorf("error getting genesis block info: %w", err)
 	}
