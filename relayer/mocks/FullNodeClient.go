@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	"fmt"
+
 	address "github.com/fbsobreira/gotron-sdk/pkg/address"
 	common "github.com/fbsobreira/gotron-sdk/pkg/http/common"
 
@@ -260,6 +262,7 @@ func (_m *FullNodeClient) GetNowBlock() (*soliditynode.Block, error) {
 
 // GetTransactionInfoById provides a mock function with given fields: txhash
 func (_m *FullNodeClient) GetTransactionInfoById(txhash string) (*soliditynode.TransactionInfo, error) {
+	fmt.Println("hi")
 	ret := _m.Called(txhash)
 
 	if len(ret) == 0 {

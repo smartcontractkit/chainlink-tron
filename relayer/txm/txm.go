@@ -454,7 +454,7 @@ func (t *TronTxm) checkFinalized() {
 
 func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(t.Config.ReapInterval)
 	defer ticker.Stop()
 	for {
 		select {

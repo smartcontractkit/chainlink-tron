@@ -36,7 +36,7 @@ func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.D
 
 func SignAndDeployContract(t *testing.T, fullnodeClient sdk.FullNodeClient, keystore loop.Keystore, fromAddress address.Address, contractName string, abiJson string, codeHex string, feeLimit int, params []interface{}) string {
 	deployResponse, err := fullnodeClient.DeployContract(
-		fromAddress, contractName, abiJson, codeHex, 0, 100, feeLimit, params)
+		fromAddress, contractName, abiJson, codeHex, 1, 100, feeLimit, params)
 	require.NoError(t, err)
 
 	tx := &deployResponse.Transaction

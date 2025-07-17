@@ -9,4 +9,5 @@ type TronTxmConfig struct {
 	FixedEnergyValue  int64
 	FinalityDepth     uint64
 	RetentionPeriod   time.Duration
+	ReapInterval      time.Duration
 }

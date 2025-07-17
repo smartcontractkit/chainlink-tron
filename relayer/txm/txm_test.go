@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -28,6 +29,9 @@ var keystore *testutils.TestKeystore
 var config = trontxm.TronTxmConfig{
 	BroadcastChanSize: 100,
 	ConfirmPollSecs:   2,
+	FinalityDepth:     10,
+	RetentionPeriod:   10 * time.Second,
+	ReapInterval:      1 * time.Second,
 }
 var genesisAccountKey = testutils.CreateKey(rand.Reader)
 var genesisAddress = genesisAccountKey.Address
@@ -70,6 +74,7 @@ func TestTxm(t *testing.T) {
 		BlockHeader: &soliditynode.BlockHeader{
 			RawData: &soliditynode.BlockHeaderRaw{
 				Timestamp: 1000,
+				Number:    12345,
 			},
 		},
 	}, nil)
@@ -93,10 +98,6 @@ func TestTxm(t *testing.T) {
 		Message: "broadcast message",
 	}, nil)
 
-	fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
-		Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-		BlockNumber: 12345,
-	}, nil)
 	keystore = testutils.NewTestKeystore(genesisAddress.String(), genesisPrivateKey)
 
 	t.Run("Invalid input params", func(t *testing.T) {
@@ -112,6 +113,11 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Times(2)
+
 		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
 		err := txm.Enqueue(trontxm.TronTxmRequest{
 			FromAddress:     genesisAddress,
@@ -127,7 +133,78 @@ func TestTxm(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("confirmed transaction").Len(), 1)
 	})
 
+	t.Run("Reorg success", func(t *testing.T) {
+		// mark confirmed
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12345,
+		}, nil).Once()
+		// reorg
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "FAILED"},
+			BlockNumber: 12346,
+		}, errors.New("block reorg")).Once()
+		// re-confirm w/ lower block height to simulate finalization after reorg
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("tx missing after reorg, moving back to unconfirmed").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
+	})
+
+	t.Run("Reap expired txs", func(t *testing.T) {
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient)
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 5*time.Second)
+		finishedBefore := txm.AccountStore.GetTotalFinishedCount()
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+		finishedAfter := txm.AccountStore.GetTotalFinishedCount()
+
+		require.Greater(t, finishedBefore, finishedAfter)
+	})
+
 	t.Run("Retry on broadcast server busy", func(t *testing.T) {
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Times(2)
+
 		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
 		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
@@ -154,6 +231,11 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Retry on broadcast block unsolidified", func(t *testing.T) {
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Times(2)
+
 		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
 		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,

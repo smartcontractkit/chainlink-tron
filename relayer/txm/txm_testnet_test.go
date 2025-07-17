@@ -23,7 +23,7 @@ func TestTxmShasta(t *testing.T) {
 }
 
 func TestTxmNile(t *testing.T) {
-	runTestnetTest(t, "grpc.nile.trongrid.io:50051")
+	runTestnetTest(t, "https://nile.trongrid.io/wallet")
 }
 
 func runTestnetTest(t *testing.T, fullnodeUrl string) {

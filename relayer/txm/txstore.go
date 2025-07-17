@@ -208,6 +208,12 @@ func (s *TxStore) InflightCount() int {
 	return len(s.unconfirmedTxs)
 }
 
+func (s *TxStore) FinishedCount() int {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return len(s.finishedTxs)
+}
+
 type AccountStore struct {
 	store map[string]*TxStore // map account address to txstore
 	lock  sync.RWMutex
@@ -254,6 +260,19 @@ func (c *AccountStore) GetTotalInflightCount() int {
 	count := 0
 	for _, store := range c.store {
 		count += store.InflightCount()
+	}
+
+	return count
+}
+
+func (c *AccountStore) GetTotalFinishedCount() int {
+	// use read lock for methods that read underlying data
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	count := 0
+	for _, store := range c.store {
+		count += store.FinishedCount()
 	}
 
 	return count
