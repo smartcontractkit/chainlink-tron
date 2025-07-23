@@ -48,6 +48,9 @@ func runTestnetTest(t *testing.T, fullnodeUrl string) {
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		FinalityDepth:     10,
+		RetentionPeriod:   10 * time.Second,
+		ReapInterval:      1 * time.Second,
 	}
 
 	runTxmTest(t, logger, fullnodeClient, config, keystore, pubAddress, 5)

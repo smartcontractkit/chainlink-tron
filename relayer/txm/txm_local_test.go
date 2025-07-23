@@ -58,6 +58,9 @@ func TestTxmLocal(t *testing.T) {
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		FinalityDepth:     10,
+		RetentionPeriod:   10 * time.Second,
+		ReapInterval:      1 * time.Second,
 		// EnergyMultiplier is set to 1.5 by default
 	}
 

@@ -97,7 +97,7 @@ func (t *TronTxm) GetClient() sdk.FullNodeClient {
 
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
-		t.Done.Add(2) // waitgroup: broadcast loop and confirm loop
+		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
 		go t.broadcastLoop()
 		go t.confirmLoop()
 		go t.reapLoop()
@@ -402,7 +402,6 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *PendingTx, bumpEnergy bool, isOutOfT
 }
 
 func (t *TronTxm) checkFinalized() {
-	// Fetch current head
 	nowBlk, err := t.GetClient().GetNowBlock()
 	if err != nil {
 		t.Logger.Errorw("could not get latest block for finalization", "error", err)
@@ -410,10 +409,8 @@ func (t *TronTxm) checkFinalized() {
 	}
 	currentHeight := nowBlk.BlockHeader.RawData.Number
 
-	// Iterate over all accounts
 	for acc := range t.AccountStore.store {
 		store := t.AccountStore.GetTxStore(acc)
-		// copy under lock
 		store.lock.RLock()
 		pts := make([]*PendingTx, 0, len(store.confirmedTxs))
 		for _, pt := range store.confirmedTxs {
@@ -422,18 +419,16 @@ func (t *TronTxm) checkFinalized() {
 		store.lock.RUnlock()
 
 		for _, pt := range pts {
-			// lookup the tx to make sure it's still included
 			txInfo, err := t.GetClient().GetTransactionInfoById(pt.Hash)
 			if err != nil {
 				t.Logger.Warnw("tx missing after reorg, moving back to unconfirmed", "txID", pt.Tx.ID)
 				if derr := store.OnReorg(pt.Tx.ID); derr != nil {
 					t.Logger.Errorw("failed to OnReorg tx", "txID", pt.Tx.ID, "error", derr)
 				}
-				t.BroadcastChan <- pt.Tx // rebroadcast the tx
+				t.BroadcastChan <- pt.Tx
 				continue
 			}
 
-			// check finality
 			depth := currentHeight - txInfo.BlockNumber
 			if depth < 0 {
 				t.Logger.Warnf("RPC Lagging! Negative depth for tx %s, currentHeight: %d, txBlockNumber: %d", pt.Tx.ID, currentHeight, txInfo.BlockNumber)
@@ -483,7 +478,7 @@ func (t *TronTxm) GetTransactionStatus(ctx context.Context, transactionID string
 		state, exists := store.GetStatus(transactionID)
 		if exists {
 			switch state {
-			case Pending:
+			case Pending, Broadcasted:
 				return commontypes.Pending, nil
 			case Confirmed:
 				return commontypes.Unconfirmed, nil
