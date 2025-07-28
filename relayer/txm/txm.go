@@ -367,8 +367,30 @@ func (t *TronTxm) checkUnconfirmed() {
 				t.Logger.Errorw("transaction failed due to out of time", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "txID", unconfirmedTx.Tx.ID)
 				t.maybeRetry(unconfirmedTx, false, true, txStore)
 				continue
-			case soliditynode.TransactionResultUnknown:
+			case soliditynode.TransactionResultRevert,
+				soliditynode.TransactionResultBadJumpDestination,
+				soliditynode.TransactionResultOutOfMemory,
+				soliditynode.TransactionResultStackTooSmall,
+				soliditynode.TransactionResultStackTooLarge,
+				soliditynode.TransactionResultIllegalOperation,
+				soliditynode.TransactionResultStackOverflow,
+				soliditynode.TransactionResultJvmStackOverflow,
+				soliditynode.TransactionResultTransferFailed,
+				soliditynode.TransactionResultInvalidCode:
+				// fatal error
+				t.Logger.Errorw("transaction failed with fatal error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult, "txID", unconfirmedTx.Tx.ID)
+				if err := txStore.OnFatalError(unconfirmedTx.Tx.ID); err != nil {
+					t.Logger.Errorw("failed to mark transaction as fatally errored", "txID", unconfirmedTx.Tx.ID, "error", err)
+				}
+				continue
+			case soliditynode.TransactionResultUnknown, soliditynode.TransactionResultDefault:
+				// retry unknown error
 				t.Logger.Errorw("transaction failed due to unknown error", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "txID", unconfirmedTx.Tx.ID)
+				t.maybeRetry(unconfirmedTx, false, false, txStore)
+				continue
+			default:
+				// Unhandled result type - treat as unknown
+				t.Logger.Errorw("transaction failed with unhandled result type", "attempt", unconfirmedTx.Tx.Attempt, "txHash", unconfirmedTx.Hash, "blockNumber", txInfo.BlockNumber, "contractResult", contractResult, "txID", unconfirmedTx.Tx.ID)
 				t.maybeRetry(unconfirmedTx, false, false, txStore)
 				continue
 			}

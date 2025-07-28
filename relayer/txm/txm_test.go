@@ -822,6 +822,268 @@ func TestTxmRaceConditions(t *testing.T) {
 	})
 }
 
+func TestTxmTransactionFailureScenarios(t *testing.T) {
+	t.Parallel()
+
+	t.Run("OUT_OF_ENERGY failure with energy bump retry", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
+			BlockNumber: 12345,
+		}, nil).Once()
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Maybe()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "energy_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "energy_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+	})
+
+	t.Run("OUT_OF_TIME failure with retry limit", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_TIME"},
+			BlockNumber: 12345,
+		}, nil).Maybe()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "timeout_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of time").Len(), 3)
+		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, multiple OUT_OF_TIME errors").Len(), 1)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "timeout_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Fatal, status)
+	})
+
+	t.Run("REVERT failure marked as fatal immediately", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "REVERT"},
+			BlockNumber: 12345,
+		}, nil).Once()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "revert_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "revert_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Fatal, status)
+	})
+
+	t.Run("UNKNOWN failure with retry", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "UNKNOWN"},
+			BlockNumber: 12345,
+		}, nil).Once()
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Maybe()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "unknown_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to unknown error").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
+		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "unknown_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+	})
+
+	t.Run("Multiple fatal error types", func(t *testing.T) {
+		fatalResults := []string{
+			"BAD_JUMP_DESTINATION",
+			"OUT_OF_MEMORY", 
+			"STACK_TOO_SMALL",
+			"STACK_TOO_LARGE",
+			"ILLEGAL_OPERATION",
+			"STACK_OVERFLOW",
+			"JVM_STACK_OVER_FLOW",
+			"TRANSFER_FAILED",
+			"INVALID_CODE",
+		}
+
+		for _, result := range fatalResults {
+			t.Run("fatal_"+result, func(t *testing.T) {
+				fullNodeClient := createDefaultMockClient(t)
+				
+				fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+					Receipt:     soliditynode.ResourceReceipt{Result: result},
+					BlockNumber: 12345,
+				}, nil).Once()
+
+				txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+				defer txm.Close()
+
+				testID := "fatal_" + result + "_test"
+				err := txm.Enqueue(trontxm.TronTxmRequest{
+					FromAddress:     genesisAddress,
+					ContractAddress: genesisAddress,
+					Method:          "foo()",
+					Params:          []any{},
+					ID:              testID,
+				})
+				require.NoError(t, err)
+
+				testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+
+				require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
+				require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
+				
+				status, err := txm.GetTransactionStatus(context.Background(), testID)
+				require.NoError(t, err)
+				require.Equal(t, types.Fatal, status)
+			})
+		}
+	})
+
+	t.Run("Max retry attempts reached", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		maxRetryConfig := &trontxm.TronTxmConfig{
+			BroadcastChanSize: 100,
+			ConfirmPollSecs:   2,
+			FinalityDepth:     10,
+			RetentionPeriod:   60 * time.Second,
+			ReapInterval:      1 * time.Second,
+		}
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
+			BlockNumber: 12345,
+		}, nil).Maybe()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, maxRetryConfig)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "max_retry_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 15*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 5)
+		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "max_retry_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Fatal, status)
+	})
+
+	t.Run("Energy bump progression", func(t *testing.T) {
+		fullNodeClient := createDefaultMockClient(t)
+		
+		fullNodeClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.EnergyEstimateResult{
+			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
+			EnergyRequired: 1000,
+		}, nil)
+
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
+			BlockNumber: 12345,
+		}, nil).Times(3)
+		
+		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Maybe()
+
+		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		defer txm.Close()
+
+		err := txm.Enqueue(trontxm.TronTxmRequest{
+			FromAddress:     genesisAddress,
+			ContractAddress: genesisAddress,
+			Method:          "foo()",
+			Params:          []any{},
+			ID:              "energy_bump_test",
+		})
+		require.NoError(t, err)
+
+		testutils.WaitForInflightTxs(lggr, txm, 15*time.Second)
+
+		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 3)
+		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 3)
+		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
+		
+		status, err := txm.GetTransactionStatus(context.Background(), "energy_bump_test")
+		require.NoError(t, err)
+		require.Equal(t, types.Finalized, status)
+	})
+}
+
 func TestTxmLoadTesting(t *testing.T) {
 	t.Parallel()
 	t.Run("High volume transaction enqueueing", func(t *testing.T) {
