@@ -168,11 +168,11 @@ func TestTxm(t *testing.T) {
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12345,
 		}, nil).Once()
-		// reorg
+		// reorg - account for retry logic (1 initial + 3 retries = 4 calls per reorg detection)
 		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "FAILED"},
 			BlockNumber: 12346,
-		}, errors.New("block reorg")).Once()
+		}, errors.New("block reorg")).Times(4)
 		// re-confirm w/ lower block height to simulate finalization after reorg
 		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
@@ -325,9 +325,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.Greater(t, finishedBefore, finishedAfter)
 	})
 
-		t.Run("Reap multiple transactions with different states", func(t *testing.T) {
+	t.Run("Reap multiple transactions with different states", func(t *testing.T) {
 		fullNodeClient := createDefaultMockClient(t)
-		
+
 		shortReapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
@@ -367,9 +367,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.False(t, store.Has(fatalTx2.ID))
 	})
 
-		t.Run("Reap only expired transactions, keep recent ones", func(t *testing.T) {
+	t.Run("Reap only expired transactions, keep recent ones", func(t *testing.T) {
 		fullNodeClient := createDefaultMockClient(t)
-		
+
 		reapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
@@ -413,9 +413,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.Equal(t, 1, store.FinishedCount())
 	})
 
-		t.Run("Reap across multiple accounts", func(t *testing.T) {
+	t.Run("Reap across multiple accounts", func(t *testing.T) {
 		fullNodeClient := createDefaultMockClient(t)
-		
+
 		multiAccountConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
@@ -435,7 +435,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 
 		for i, account := range accounts {
 			store := txm.AccountStore.GetTxStore(account)
-			
+
 			tx := &trontxm.TronTx{
 				ID:          fmt.Sprintf("account_%d_tx", i),
 				FromAddress: genesisAddress,
@@ -465,9 +465,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.Equal(t, 0, totalFinishedAfter)
 	})
 
-		t.Run("No reaping when no expired transactions", func(t *testing.T) {
+	t.Run("No reaping when no expired transactions", func(t *testing.T) {
 		fullNodeClient := createDefaultMockClient(t)
-		
+
 		noReapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
@@ -499,9 +499,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.Equal(t, 1, store.FinishedCount())
 	})
 
-		t.Run("Reap performance with many transactions", func(t *testing.T) {
+	t.Run("Reap performance with many transactions", func(t *testing.T) {
 		fullNodeClient := createDefaultMockClient(t)
-		
+
 		perfConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,

@@ -103,14 +103,22 @@ func (s *TxStore) OnErrored(id string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	pt, exists := s.unconfirmedTxs[id]
-	if !exists {
-		return fmt.Errorf("no such unconfirmed id: %s", id)
+	if pt, exists := s.unconfirmedTxs[id]; exists {
+		delete(s.hashToId, pt.Hash)
+		pt.Tx.State = Errored
+		return nil
 	}
-	delete(s.hashToId, pt.Hash)
 
-	pt.Tx.State = Errored
-	return nil
+	// check if the tx is confirmed for sanity
+	if pt, exists := s.confirmedTxs[id]; exists {
+		delete(s.confirmedTxs, id)
+		delete(s.hashToId, pt.Hash)
+		pt.Tx.State = Errored
+		s.unconfirmedTxs[id] = pt
+		return nil
+	}
+
+	return fmt.Errorf("no such unconfirmed or confirmed id: %s", id)
 }
 
 func (s *TxStore) OnFatalError(id string) error {
