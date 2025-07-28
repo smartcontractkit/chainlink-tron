@@ -472,7 +472,12 @@ func (t *TronTxm) checkFinalized() {
 				if derr := store.OnReorg(txId); derr != nil {
 					t.Logger.Errorw("failed to OnReorg tx", "txID", txId, "error", derr)
 				} else {
-					t.BroadcastChan <- pt.Tx
+					select {
+					case t.BroadcastChan <- pt.Tx:
+						// Successfully enqueued the transaction
+					default:
+						t.Logger.Warnw("Broadcast channel is full, dropping transaction", "txID", txId)
+					}
 				}
 				continue
 			}
