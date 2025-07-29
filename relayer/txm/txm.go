@@ -40,7 +40,7 @@ type TronTxm struct {
 	Config                TronTxmConfig
 	EstimateEnergyEnabled bool // TODO: Move this to a NodeState/Config struct when we move to MultiNode
 
-	Client        sdk.FullNodeClient
+	Client        sdk.CombinedClient
 	BroadcastChan chan *TronTx
 	AccountStore  *AccountStore
 	Starter       utils.StartStopOnce
@@ -56,7 +56,7 @@ type TronTxmRequest struct {
 	ID              string
 }
 
-func New(lgr logger.Logger, keystore loop.Keystore, client sdk.FullNodeClient, config TronTxmConfig) *TronTxm {
+func New(lgr logger.Logger, keystore loop.Keystore, client sdk.CombinedClient, config TronTxmConfig) *TronTxm {
 	txm := &TronTxm{
 		Logger:                logger.Named(lgr, "TronTxm"),
 		Keystore:              keystore,
@@ -93,7 +93,7 @@ func (t *TronTxm) HealthReport() map[string]error {
 	return map[string]error{t.Name(): t.Starter.Healthy()}
 }
 
-func (t *TronTxm) GetClient() sdk.FullNodeClient {
+func (t *TronTxm) GetClient() sdk.CombinedClient {
 	return t.Client
 }
 
@@ -322,7 +322,7 @@ func (t *TronTxm) confirmLoop() {
 func (t *TronTxm) checkUnconfirmed() {
 	allUnconfirmedTxs := t.AccountStore.GetAllUnconfirmed()
 	for fromAddress, unconfirmedTxs := range allUnconfirmedTxs {
-		nowBlock, err := t.GetClient().GetNowBlock()
+		nowBlock, err := t.GetClient().GetNowBlockFullNode()
 		if err != nil {
 			t.Logger.Errorw("could not get latest block", "error", err)
 			continue
@@ -333,7 +333,8 @@ func (t *TronTxm) checkUnconfirmed() {
 		}
 		timestampMs := nowBlock.BlockHeader.RawData.Timestamp
 		for _, unconfirmedTx := range unconfirmedTxs {
-			txInfo, err := t.GetClient().GetTransactionInfoById(unconfirmedTx.Hash)
+			// use fullnode endpoint for unfinalized data
+			txInfo, err := t.GetClient().GetTransactionInfoByIdFullNode(unconfirmedTx.Hash)
 			txStore := t.AccountStore.GetTxStore(fromAddress)
 
 			if err != nil {
@@ -440,13 +441,6 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *PendingTx, bumpEnergy bool, isOutOfT
 }
 
 func (t *TronTxm) checkFinalized() {
-	nowBlk, err := t.GetClient().GetNowBlock()
-	if err != nil {
-		t.Logger.Errorw("could not get latest block for finalization", "error", err)
-		return
-	}
-	currentHeight := nowBlk.BlockHeader.RawData.Number
-
 	for acc := range t.AccountStore.store {
 		store := t.AccountStore.GetTxStore(acc)
 		store.lock.RLock()
@@ -466,8 +460,8 @@ func (t *TronTxm) checkFinalized() {
 			txHash := pt.Hash
 			store.lock.RUnlock()
 
-			txInfo, err := t.getTransactionInfoWithRetry(txHash)
-			if err != nil {
+			_, err := t.GetClient().GetTransactionInfoById(txHash)
+			if err != nil && t.checkReorged(txHash) {
 				t.Logger.Warnw("tx missing after reorg, moving back to unconfirmed", "txID", txId)
 				if derr := store.OnReorg(txId); derr != nil {
 					t.Logger.Errorw("failed to OnReorg tx", "txID", txId, "error", derr)
@@ -482,19 +476,10 @@ func (t *TronTxm) checkFinalized() {
 				continue
 			}
 
-			depth := currentHeight - txInfo.BlockNumber
-			if depth < 0 {
-				t.Logger.Warnf("RPC Lagging! Negative depth for tx %s, currentHeight: %d, txBlockNumber: %d", txId, currentHeight, txInfo.BlockNumber)
-				continue
-			}
-
-			convertedDepth := uint64(depth)
-			if convertedDepth >= t.Config.FinalityDepth {
-				if err := store.OnFinalized(txId); err != nil {
-					t.Logger.Errorw("failed to finalize tx", "txID", txId, "error", err)
-				} else {
-					t.Logger.Infow("finalized transaction", "txID", txId, "depth", depth)
-				}
+			if err := store.OnFinalized(txId); err != nil {
+				t.Logger.Errorw("failed to finalize tx", "txID", txId, "error", err)
+			} else {
+				t.Logger.Infow("finalized transaction", "txID", txId)
 			}
 		}
 	}
@@ -581,7 +566,7 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	}
 
 	// Using TriggerConstantContract as EstimateEnergy is unsupported or failed.
-	triggerResponse, err := t.GetClient().TriggerConstantContract(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
+	triggerResponse, err := t.GetClient().TriggerConstantContractFullNode(tx.FromAddress, tx.ContractAddress, tx.Method, tx.Params)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call TriggerConstantContract: %w", err)
 	}
@@ -594,12 +579,12 @@ func (t *TronTxm) estimateEnergy(tx *TronTx) (int64, error) {
 	return triggerResponse.EnergyUsed, nil
 }
 
-// getTransactionInfoWithRetry attempts to fetch transaction info with retries to distinguish
+// checkReorged attempts to fetch transaction info with retries to distinguish
 // between temporary RPC failures and actual chain reorgs.
-func (t *TronTxm) getTransactionInfoWithRetry(txHash string) (*soliditynode.TransactionInfo, error) {
-	txInfo, err := t.GetClient().GetTransactionInfoById(txHash)
+func (t *TronTxm) checkReorged(txHash string) bool {
+	_, err := t.GetClient().GetTransactionInfoByIdFullNode(txHash)
 	if err == nil {
-		return txInfo, nil
+		return false
 	}
 
 	ticker := time.NewTicker(REORG_RETRY_DELAY)
@@ -607,11 +592,11 @@ func (t *TronTxm) getTransactionInfoWithRetry(txHash string) (*soliditynode.Tran
 
 	for retry := uint(0); retry < REORG_RETRY_COUNT; retry++ {
 		<-ticker.C
-		txInfo, err = t.GetClient().GetTransactionInfoById(txHash)
+		_, err = t.GetClient().GetTransactionInfoByIdFullNode(txHash)
 		if err == nil {
-			return txInfo, nil
+			return false
 		}
 	}
 
-	return nil, err
+	return true
 }

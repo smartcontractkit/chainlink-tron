@@ -34,7 +34,6 @@ var (
 	defaultConfig = trontxm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
-		FinalityDepth:     10,
 		RetentionPeriod:   10 * time.Second,
 		ReapInterval:      1 * time.Second,
 	}
@@ -48,19 +47,19 @@ func createTestKeystore() *testutils.TestKeystore {
 	return testutils.NewTestKeystore(genesisAddress.String(), genesisPrivateKey)
 }
 
-func createDefaultMockClient(t *testing.T) *mocks.FullNodeClient {
-	fullNodeClient := mocks.NewFullNodeClient(t)
+func createDefaultMockClient(t *testing.T) *mocks.CombinedClient {
+	combinedClient := mocks.NewCombinedClient(t)
 
-	fullNodeClient.On("Start", mock.Anything).Maybe().Return(nil)
-	fullNodeClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&soliditynode.EnergyEstimateResult{
+	combinedClient.On("Start", mock.Anything).Maybe().Return(nil)
+	combinedClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&soliditynode.EnergyEstimateResult{
 		Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 		EnergyRequired: 1000,
 	}, nil)
-	fullNodeClient.On("GetEnergyPrices").Maybe().Return(&fullnode.EnergyPrices{Prices: "0:420"}, nil)
+	combinedClient.On("GetEnergyPrices").Maybe().Return(&fullnode.EnergyPrices{Prices: "0:420"}, nil)
 
 	txid, _ := hex.DecodeString("2a037789237971c1c1d648f7b90b70c68a9aa6b0a2892f947213286346d0210d")
 
-	fullNodeClient.On("GetNowBlock").Maybe().Return(&soliditynode.Block{
+	combinedClient.On("GetNowBlockFullNode").Maybe().Return(&soliditynode.Block{
 		BlockHeader: &soliditynode.BlockHeader{
 			RawData: &soliditynode.BlockHeaderRaw{
 				Timestamp: 1000,
@@ -69,7 +68,7 @@ func createDefaultMockClient(t *testing.T) *mocks.FullNodeClient {
 		},
 	}, nil)
 
-	fullNodeClient.On("TriggerSmartContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&fullnode.TriggerSmartContractResponse{
+	combinedClient.On("TriggerSmartContract", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(&fullnode.TriggerSmartContractResponse{
 		Transaction: &common.Transaction{
 			TxID: hex.EncodeToString(txid),
 			RawData: common.RawData{
@@ -82,16 +81,16 @@ func createDefaultMockClient(t *testing.T) *mocks.FullNodeClient {
 		Result: fullnode.TriggerResult{Result: true},
 	}, nil)
 
-	fullNodeClient.On("BroadcastTransaction", mock.Anything).Maybe().Return(&fullnode.BroadcastResponse{
+	combinedClient.On("BroadcastTransaction", mock.Anything).Maybe().Return(&fullnode.BroadcastResponse{
 		Result:  true,
 		Code:    "SUCCESS",
 		Message: "broadcast message",
 	}, nil)
 
-	return fullNodeClient
+	return combinedClient
 }
 
-func setupTxm(t *testing.T, fullNodeClient sdk.FullNodeClient, customConfig *trontxm.TronTxmConfig) (*trontxm.TronTxm, logger.Logger, *observer.ObservedLogs) {
+func setupTxm(t *testing.T, combinedClient sdk.CombinedClient, customConfig *trontxm.TronTxmConfig) (*trontxm.TronTxm, logger.Logger, *observer.ObservedLogs) {
 	testLogger, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
 	keystore := createTestKeystore()
 
@@ -105,7 +104,7 @@ func setupTxm(t *testing.T, fullNodeClient sdk.FullNodeClient, customConfig *tro
 		Keystore:              keystore,
 		Config:                config,
 		EstimateEnergyEnabled: true,
-		Client:                fullNodeClient,
+		Client:                combinedClient,
 		BroadcastChan:         make(chan *trontxm.TronTx, config.BroadcastChanSize),
 		AccountStore:          trontxm.NewAccountStore(),
 		Stop:                  make(chan struct{}),
@@ -122,8 +121,8 @@ func waitForMaxRetryDuration() {
 func TestTxm(t *testing.T) {
 	t.Parallel()
 	t.Run("Invalid input params", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		txm, _, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient := createDefaultMockClient(t)
+		txm, _, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -137,13 +136,17 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 123,
-		}, nil).Times(2)
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -161,25 +164,35 @@ func TestTxm(t *testing.T) {
 	})
 
 	t.Run("Reorg success", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		// mark confirmed
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12345,
 		}, nil).Once()
+		// finalization not found at first
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "FAILED"},
+			BlockNumber: 12346,
+		}, errors.New("block reorg")).Once()
 		// reorg - account for retry logic (1 initial + 3 retries = 4 calls per reorg detection)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "FAILED"},
 			BlockNumber: 12346,
 		}, errors.New("block reorg")).Times(4)
 		// re-confirm w/ lower block height to simulate finalization after reorg
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12300,
-		}, nil).Times(2)
+		}, nil).Once()
+		// finalized
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -200,20 +213,24 @@ func TestTxm(t *testing.T) {
 func TestTxmRetryLogic(t *testing.T) {
 	t.Parallel()
 	t.Run("Retry on broadcast server busy", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 123,
-		}, nil).Times(2)
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Once()
 
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
+		combinedClient.On("BroadcastTransaction", mock.Anything).Unset()
+		combinedClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
 			Code:    "SERVER_BUSY",
 			Message: "server busy",
 		}, fmt.Errorf("some err"))
 
-		txm, _, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, _, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -234,20 +251,24 @@ func TestTxmRetryLogic(t *testing.T) {
 	})
 
 	t.Run("Retry on broadcast block unsolidified", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 123,
-		}, nil).Times(2)
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Once()
 
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
+		combinedClient.On("BroadcastTransaction", mock.Anything).Unset()
+		combinedClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
 			Code:    "BLOCK_UNSOLIDIFIED",
 			Message: "block unsolid",
 		}, fmt.Errorf("some err"))
 
-		txm, _, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, _, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -268,15 +289,15 @@ func TestTxmRetryLogic(t *testing.T) {
 	})
 
 	t.Run("No retry on other broadcast error", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Unset()
-		fullNodeClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("BroadcastTransaction", mock.Anything).Unset()
+		combinedClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
 			Result:  false,
 			Code:    "BANDWITH_ERROR",
 			Message: "some error",
 		}, fmt.Errorf("some err"))
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -297,13 +318,17 @@ func TestTxmRetryLogic(t *testing.T) {
 func TestTxmTransactionReaping(t *testing.T) {
 	t.Parallel()
 	t.Run("Reap expired transactions", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 12300,
-		}, nil).Times(2)
+			BlockNumber: 123,
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -326,17 +351,16 @@ func TestTxmTransactionReaping(t *testing.T) {
 	})
 
 	t.Run("Reap multiple transactions with different states", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		shortReapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   200 * time.Millisecond,
 			ReapInterval:      50 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, shortReapConfig)
+		txm, _, _ := setupTxm(t, combinedClient, shortReapConfig)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -368,17 +392,16 @@ func TestTxmTransactionReaping(t *testing.T) {
 	})
 
 	t.Run("Reap only expired transactions, keep recent ones", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		reapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   500 * time.Millisecond,
 			ReapInterval:      50 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, reapConfig)
+		txm, _, _ := setupTxm(t, combinedClient, reapConfig)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -414,17 +437,16 @@ func TestTxmTransactionReaping(t *testing.T) {
 	})
 
 	t.Run("Reap across multiple accounts", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		multiAccountConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   150 * time.Millisecond,
 			ReapInterval:      30 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, multiAccountConfig)
+		txm, _, _ := setupTxm(t, combinedClient, multiAccountConfig)
 		defer txm.Close()
 
 		accounts := make([]string, 3)
@@ -466,17 +488,16 @@ func TestTxmTransactionReaping(t *testing.T) {
 	})
 
 	t.Run("No reaping when no expired transactions", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		noReapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   5 * time.Second,
 			ReapInterval:      50 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, noReapConfig)
+		txm, _, _ := setupTxm(t, combinedClient, noReapConfig)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -500,17 +521,16 @@ func TestTxmTransactionReaping(t *testing.T) {
 	})
 
 	t.Run("Reap performance with many transactions", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
+		combinedClient := createDefaultMockClient(t)
 
 		perfConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   100 * time.Millisecond,
 			ReapInterval:      50 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, perfConfig)
+		txm, _, _ := setupTxm(t, combinedClient, perfConfig)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -543,8 +563,8 @@ func TestTxmStateTransitions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("TxStore state transitions", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		txm, _, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient := createDefaultMockClient(t)
+		txm, _, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -611,8 +631,12 @@ func TestTxmRaceConditions(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Concurrent enqueue operations", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 123,
 		}, nil)
@@ -620,12 +644,11 @@ func TestTxmRaceConditions(t *testing.T) {
 		raceConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 300,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     10,
 			RetentionPeriod:   10 * time.Second,
 			ReapInterval:      1 * time.Second,
 		}
 
-		txm, testLogger, _ := setupTxm(t, fullNodeClient, raceConfig)
+		txm, testLogger, _ := setupTxm(t, combinedClient, raceConfig)
 		defer func() {
 			done := make(chan struct{})
 			go func() {
@@ -683,8 +706,8 @@ func TestTxmRaceConditions(t *testing.T) {
 	})
 
 	t.Run("Concurrent state transitions", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		txm, _, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient := createDefaultMockClient(t)
+		txm, _, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
@@ -721,8 +744,8 @@ func TestTxmRaceConditions(t *testing.T) {
 	})
 
 	t.Run("Concurrent account access", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		txm, _, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient := createDefaultMockClient(t)
+		txm, _, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		numGoroutines := 50
@@ -767,12 +790,16 @@ func TestTxmRaceConditions(t *testing.T) {
 	})
 
 	t.Run("Concurrent transaction status checks", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 123,
 		}, nil)
-		txm, _, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 123,
+		}, nil)
+		txm, _, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		txID := "concurrent_status_test"
@@ -826,19 +853,23 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 	t.Parallel()
 
 	t.Run("OUT_OF_ENERGY failure with energy bump retry", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
 			BlockNumber: 12345,
 		}, nil).Once()
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12300,
-		}, nil).Maybe()
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -855,21 +886,21 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "energy_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
 	})
 
 	t.Run("OUT_OF_TIME failure with retry limit", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_TIME"},
 			BlockNumber: 12345,
-		}, nil).Maybe()
+		}, nil)
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -885,21 +916,21 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of time").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, multiple OUT_OF_TIME errors").Len(), 1)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "timeout_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
 
 	t.Run("REVERT failure marked as fatal immediately", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "REVERT"},
 			BlockNumber: 12345,
 		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -915,26 +946,30 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "revert_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
 
 	t.Run("UNKNOWN failure with retry", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "UNKNOWN"},
 			BlockNumber: 12345,
 		}, nil).Once()
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12300,
-		}, nil).Maybe()
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -951,7 +986,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to unknown error").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "unknown_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
@@ -960,7 +995,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 	t.Run("Multiple fatal error types", func(t *testing.T) {
 		fatalResults := []string{
 			"BAD_JUMP_DESTINATION",
-			"OUT_OF_MEMORY", 
+			"OUT_OF_MEMORY",
 			"STACK_TOO_SMALL",
 			"STACK_TOO_LARGE",
 			"ILLEGAL_OPERATION",
@@ -972,14 +1007,14 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		for _, result := range fatalResults {
 			t.Run("fatal_"+result, func(t *testing.T) {
-				fullNodeClient := createDefaultMockClient(t)
-				
-				fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+				combinedClient := createDefaultMockClient(t)
+
+				combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 					Receipt:     soliditynode.ResourceReceipt{Result: result},
 					BlockNumber: 12345,
 				}, nil).Once()
 
-				txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+				txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 				defer txm.Close()
 
 				testID := "fatal_" + result + "_test"
@@ -996,7 +1031,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 				require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
 				require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
-				
+
 				status, err := txm.GetTransactionStatus(context.Background(), testID)
 				require.NoError(t, err)
 				require.Equal(t, types.Fatal, status)
@@ -1005,22 +1040,21 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 	})
 
 	t.Run("Max retry attempts reached", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
+		combinedClient := createDefaultMockClient(t)
+
 		maxRetryConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   2,
-			FinalityDepth:     10,
 			RetentionPeriod:   60 * time.Second,
 			ReapInterval:      1 * time.Second,
 		}
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
 			BlockNumber: 12345,
-		}, nil).Maybe()
+		}, nil)
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, maxRetryConfig)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, maxRetryConfig)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -1036,31 +1070,35 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 5)
 		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "max_retry_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
 
 	t.Run("Energy bump progression", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		
-		fullNodeClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.EnergyEstimateResult{
+		combinedClient := createDefaultMockClient(t)
+
+		combinedClient.On("EstimateEnergy", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&soliditynode.EnergyEstimateResult{
 			Result:         soliditynode.ReturnEnergyEstimate{Result: true},
 			EnergyRequired: 1000,
 		}, nil)
 
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "OUT_OF_ENERGY"},
 			BlockNumber: 12345,
 		}, nil).Times(3)
-		
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
 			BlockNumber: 12300,
-		}, nil).Maybe()
+		}, nil).Once()
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, fullNodeClient, nil)
+		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -1077,7 +1115,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
-		
+
 		status, err := txm.GetTransactionStatus(context.Background(), "energy_bump_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
@@ -1087,21 +1125,24 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 func TestTxmLoadTesting(t *testing.T) {
 	t.Parallel()
 	t.Run("High volume transaction enqueueing", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
+			BlockNumber: 12300,
+		}, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
 		}, nil)
 
 		loadConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 300,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     5,
 			RetentionPeriod:   5 * time.Second,
 			ReapInterval:      500 * time.Millisecond,
 		}
 
-		txm, testLogger, _ := setupTxm(t, fullNodeClient, loadConfig)
+		txm, testLogger, _ := setupTxm(t, combinedClient, loadConfig)
 		defer txm.Close()
 
 		numTransactions := 200
@@ -1137,21 +1178,24 @@ func TestTxmLoadTesting(t *testing.T) {
 	})
 
 	t.Run("Channel capacity stress test", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
+			BlockNumber: 12300,
+		}, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
 		}, nil)
 
 		smallConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 10,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     5,
 			RetentionPeriod:   5 * time.Second,
 			ReapInterval:      500 * time.Millisecond,
 		}
 
-		txm, testLogger, _ := setupTxm(t, fullNodeClient, smallConfig)
+		txm, testLogger, _ := setupTxm(t, combinedClient, smallConfig)
 		defer txm.Close()
 
 		numGoroutines := 20
@@ -1183,12 +1227,16 @@ func TestTxmLoadTesting(t *testing.T) {
 	})
 
 	t.Run("Multiple accounts high volume", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
+			BlockNumber: 12300,
 		}, nil)
-		txm, testLogger, _ := setupTxm(t, fullNodeClient, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
+		}, nil)
+		txm, testLogger, _ := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		numAccounts := 5
@@ -1233,21 +1281,24 @@ func TestTxmLoadTesting(t *testing.T) {
 	})
 
 	t.Run("Concurrent reaping and finalization", func(t *testing.T) {
-		fullNodeClient := createDefaultMockClient(t)
-		fullNodeClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
+		combinedClient := createDefaultMockClient(t)
+		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Return(&soliditynode.TransactionInfo{
 			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
+			BlockNumber: 12300,
+		}, nil)
+		combinedClient.On("GetTransactionInfoById", mock.Anything).Return(&soliditynode.TransactionInfo{
+			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
+			BlockNumber: 12300,
 		}, nil)
 
 		shortConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			ConfirmPollSecs:   1,
-			FinalityDepth:     1,
 			RetentionPeriod:   100 * time.Millisecond,
 			ReapInterval:      50 * time.Millisecond,
 		}
 
-		txm, _, _ := setupTxm(t, fullNodeClient, shortConfig)
+		txm, _, _ := setupTxm(t, combinedClient, shortConfig)
 		defer txm.Close()
 
 		numTransactions := 50
