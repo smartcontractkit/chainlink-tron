@@ -619,10 +619,10 @@ func TestTxmStateTransitions(t *testing.T) {
 
 		tx3 := &trontxm.TronTx{ID: "id2", FromAddress: genesisAddress}
 		// OnErrored
-		require.Error(t, store.OnErrored("no-such"))
+		require.Error(t, store.OnErrored("no-such", true))
 		require.NoError(t, store.OnPending(tx3))
 		require.NoError(t, store.OnBroadcasted("h4", 2000, tx3))
-		require.NoError(t, store.OnErrored(tx3.ID))
+		require.NoError(t, store.OnErrored(tx3.ID, true))
 		require.Equal(t, trontxm.Errored, tx3.State)
 		require.True(t, store.Has(tx3.ID))
 
@@ -937,7 +937,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		status, err := txm.GetTransactionStatus(t.Context(), "timeout_test")
 		require.NoError(t, err)
-		require.Equal(t, types.Fatal, status)
+		require.Equal(t, types.Failed, status)
 	})
 
 	t.Run("REVERT failure marked as fatal immediately", func(t *testing.T) {
@@ -1091,7 +1091,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 
 		status, err := txm.GetTransactionStatus(t.Context(), "max_retry_test")
 		require.NoError(t, err)
-		require.Equal(t, types.Fatal, status)
+		require.Equal(t, types.Failed, status)
 	})
 
 	t.Run("Energy bump progression", func(t *testing.T) {

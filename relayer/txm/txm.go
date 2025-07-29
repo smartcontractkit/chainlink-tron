@@ -404,22 +404,22 @@ func (t *TronTxm) checkUnconfirmed() {
 func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOfTimeError bool, txStore *TxStore) {
 	tx := unconfirmedTx.Tx
 
-	if err := txStore.OnErrored(tx.ID); err != nil {
+	if err := txStore.OnErrored(tx.ID, true); err != nil {
 		t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
 		return
 	}
 
 	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
 		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError, "txID", tx.ID)
-		if err := txStore.OnFatalError(tx.ID); err != nil {
-			t.Logger.Errorw("failed to mark transaction as fatally errored", "txID", tx.ID, "error", err)
+		if err := txStore.OnErrored(tx.ID, false); err != nil {
+			t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
 		}
 		return
 	}
 	if tx.OutOfTimeErrors >= 2 {
 		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError, "txID", tx.ID)
-		if err := txStore.OnFatalError(tx.ID); err != nil {
-			t.Logger.Errorw("failed to mark transaction as fatally errored", "txID", tx.ID, "error", err)
+		if err := txStore.OnErrored(tx.ID, false); err != nil {
+			t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
 		}
 		return
 	}

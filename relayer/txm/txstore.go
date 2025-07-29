@@ -114,12 +114,20 @@ func (s *TxStore) OnConfirmed(id string) error {
 	return nil
 }
 
-func (s *TxStore) OnErrored(id string) error {
+func (s *TxStore) OnErrored(id string, retry bool) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	if pt, exists := s.unconfirmedTxs[id]; exists {
 		delete(s.hashToId, pt.Hash)
+		if !retry {
+			delete(s.unconfirmedTxs, id)
+			s.finishedTxs[id] = &FinishedTx{
+				Hash:        pt.Hash,
+				Tx:          pt.Tx,
+				RetentionTs: time.Now(),
+			}
+		}
 		pt.Tx.State = Errored
 		return nil
 	}
@@ -128,6 +136,15 @@ func (s *TxStore) OnErrored(id string) error {
 	if pt, exists := s.confirmedTxs[id]; exists {
 		delete(s.confirmedTxs, id)
 		delete(s.hashToId, pt.Hash)
+		if retry {
+			s.unconfirmedTxs[id] = pt
+		} else {
+			s.finishedTxs[id] = &FinishedTx{
+				Hash:        pt.Hash,
+				Tx:          pt.Tx,
+				RetentionTs: time.Now(),
+			}
+		}
 		pt.Tx.State = Errored
 		s.unconfirmedTxs[id] = pt
 		return nil
