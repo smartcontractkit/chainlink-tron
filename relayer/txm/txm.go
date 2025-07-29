@@ -149,6 +149,8 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 
 	// Construct the transaction
 	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, ID: request.ID, CreateTs: time.Now()}
+	txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
+	txStore.OnPending(tx)
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -182,7 +184,6 @@ func (t *TronTxm) broadcastLoop() {
 			// RefBlockNum is optional and does not seem in use anymore.
 			t.Logger.Debugw("created transaction", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit, "txID", tx.ID)
 			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
-			txStore.OnPending(txHash, coreTx.RawData.Expiration, tx)
 
 			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
 			if err != nil {
@@ -193,7 +194,7 @@ func (t *TronTxm) broadcastLoop() {
 
 			t.Logger.Infow("transaction broadcasted", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit, "txID", tx.ID)
 
-			txStore.OnBroadcasted(tx.ID)
+			txStore.OnBroadcasted(txHash, coreTx.RawData.Expiration, tx)
 		case <-t.Stop:
 			t.Logger.Debugw("broadcastLoop: stopped")
 			return
@@ -400,7 +401,7 @@ func (t *TronTxm) checkUnconfirmed() {
 	}
 }
 
-func (t *TronTxm) maybeRetry(unconfirmedTx *PendingTx, bumpEnergy bool, isOutOfTimeError bool, txStore *TxStore) {
+func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOfTimeError bool, txStore *TxStore) {
 	tx := unconfirmedTx.Tx
 
 	if err := txStore.OnErrored(tx.ID); err != nil {

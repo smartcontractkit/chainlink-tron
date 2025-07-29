@@ -213,14 +213,6 @@ func TestTxmRetryLogic(t *testing.T) {
 	t.Parallel()
 	t.Run("Retry on broadcast server busy", func(t *testing.T) {
 		combinedClient := createDefaultMockClient(t)
-		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
-			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
-		}, nil).Once()
-		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
-			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
-		}, nil).Once()
 
 		combinedClient.On("BroadcastTransaction", mock.Anything).Unset()
 		combinedClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
@@ -251,14 +243,6 @@ func TestTxmRetryLogic(t *testing.T) {
 
 	t.Run("Retry on broadcast block unsolidified", func(t *testing.T) {
 		combinedClient := createDefaultMockClient(t)
-		combinedClient.On("GetTransactionInfoByIdFullNode", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
-			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
-		}, nil).Once()
-		combinedClient.On("GetTransactionInfoById", mock.Anything).Maybe().Return(&soliditynode.TransactionInfo{
-			Receipt:     soliditynode.ResourceReceipt{Result: "SUCCESS"},
-			BlockNumber: 123,
-		}, nil).Once()
 
 		combinedClient.On("BroadcastTransaction", mock.Anything).Unset()
 		combinedClient.On("BroadcastTransaction", mock.Anything).Return(&fullnode.BroadcastResponse{
@@ -368,16 +352,17 @@ func TestTxmTransactionReaping(t *testing.T) {
 		fatalTx1 := &trontxm.TronTx{ID: "fatal_tx_1", FromAddress: genesisAddress, CreateTs: time.Now()}
 		fatalTx2 := &trontxm.TronTx{ID: "fatal_tx_2", FromAddress: genesisAddress, CreateTs: time.Now()}
 
-		require.NoError(t, store.OnPending("hash1", time.Now().UnixMilli()+1000, finalizedTx))
-		require.NoError(t, store.OnBroadcasted(finalizedTx.ID))
+		require.NoError(t, store.OnPending(finalizedTx))
+		require.NoError(t, store.OnBroadcasted("hash1", time.Now().UnixMilli()+1000, finalizedTx))
 		require.NoError(t, store.OnConfirmed(finalizedTx.ID))
 		require.NoError(t, store.OnFinalized(finalizedTx.ID))
 
-		require.NoError(t, store.OnPending("hash2", time.Now().UnixMilli()+1000, fatalTx1))
+		require.NoError(t, store.OnPending(fatalTx1))
+		require.NoError(t, store.OnBroadcasted("hash2", time.Now().UnixMilli()+1000, fatalTx1))
 		require.NoError(t, store.OnFatalError(fatalTx1.ID))
 
-		require.NoError(t, store.OnPending("hash3", time.Now().UnixMilli()+1000, fatalTx2))
-		require.NoError(t, store.OnBroadcasted(fatalTx2.ID))
+		require.NoError(t, store.OnPending(fatalTx2))
+		require.NoError(t, store.OnBroadcasted("hash3", time.Now().UnixMilli()+1000, fatalTx2))
 		require.NoError(t, store.OnConfirmed(fatalTx2.ID))
 		require.NoError(t, store.OnFatalError(fatalTx2.ID))
 
@@ -415,8 +400,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 			CreateTs:    oldTime,
 		}
 
-		require.NoError(t, store.OnPending("old_hash", time.Now().UnixMilli()+1000, oldTx))
-		require.NoError(t, store.OnBroadcasted(oldTx.ID))
+		require.NoError(t, store.OnPending(oldTx))
+		require.NoError(t, store.OnBroadcasted("old_hash", time.Now().UnixMilli()+1000, oldTx))
 		require.NoError(t, store.OnConfirmed(oldTx.ID))
 		require.NoError(t, store.OnFinalized(oldTx.ID))
 
@@ -426,8 +411,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 			CreateTs:    time.Now(),
 		}
 
-		require.NoError(t, store.OnPending("new_hash", time.Now().UnixMilli()+1000, newTx))
-		require.NoError(t, store.OnBroadcasted(newTx.ID))
+		require.NoError(t, store.OnPending(newTx))
+		require.NoError(t, store.OnBroadcasted("new_hash", time.Now().UnixMilli()+1000, newTx))
 		require.NoError(t, store.OnConfirmed(newTx.ID))
 		require.NoError(t, store.OnFinalized(newTx.ID))
 
@@ -470,8 +455,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 				CreateTs:    time.Now(),
 			}
 
-			require.NoError(t, store.OnPending(fmt.Sprintf("hash_%d", i), time.Now().UnixMilli()+1000, tx))
-			require.NoError(t, store.OnBroadcasted(tx.ID))
+			require.NoError(t, store.OnPending(tx))
+			require.NoError(t, store.OnBroadcasted(fmt.Sprintf("hash_%d", i), time.Now().UnixMilli()+1000, tx))
 			require.NoError(t, store.OnConfirmed(tx.ID))
 			require.NoError(t, store.OnFinalized(tx.ID))
 		}
@@ -517,8 +502,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 			CreateTs:    time.Now(),
 		}
 
-		require.NoError(t, store.OnPending("recent_hash", time.Now().UnixMilli()+1000, recentTx))
-		require.NoError(t, store.OnBroadcasted(recentTx.ID))
+		require.NoError(t, store.OnPending(recentTx))
+		require.NoError(t, store.OnBroadcasted("recent_hash", time.Now().UnixMilli()+1000, recentTx))
 		require.NoError(t, store.OnConfirmed(recentTx.ID))
 		require.NoError(t, store.OnFinalized(recentTx.ID))
 
@@ -555,8 +540,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 				CreateTs:    time.Now(),
 			}
 
-			require.NoError(t, store.OnPending(fmt.Sprintf("perf_hash_%d", i), time.Now().UnixMilli()+1000, tx))
-			require.NoError(t, store.OnBroadcasted(tx.ID))
+			require.NoError(t, store.OnPending(tx))
+			require.NoError(t, store.OnBroadcasted(fmt.Sprintf("perf_hash_%d", i), time.Now().UnixMilli()+1000, tx))
 			require.NoError(t, store.OnConfirmed(tx.ID))
 			require.NoError(t, store.OnFinalized(tx.ID))
 		}
@@ -587,7 +572,7 @@ func TestTxmStateTransitions(t *testing.T) {
 		// OnPending
 		tx1 := &trontxm.TronTx{ID: "id1", FromAddress: genesisAddress}
 		hash1 := "hash1"
-		require.NoError(t, store.OnPending(hash1, 1000, tx1))
+		require.NoError(t, store.OnPending(tx1))
 		require.True(t, store.Has("id1"))
 		require.Equal(t, trontxm.Pending, tx1.State)
 		status, err := txm.GetTransactionStatus(t.Context(), tx1.ID)
@@ -595,14 +580,14 @@ func TestTxmStateTransitions(t *testing.T) {
 		require.Equal(t, types.Pending, status)
 
 		// duplicate hash → error
-		require.Error(t, store.OnPending(hash1, 1000, &trontxm.TronTx{ID: "id1"}))
+		require.Error(t, store.OnPending(&trontxm.TronTx{ID: "id1"}))
 
 		// OnBroadcasted
-		require.NoError(t, store.OnBroadcasted(tx1.ID))
+		require.NoError(t, store.OnBroadcasted(hash1, 1000, tx1))
 		require.Equal(t, trontxm.Broadcasted, tx1.State)
-		err = store.OnBroadcasted(tx1.ID)
-		require.ErrorContains(t, err, "tx is not pending")
-		require.Error(t, store.OnBroadcasted("no-such"))
+		err = store.OnBroadcasted(hash1, 1000, tx1)
+		require.ErrorContains(t, err, "hash already exists")
+		require.Error(t, store.OnBroadcasted("no-such", 1000, &trontxm.TronTx{ID: "no-such"}))
 
 		// OnConfirmed
 		require.NoError(t, store.OnConfirmed(tx1.ID))
@@ -613,26 +598,22 @@ func TestTxmStateTransitions(t *testing.T) {
 		require.Error(t, store.OnConfirmed("no-such"))
 
 		// Fatal error from confirmed
-		require.NoError(t, store.OnPending("h2", 2000, tx1))
-		require.NoError(t, store.OnBroadcasted(tx1.ID))
-		require.NoError(t, store.OnConfirmed(tx1.ID))
 		require.NoError(t, store.OnFatalError(tx1.ID))
 		require.Equal(t, trontxm.FatallyErrored, tx1.State)
 		// retain id
 		require.True(t, store.Has(tx1.ID))
 
 		tx2 := &trontxm.TronTx{ID: "id2", FromAddress: genesisAddress}
-		hash2 := "hash2"
 		// OnErrored
 		require.Error(t, store.OnErrored("no-such"))
-		require.NoError(t, store.OnPending(hash2, 2000, tx2))
+		require.NoError(t, store.OnPending(tx2))
+		require.NoError(t, store.OnBroadcasted("h3", 2000, tx2))
 		require.NoError(t, store.OnErrored(tx2.ID))
 		require.Equal(t, trontxm.Errored, tx2.State)
 		require.True(t, store.Has(tx2.ID))
 
 		// OnReorg
-		require.NoError(t, store.OnPending("h3", 2000, tx2))
-		require.NoError(t, store.OnBroadcasted(tx2.ID))
+		require.NoError(t, store.OnBroadcasted("h3", 2000, tx2))
 		require.NoError(t, store.OnConfirmed(tx2.ID))
 		require.NoError(t, store.OnReorg(tx2.ID))
 		require.Equal(t, trontxm.Broadcasted, tx2.State)
@@ -647,18 +628,18 @@ func TestTxmStateTransitions(t *testing.T) {
 		require.Equal(t, store.FinishedCount(), 2)
 
 		// ensure finalized can't be changed
-		require.Error(t, store.OnPending("h3", 2000, tx2))
-		require.Error(t, store.OnBroadcasted(tx2.ID))
+		require.Error(t, store.OnPending(tx2))
+		require.Error(t, store.OnBroadcasted("h3", 2000, tx2))
 		require.Error(t, store.OnConfirmed(tx2.ID))
 		require.Error(t, store.OnFinalized(tx2.ID))
 		require.Error(t, store.OnFatalError(tx2.ID))
 
 		// ensure fatal can't be changed
-		require.Error(t, store.OnPending("h2", 2000, tx1))
-		require.Error(t, store.OnBroadcasted(tx2.ID))
-		require.Error(t, store.OnConfirmed(tx2.ID))
-		require.Error(t, store.OnFinalized(tx2.ID))
-		require.Error(t, store.OnFatalError(tx2.ID))
+		require.Error(t, store.OnPending(tx1))
+		require.Error(t, store.OnBroadcasted("h2", 2000, tx1))
+		require.Error(t, store.OnConfirmed(tx1.ID))
+		require.Error(t, store.OnFinalized(tx1.ID))
+		require.Error(t, store.OnFatalError(tx1.ID))
 	})
 }
 
@@ -752,7 +733,7 @@ func TestTxmRaceConditions(t *testing.T) {
 
 		tx := &trontxm.TronTx{ID: "race_test_tx", FromAddress: genesisAddress}
 		hash := "race_test_hash"
-		require.NoError(t, store.OnPending(hash, 2000, tx))
+		require.NoError(t, store.OnPending(tx))
 
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
@@ -760,7 +741,7 @@ func TestTxmRaceConditions(t *testing.T) {
 				defer wg.Done()
 				switch routineID % 4 {
 				case 0:
-					store.OnBroadcasted(tx.ID)
+					store.OnBroadcasted(hash, 2000, tx)
 				case 1:
 					store.OnConfirmed(tx.ID)
 				case 2:
@@ -807,8 +788,8 @@ func TestTxmRaceConditions(t *testing.T) {
 				}
 				hash := fmt.Sprintf("hash_%d", routineID)
 
-				store.OnPending(hash, time.Now().UnixMilli()+10000, tx)
-				store.OnBroadcasted(tx.ID)
+				store.OnPending(tx)
+				store.OnBroadcasted(hash, time.Now().UnixMilli()+10000, tx)
 				store.GetUnconfirmed()
 				store.Has(tx.ID)
 			}(i)
