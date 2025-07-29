@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -27,8 +28,9 @@ type InflightTx struct {
 
 // Errored or Finalized transactions
 type FinishedTx struct {
-	Hash string
-	Tx   *TronTx
+	Hash        string
+	Tx          *TronTx
+	RetentionTs time.Time
 }
 
 // TxStore tracks broadcast & unconfirmed txs per account address per chain id
@@ -151,8 +153,9 @@ func (s *TxStore) OnFatalError(id string) error {
 
 	pt.Tx.State = FatallyErrored
 	s.finishedTxs[id] = &FinishedTx{
-		Hash: pt.Hash,
-		Tx:   pt.Tx,
+		Hash:        pt.Hash,
+		Tx:          pt.Tx,
+		RetentionTs: time.Now(),
 	}
 	return nil
 }
@@ -188,8 +191,9 @@ func (s *TxStore) OnFinalized(id string) error {
 
 	pt.Tx.State = Finalized
 	s.finishedTxs[id] = &FinishedTx{
-		Hash: pt.Hash,
-		Tx:   pt.Tx,
+		Hash:        pt.Hash,
+		Tx:          pt.Tx,
+		RetentionTs: time.Now(),
 	}
 	return nil
 }

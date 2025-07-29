@@ -500,7 +500,7 @@ func (t *TronTxm) reapLoop() {
 				store := t.AccountStore.GetTxStore(acc)
 				store.lock.Lock()
 				for id, ft := range store.finishedTxs {
-					if ft.Tx.CreateTs.Before(cutoff) {
+					if ft.RetentionTs.Before(cutoff) {
 						delete(store.finishedTxs, id)
 						delete(store.hashToId, ft.Hash)
 						reapCount++

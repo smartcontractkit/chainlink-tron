@@ -327,7 +327,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
 
-		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+		time.Sleep(10 * time.Second)
 		finishedAfter := txm.AccountStore.GetTotalFinishedCount()
 
 		require.Greater(t, finishedBefore, finishedAfter)
@@ -393,11 +393,10 @@ func TestTxmTransactionReaping(t *testing.T) {
 
 		store := txm.AccountStore.GetTxStore(genesisAddress.String())
 
-		oldTime := time.Now().Add(-1 * time.Second)
 		oldTx := &trontxm.TronTx{
 			ID:          "old_tx",
 			FromAddress: genesisAddress,
-			CreateTs:    oldTime,
+			CreateTs:    time.Now(),
 		}
 
 		require.NoError(t, store.OnPending(oldTx))
@@ -414,12 +413,12 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.NoError(t, store.OnPending(newTx))
 		require.NoError(t, store.OnBroadcasted("new_hash", time.Now().UnixMilli()+1000, newTx))
 		require.NoError(t, store.OnConfirmed(newTx.ID))
-		require.NoError(t, store.OnFinalized(newTx.ID))
 
-		require.Equal(t, 2, store.FinishedCount())
 		require.Equal(t, 2, len(txm.AccountStore.GetHashToIdMap()))
+		require.Equal(t, 1, store.FinishedCount())
 
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(1 * time.Second)
+		require.NoError(t, store.OnFinalized(newTx.ID))
 
 		require.False(t, store.Has(oldTx.ID))
 		require.True(t, store.Has(newTx.ID))
