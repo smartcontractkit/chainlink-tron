@@ -501,6 +501,7 @@ func (t *TronTxm) reapLoop() {
 				for id, ft := range store.finishedTxs {
 					if ft.Tx.CreateTs.Before(cutoff) {
 						delete(store.finishedTxs, id)
+						delete(store.hashToId, ft.Hash)
 						reapCount++
 					}
 				}

@@ -78,6 +78,9 @@ func (s *TxStore) OnBroadcasted(id string) error {
 	if !exists {
 		return fmt.Errorf("no such unconfirmed id: %s", id)
 	}
+	if tx.Tx.State != Pending {
+		return fmt.Errorf("tx is not pending: %s", id)
+	}
 	tx.Tx.State = Broadcasted
 
 	return nil
@@ -90,6 +93,9 @@ func (s *TxStore) OnConfirmed(id string) error {
 	tx, exists := s.unconfirmedTxs[id]
 	if !exists {
 		return fmt.Errorf("no such unconfirmed id: %s", id)
+	}
+	if tx.Tx.State != Broadcasted {
+		return fmt.Errorf("tx is not broadcasted, state: %d | id: %s", tx.Tx.State, id)
 	}
 	delete(s.unconfirmedTxs, id)
 
@@ -126,18 +132,14 @@ func (s *TxStore) OnFatalError(id string) error {
 	defer s.lock.Unlock()
 
 	var pt *PendingTx
-	if _, unconfirmedExists := s.unconfirmedTxs[id]; !unconfirmedExists {
-		if _, confirmedExists := s.confirmedTxs[id]; !confirmedExists {
-			return fmt.Errorf("no such unconfirmed or confirmed id: %s", id)
-		} else {
-			pt = s.confirmedTxs[id]
-			delete(s.confirmedTxs, id)
-		}
-	} else {
-		pt = s.unconfirmedTxs[id]
+	var exists bool
+	if pt, exists = s.unconfirmedTxs[id]; exists {
 		delete(s.unconfirmedTxs, id)
+	} else if pt, exists = s.confirmedTxs[id]; exists {
+		delete(s.confirmedTxs, id)
+	} else {
+		return fmt.Errorf("no such unconfirmed or confirmed id: %s", id)
 	}
-	delete(s.hashToId, pt.Hash)
 
 	pt.Tx.State = FatallyErrored
 	s.finishedTxs[id] = &FinishedTx{
@@ -176,7 +178,6 @@ func (s *TxStore) OnFinalized(id string) error {
 		return fmt.Errorf("no such confirmed id: %s", id)
 	}
 	delete(s.confirmedTxs, id)
-	delete(s.hashToId, pt.Hash)
 
 	pt.Tx.State = Finalized
 	s.finishedTxs[id] = &FinishedTx{
@@ -271,6 +272,18 @@ func (c *AccountStore) GetTotalInflightCount() int {
 	}
 
 	return count
+}
+
+func (c *AccountStore) GetHashToIdMap() map[string]string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	hashToId := map[string]string{}
+	for _, store := range c.store {
+		for hash, id := range store.hashToId {
+			hashToId[hash] = id
+		}
+	}
+	return hashToId
 }
 
 func (c *AccountStore) GetTotalFinishedCount() int {

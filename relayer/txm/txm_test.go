@@ -369,6 +369,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 		fatalTx2 := &trontxm.TronTx{ID: "fatal_tx_2", FromAddress: genesisAddress, CreateTs: time.Now()}
 
 		require.NoError(t, store.OnPending("hash1", time.Now().UnixMilli()+1000, finalizedTx))
+		require.NoError(t, store.OnBroadcasted(finalizedTx.ID))
 		require.NoError(t, store.OnConfirmed(finalizedTx.ID))
 		require.NoError(t, store.OnFinalized(finalizedTx.ID))
 
@@ -376,6 +377,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 		require.NoError(t, store.OnFatalError(fatalTx1.ID))
 
 		require.NoError(t, store.OnPending("hash3", time.Now().UnixMilli()+1000, fatalTx2))
+		require.NoError(t, store.OnBroadcasted(fatalTx2.ID))
 		require.NoError(t, store.OnConfirmed(fatalTx2.ID))
 		require.NoError(t, store.OnFatalError(fatalTx2.ID))
 
@@ -385,6 +387,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 
 		require.Equal(t, 0, store.FinishedCount())
+		require.Equal(t, 0, len(txm.AccountStore.GetHashToIdMap()))
 		require.False(t, store.Has(finalizedTx.ID))
 		require.False(t, store.Has(fatalTx1.ID))
 		require.False(t, store.Has(fatalTx2.ID))
@@ -413,6 +416,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 		}
 
 		require.NoError(t, store.OnPending("old_hash", time.Now().UnixMilli()+1000, oldTx))
+		require.NoError(t, store.OnBroadcasted(oldTx.ID))
 		require.NoError(t, store.OnConfirmed(oldTx.ID))
 		require.NoError(t, store.OnFinalized(oldTx.ID))
 
@@ -423,16 +427,19 @@ func TestTxmTransactionReaping(t *testing.T) {
 		}
 
 		require.NoError(t, store.OnPending("new_hash", time.Now().UnixMilli()+1000, newTx))
+		require.NoError(t, store.OnBroadcasted(newTx.ID))
 		require.NoError(t, store.OnConfirmed(newTx.ID))
 		require.NoError(t, store.OnFinalized(newTx.ID))
 
 		require.Equal(t, 2, store.FinishedCount())
+		require.Equal(t, 2, len(txm.AccountStore.GetHashToIdMap()))
 
 		time.Sleep(150 * time.Millisecond)
 
 		require.False(t, store.Has(oldTx.ID))
 		require.True(t, store.Has(newTx.ID))
 		require.Equal(t, 1, store.FinishedCount())
+		require.Equal(t, 1, len(txm.AccountStore.GetHashToIdMap()))
 	})
 
 	t.Run("Reap across multiple accounts", func(t *testing.T) {
@@ -464,6 +471,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 			}
 
 			require.NoError(t, store.OnPending(fmt.Sprintf("hash_%d", i), time.Now().UnixMilli()+1000, tx))
+			require.NoError(t, store.OnBroadcasted(tx.ID))
 			require.NoError(t, store.OnConfirmed(tx.ID))
 			require.NoError(t, store.OnFinalized(tx.ID))
 		}
@@ -474,6 +482,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 			totalFinished += store.FinishedCount()
 		}
 		require.Equal(t, 3, totalFinished)
+		require.Equal(t, 3, len(txm.AccountStore.GetHashToIdMap()))
 
 		time.Sleep(200 * time.Millisecond)
 		time.Sleep(100 * time.Millisecond)
@@ -484,6 +493,7 @@ func TestTxmTransactionReaping(t *testing.T) {
 			totalFinishedAfter += store.FinishedCount()
 		}
 		require.Equal(t, 0, totalFinishedAfter)
+		require.Equal(t, 0, len(txm.AccountStore.GetHashToIdMap()))
 	})
 
 	t.Run("No reaping when no expired transactions", func(t *testing.T) {
@@ -508,15 +518,18 @@ func TestTxmTransactionReaping(t *testing.T) {
 		}
 
 		require.NoError(t, store.OnPending("recent_hash", time.Now().UnixMilli()+1000, recentTx))
+		require.NoError(t, store.OnBroadcasted(recentTx.ID))
 		require.NoError(t, store.OnConfirmed(recentTx.ID))
 		require.NoError(t, store.OnFinalized(recentTx.ID))
 
 		require.Equal(t, 1, store.FinishedCount())
+		require.Equal(t, 1, len(txm.AccountStore.GetHashToIdMap()))
 
 		time.Sleep(200 * time.Millisecond)
 
 		require.True(t, store.Has(recentTx.ID))
 		require.Equal(t, 1, store.FinishedCount())
+		require.Equal(t, 1, len(txm.AccountStore.GetHashToIdMap()))
 	})
 
 	t.Run("Reap performance with many transactions", func(t *testing.T) {
@@ -543,17 +556,20 @@ func TestTxmTransactionReaping(t *testing.T) {
 			}
 
 			require.NoError(t, store.OnPending(fmt.Sprintf("perf_hash_%d", i), time.Now().UnixMilli()+1000, tx))
+			require.NoError(t, store.OnBroadcasted(tx.ID))
 			require.NoError(t, store.OnConfirmed(tx.ID))
 			require.NoError(t, store.OnFinalized(tx.ID))
 		}
 
 		require.Equal(t, numTxs, store.FinishedCount())
+		require.Equal(t, numTxs, len(txm.AccountStore.GetHashToIdMap()))
 
 		startTime := time.Now()
 		time.Sleep(200 * time.Millisecond)
 		reapDuration := time.Since(startTime)
 
 		require.Equal(t, 0, store.FinishedCount())
+		require.Equal(t, 0, len(txm.AccountStore.GetHashToIdMap()))
 		require.Less(t, reapDuration, 1*time.Second)
 	})
 }
@@ -584,16 +600,21 @@ func TestTxmStateTransitions(t *testing.T) {
 		// OnBroadcasted
 		require.NoError(t, store.OnBroadcasted(tx1.ID))
 		require.Equal(t, trontxm.Broadcasted, tx1.State)
+		err = store.OnBroadcasted(tx1.ID)
+		require.ErrorContains(t, err, "tx is not pending")
 		require.Error(t, store.OnBroadcasted("no-such"))
 
 		// OnConfirmed
 		require.NoError(t, store.OnConfirmed(tx1.ID))
 		require.Equal(t, trontxm.Confirmed, tx1.State)
+		// can't confirm again bc not in broadcasted state / unconfirmed txs map
+		require.Error(t, store.OnConfirmed(tx1.ID))
 		require.Len(t, store.GetUnconfirmed(), 0)
 		require.Error(t, store.OnConfirmed("no-such"))
 
 		// Fatal error from confirmed
 		require.NoError(t, store.OnPending("h2", 2000, tx1))
+		require.NoError(t, store.OnBroadcasted(tx1.ID))
 		require.NoError(t, store.OnConfirmed(tx1.ID))
 		require.NoError(t, store.OnFatalError(tx1.ID))
 		require.Equal(t, trontxm.FatallyErrored, tx1.State)
@@ -611,6 +632,7 @@ func TestTxmStateTransitions(t *testing.T) {
 
 		// OnReorg
 		require.NoError(t, store.OnPending("h3", 2000, tx2))
+		require.NoError(t, store.OnBroadcasted(tx2.ID))
 		require.NoError(t, store.OnConfirmed(tx2.ID))
 		require.NoError(t, store.OnReorg(tx2.ID))
 		require.Equal(t, trontxm.Broadcasted, tx2.State)
@@ -623,6 +645,20 @@ func TestTxmStateTransitions(t *testing.T) {
 
 		// fatal tx + finalized tx
 		require.Equal(t, store.FinishedCount(), 2)
+
+		// ensure finalized can't be changed
+		require.Error(t, store.OnPending("h3", 2000, tx2))
+		require.Error(t, store.OnBroadcasted(tx2.ID))
+		require.Error(t, store.OnConfirmed(tx2.ID))
+		require.Error(t, store.OnFinalized(tx2.ID))
+		require.Error(t, store.OnFatalError(tx2.ID))
+
+		// ensure fatal can't be changed
+		require.Error(t, store.OnPending("h2", 2000, tx1))
+		require.Error(t, store.OnBroadcasted(tx2.ID))
+		require.Error(t, store.OnConfirmed(tx2.ID))
+		require.Error(t, store.OnFinalized(tx2.ID))
+		require.Error(t, store.OnFatalError(tx2.ID))
 	})
 }
 
