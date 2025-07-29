@@ -25,6 +25,7 @@ func WaitForInflightTxs(logger logger.Logger, txmgr *txm.TronTxm, timeout time.D
 		queueLen, unconfirmedLen := txmgr.InflightCount()
 		logger.Debugw("Inflight count", "queued", queueLen, "unconfirmed", unconfirmedLen)
 		if queueLen == 0 && unconfirmedLen == 0 {
+			logger.Debugw("No inflight txs, exiting")
 			break
 		}
 		if time.Since(start) > timeout {

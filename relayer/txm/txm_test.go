@@ -602,33 +602,36 @@ func TestTxmStateTransitions(t *testing.T) {
 		// retain id
 		require.True(t, store.Has(tx1.ID))
 
-		tx2 := &trontxm.TronTx{ID: "id2", FromAddress: genesisAddress}
-		// OnErrored
-		require.Error(t, store.OnErrored("no-such"))
-		require.NoError(t, store.OnPending(tx2))
-		require.NoError(t, store.OnBroadcasted("h3", 2000, tx2))
-		require.NoError(t, store.OnErrored(tx2.ID))
-		require.Equal(t, trontxm.Errored, tx2.State)
-		require.True(t, store.Has(tx2.ID))
-
+		tx2 := &trontxm.TronTx{ID: "id3", FromAddress: genesisAddress}
 		// OnReorg
-		require.NoError(t, store.OnBroadcasted("h3", 2000, tx2))
+		require.NoError(t, store.OnPending(tx2))
+		require.NoError(t, store.OnBroadcasted("h4", 2000, tx2))
 		require.NoError(t, store.OnConfirmed(tx2.ID))
 		require.NoError(t, store.OnReorg(tx2.ID))
-		require.Equal(t, trontxm.Broadcasted, tx2.State)
+		require.Equal(t, trontxm.Pending, tx2.State)
 
 		// OnFinalized
+		require.NoError(t, store.OnBroadcasted("h3", 2000, tx2))
 		require.NoError(t, store.OnConfirmed(tx2.ID))
 		require.NoError(t, store.OnFinalized(tx2.ID))
 		require.Equal(t, trontxm.Finalized, tx2.State)
 		require.Len(t, store.GetUnconfirmed(), 0)
+
+		tx3 := &trontxm.TronTx{ID: "id2", FromAddress: genesisAddress}
+		// OnErrored
+		require.Error(t, store.OnErrored("no-such"))
+		require.NoError(t, store.OnPending(tx3))
+		require.NoError(t, store.OnBroadcasted("h4", 2000, tx3))
+		require.NoError(t, store.OnErrored(tx3.ID))
+		require.Equal(t, trontxm.Errored, tx3.State)
+		require.True(t, store.Has(tx3.ID))
 
 		// fatal tx + finalized tx
 		require.Equal(t, store.FinishedCount(), 2)
 
 		// ensure finalized can't be changed
 		require.Error(t, store.OnPending(tx2))
-		require.Error(t, store.OnBroadcasted("h3", 2000, tx2))
+		require.Error(t, store.OnBroadcasted("h4", 2000, tx2))
 		require.Error(t, store.OnConfirmed(tx2.ID))
 		require.Error(t, store.OnFinalized(tx2.ID))
 		require.Error(t, store.OnFatalError(tx2.ID))
@@ -744,7 +747,7 @@ func TestTxmRaceConditions(t *testing.T) {
 				case 1:
 					store.OnConfirmed(tx.ID)
 				case 2:
-					store.OnReorg(tx.ID)
+					store.OnFinalized(tx.ID)
 				case 3:
 					store.GetStatus(tx.ID)
 				}
@@ -884,7 +887,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 			BlockNumber: 12300,
 		}, nil).Once()
 
-		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
+		txm, _, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -896,7 +899,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+		time.Sleep(10 * time.Second)
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
@@ -915,7 +918,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 			BlockNumber: 12345,
 		}, nil)
 
-		txm, lggr, observedLogs := setupTxm(t, combinedClient, nil)
+		txm, _, observedLogs := setupTxm(t, combinedClient, nil)
 		defer txm.Close()
 
 		err := txm.Enqueue(trontxm.TronTxmRequest{
@@ -927,7 +930,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		testutils.WaitForInflightTxs(lggr, txm, 10*time.Second)
+		time.Sleep(10 * time.Second)
 
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of time").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, multiple OUT_OF_TIME errors").Len(), 1)

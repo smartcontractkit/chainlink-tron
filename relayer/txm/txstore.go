@@ -77,10 +77,9 @@ func (s *TxStore) OnBroadcasted(hash string, expirationMs int64, tx *TronTx) err
 		return fmt.Errorf("hash already exists: %s", tx.ID)
 	}
 
-	_, pExists := s.pendingTxs[tx.ID]
-	_, uncExists := s.unconfirmedTxs[tx.ID]
-	if !pExists && !uncExists {
-		return fmt.Errorf("no such pending or unconfirmed id: %s", tx.ID)
+	_, exists := s.pendingTxs[tx.ID]
+	if !exists {
+		return fmt.Errorf("no such pending id: %s", tx.ID)
 	}
 
 	s.hashToId[hash] = tx.ID
@@ -172,10 +171,11 @@ func (s *TxStore) OnReorg(id string) error {
 	}
 	// remove from confirmed
 	delete(s.confirmedTxs, id)
+	delete(s.hashToId, pt.Hash)
 
-	// mark it as broadcasted again and re-queue
-	pt.Tx.State = Broadcasted
-	s.unconfirmedTxs[id] = pt
+	// mark it as pending again and re-broadcast
+	pt.Tx.State = Pending
+	s.pendingTxs[id] = pt.Tx
 	return nil
 }
 

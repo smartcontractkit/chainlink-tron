@@ -433,7 +433,8 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOf
 	}
 
 	t.Logger.Infow("retrying transaction", "txID", tx.ID, "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
-
+	tx.State = Pending
+	txStore.OnPending(tx)
 	select {
 	// TODO: do we need to retry here or mark as fatal?
 	case t.BroadcastChan <- tx:
