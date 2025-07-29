@@ -142,7 +142,8 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 		// don’t enqueue twice for the same key
 		txStore := t.AccountStore.GetTxStore(request.FromAddress.String())
 		if txStore.Has(request.ID) {
-			return fmt.Errorf("transaction with ID %s already exists", request.ID)
+			t.Logger.Warnw("transaction with ID already exists, ignoring", "txID", request.ID)
+			return nil
 		}
 	}
 
@@ -493,15 +494,20 @@ func (t *TronTxm) reapLoop() {
 		select {
 		case <-ticker.C:
 			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
+			reapCount := 0
 			for acc := range t.AccountStore.store {
 				store := t.AccountStore.GetTxStore(acc)
 				store.lock.Lock()
 				for id, ft := range store.finishedTxs {
 					if ft.Tx.CreateTs.Before(cutoff) {
 						delete(store.finishedTxs, id)
+						reapCount++
 					}
 				}
 				store.lock.Unlock()
+			}
+			if reapCount > 0 {
+				t.Logger.Debugw("reapLoop: reaped finished transactions", "count", reapCount)
 			}
 		case <-t.Stop:
 			return

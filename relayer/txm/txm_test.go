@@ -1,7 +1,6 @@
 package txm_test
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -110,7 +109,7 @@ func setupTxm(t *testing.T, combinedClient sdk.CombinedClient, customConfig *tro
 		Stop:                  make(chan struct{}),
 	}
 
-	require.NoError(t, txm.Start(context.Background()))
+	require.NoError(t, txm.Start(t.Context()))
 	return txm, testLogger, observedLogs
 }
 
@@ -575,7 +574,7 @@ func TestTxmStateTransitions(t *testing.T) {
 		require.NoError(t, store.OnPending(hash1, 1000, tx1))
 		require.True(t, store.Has("id1"))
 		require.Equal(t, trontxm.Pending, tx1.State)
-		status, err := txm.GetTransactionStatus(context.Background(), tx1.ID)
+		status, err := txm.GetTransactionStatus(t.Context(), tx1.ID)
 		require.NoError(t, err)
 		require.Equal(t, types.Pending, status)
 
@@ -814,7 +813,7 @@ func TestTxmRaceConditions(t *testing.T) {
 
 		time.Sleep(100 * time.Millisecond)
 
-		initialStatus, err := txm.GetTransactionStatus(context.Background(), txID)
+		initialStatus, err := txm.GetTransactionStatus(t.Context(), txID)
 		require.NoError(t, err)
 		require.NotEqual(t, types.Unknown, initialStatus, "Transaction should be trackable before concurrent testing")
 
@@ -827,7 +826,7 @@ func TestTxmRaceConditions(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				status, err := txm.GetTransactionStatus(context.Background(), txID)
+				status, err := txm.GetTransactionStatus(t.Context(), txID)
 				if err == nil {
 					statusResults[idx] = status
 				} else {
@@ -887,7 +886,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "energy_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "energy_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
 	})
@@ -917,7 +916,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of time").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, multiple OUT_OF_TIME errors").Len(), 1)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "timeout_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "timeout_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
@@ -947,7 +946,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "revert_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "revert_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
@@ -987,7 +986,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 1)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "unknown_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "unknown_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
 	})
@@ -1032,7 +1031,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 				require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed with fatal error").Len(), 1)
 				require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 0)
 
-				status, err := txm.GetTransactionStatus(context.Background(), testID)
+				status, err := txm.GetTransactionStatus(t.Context(), testID)
 				require.NoError(t, err)
 				require.Equal(t, types.Fatal, status)
 			})
@@ -1071,7 +1070,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("transaction failed due to out of energy").Len(), 5)
 		require.Equal(t, observedLogs.FilterMessageSnippet("not retrying, already reached max retries").Len(), 1)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "max_retry_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "max_retry_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Fatal, status)
 	})
@@ -1116,7 +1115,7 @@ func TestTxmTransactionFailureScenarios(t *testing.T) {
 		require.Equal(t, observedLogs.FilterMessageSnippet("retrying transaction").Len(), 3)
 		require.Equal(t, observedLogs.FilterMessageSnippet("finalized transaction").Len(), 1)
 
-		status, err := txm.GetTransactionStatus(context.Background(), "energy_bump_test")
+		status, err := txm.GetTransactionStatus(t.Context(), "energy_bump_test")
 		require.NoError(t, err)
 		require.Equal(t, types.Finalized, status)
 	})
