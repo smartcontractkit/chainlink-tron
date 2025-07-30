@@ -36,7 +36,7 @@ func runTestnetTest(t *testing.T, network string) {
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	require.NoError(t, err)
 
-	pubAddress := address.PubkeyToAddress(privateKey.PublicKey).String()
+	pubAddress := address.PubkeyToAddress(privateKey.PublicKey)
 
 	runOCR2Test(t, logger, privateKey, pubAddress, network)
 }

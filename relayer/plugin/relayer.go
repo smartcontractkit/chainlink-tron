@@ -10,9 +10,10 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pelletier/go-toml/v2"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/chains"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -38,7 +39,7 @@ type TronRelayer struct {
 	balanceMonitor services.Service
 }
 
-var _ loop.Relayer = &TronRelayer{}
+var _ types.Relayer = &TronRelayer{}
 
 func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*TronRelayer, error) {
 	id := *cfg.ChainID
@@ -133,6 +134,7 @@ func (t *TronRelayer) Ready() error {
 }
 
 func (t *TronRelayer) HealthReport() map[string]error {
+	t.lggr.Info("Health Report")
 	report := map[string]error{t.Name(): t.Healthy()}
 	services.CopyHealth(report, t.txm.HealthReport())
 	return report
@@ -263,6 +265,53 @@ func (t *TronRelayer) Replay(ctx context.Context, fromBlock string, args map[str
 	return errors.New("TODO")
 }
 
-func (t *TronRelayer) AsEVMRelayer() (loop.EVMRelayer, error) {
+func (r *TronRelayer) NewFunctionsProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.FunctionsProvider, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) NewAutomationProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.AutomationProvider, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) NewMercuryProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.MercuryProvider, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) NewCCIPCommitProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.CCIPCommitProvider, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) NewCCIPExecProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.CCIPExecProvider, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) NewOCR3CapabilityProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.OCR3CapabilityProvider, error) {
+	return nil, errors.New("ocr3 capability provider is not supported for solana")
+}
+
+func (r *TronRelayer) EVM() (types.EVMService, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) TON() (types.TONService, error) {
+	return nil, errors.New("unimplemented")
+}
+
+func (r *TronRelayer) GetChainInfo(ctx context.Context) (types.ChainInfo, error) {
+	networkName, err := chainselectors.TronNameFromChainId(r.chainIdNum.Uint64())
+	if err != nil {
+		return types.ChainInfo{}, err
+	}
+
+	return types.ChainInfo{
+		FamilyName: "tron",
+		ChainID:    r.chainIdNum.String(),
+		// TODO: separate network name and netwrok name full
+		NetworkName:     networkName,
+		NetworkNameFull: networkName,
+	}, nil
+}
+
+func (r *TronRelayer) NewCCIPProvider(ctx context.Context, rargs types.RelayArgs) (types.CCIPProvider, error) {
 	return nil, errors.New("unimplemented")
 }
