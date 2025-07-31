@@ -50,7 +50,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		idNum, ok = new(big.Int).SetString(id[2:], 16)
 	} else {
 		idNum, ok = new(big.Int).SetString(id, 10)
-	}
+	}	
 
 	if !ok {
 		return nil, fmt.Errorf("couldn't parse chain id %s", id)

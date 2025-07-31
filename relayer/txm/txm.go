@@ -150,7 +150,7 @@ func (t *TronTxm) Enqueue(request TronTxmRequest) error {
 	// Construct the transaction
 	tx := &TronTx{FromAddress: request.FromAddress, ContractAddress: request.ContractAddress, Method: request.Method, Params: request.Params, Attempt: 1, ID: request.ID, CreateTs: time.Now()}
 	txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
-	txStore.OnPending(tx)
+	txStore.OnPending(tx, false)
 
 	select {
 	case t.BroadcastChan <- tx:
@@ -404,21 +404,16 @@ func (t *TronTxm) checkUnconfirmed() {
 func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOfTimeError bool, txStore *TxStore) {
 	tx := unconfirmedTx.Tx
 
-	if err := txStore.OnErrored(tx.ID, true); err != nil {
-		t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
-		return
-	}
-
 	if tx.Attempt >= MAX_RETRY_ATTEMPTS {
 		t.Logger.Debugw("not retrying, already reached max retries", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError, "txID", tx.ID)
-		if err := txStore.OnErrored(tx.ID, false); err != nil {
+		if err := txStore.OnErrored(tx.ID); err != nil {
 			t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
 		}
 		return
 	}
 	if tx.OutOfTimeErrors >= 2 {
 		t.Logger.Debugw("not retrying, multiple OUT_OF_TIME errors", "txHash", unconfirmedTx.Hash, "lastAttempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError, "txID", tx.ID)
-		if err := txStore.OnErrored(tx.ID, false); err != nil {
+		if err := txStore.OnErrored(tx.ID); err != nil {
 			t.Logger.Errorw("failed to mark transaction as errored", "txID", tx.ID, "error", err)
 		}
 		return
@@ -434,7 +429,7 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOf
 
 	t.Logger.Infow("retrying transaction", "txID", tx.ID, "previousTxHash", unconfirmedTx.Hash, "attempt", tx.Attempt, "bumpEnergy", bumpEnergy, "isOutOfTimeError", isOutOfTimeError)
 	tx.State = Pending
-	txStore.OnPending(tx)
+	txStore.OnPending(tx, true)
 	select {
 	// TODO: do we need to retry here or mark as fatal?
 	case t.BroadcastChan <- tx:
