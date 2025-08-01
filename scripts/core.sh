@@ -62,7 +62,6 @@ for ((i = 1; i <= NODE_COUNT; i++)); do
 		--rm \
 		-d \
 		--add-host=host.docker.internal:host-gateway \
-		--network chainlink-tron.network \
 		$platform_arg \
 		"${listen_args[@]}" \
 		-e "CL_CONFIG=${CL_CONFIG}" \

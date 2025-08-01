@@ -10,8 +10,8 @@ import (
 
 const (
 	// Local RPCs
-	DefaultInternalFullNodeUrl     = "http://172.255.0.101:16667/wallet"
-	DefaultInternalSolidityNodeUrl = "http://172.255.0.101:16668/walletsolidity"
+	DefaultInternalFullNodeUrl     = "http://host.docker.internal:16667/wallet"
+	DefaultInternalSolidityNodeUrl = "http://host.docker.internal:16668/walletsolidity"
 	FullNodePort                   = "16667"
 	SolidityNodePort               = "16668"
 

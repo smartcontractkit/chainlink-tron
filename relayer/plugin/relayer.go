@@ -134,7 +134,6 @@ func (t *TronRelayer) Ready() error {
 }
 
 func (t *TronRelayer) HealthReport() map[string]error {
-	t.lggr.Info("Health Report")
 	report := map[string]error{t.Name(): t.Healthy()}
 	services.CopyHealth(report, t.txm.HealthReport())
 	return report
