@@ -502,6 +502,7 @@ func (t *TronTxm) reapLoop() {
 				}
 			}
 		case <-t.Stop:
+			t.Logger.Debugw("reapLoop: stopped")
 			return
 		}
 	}

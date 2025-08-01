@@ -316,13 +316,27 @@ func NewAccountStore() *AccountStore {
 }
 
 func (c *AccountStore) GetTxStore(fromAddress string) *TxStore {
+	c.lock.RLock()
+	store, ok := c.store[fromAddress]
+	c.lock.RUnlock()
+
+	if ok {
+		return store
+	}
+
+	// upgrade to write lock if necessary
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	store, ok := c.store[fromAddress]
-	if !ok {
-		store = NewTxStore()
-		c.store[fromAddress] = store
+
+	// double check to prevent race condition
+	store, ok = c.store[fromAddress]
+	if ok {
+		return store
 	}
+
+	store = NewTxStore()
+	c.store[fromAddress] = store
+
 	return store
 }
 
