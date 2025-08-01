@@ -303,11 +303,15 @@ func (r *TronRelayer) GetChainInfo(ctx context.Context) (types.ChainInfo, error)
 		return types.ChainInfo{}, err
 	}
 
+	envName, err := chainselectors.ExtractNetworkEnvName(networkName)
+	if err != nil {
+		return types.ChainInfo{}, err
+	}
+
 	return types.ChainInfo{
-		FamilyName: "tron",
-		ChainID:    r.chainIdNum.String(),
-		// TODO: separate network name and netwrok name full
-		NetworkName:     networkName,
+		FamilyName:      "tron",
+		ChainID:         r.chainIdNum.String(),
+		NetworkName:     envName,
 		NetworkNameFull: networkName,
 	}, nil
 }
