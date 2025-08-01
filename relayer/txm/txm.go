@@ -439,24 +439,13 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOf
 }
 
 func (t *TronTxm) checkFinalized() {
-	for acc := range t.AccountStore.store {
+	allConfirmed := t.AccountStore.GetAllConfirmed()
+	for acc, confirmedTxs := range allConfirmed {
 		store := t.AccountStore.GetTxStore(acc)
-		store.lock.RLock()
-		confirmedIds := make([]string, 0, len(store.confirmedTxs))
-		for id := range store.confirmedTxs {
-			confirmedIds = append(confirmedIds, id)
-		}
-		store.lock.RUnlock()
 
-		for _, txId := range confirmedIds {
-			store.lock.RLock()
-			pt, exists := store.confirmedTxs[txId]
-			if !exists {
-				store.lock.RUnlock()
-				continue
-			}
+		for _, pt := range confirmedTxs {
+			txId := pt.Tx.ID
 			txHash := pt.Hash
-			store.lock.RUnlock()
 
 			_, err := t.GetClient().GetTransactionInfoById(txHash)
 			if err != nil && t.checkReorged(txHash) {
@@ -491,21 +480,26 @@ func (t *TronTxm) reapLoop() {
 		select {
 		case <-ticker.C:
 			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
-			reapCount := 0
-			for acc := range t.AccountStore.store {
-				store := t.AccountStore.GetTxStore(acc)
-				store.lock.Lock()
-				for id, ft := range store.finishedTxs {
+			allFinished := t.AccountStore.GetAllFinished()
+			accountTxIds := make(map[string][]string)
+
+			for acc, finishedTxs := range allFinished {
+				var idsToDelete []string
+				for _, ft := range finishedTxs {
 					if ft.RetentionTs.Before(cutoff) {
-						delete(store.finishedTxs, id)
-						delete(store.hashToId, ft.Hash)
-						reapCount++
+						idsToDelete = append(idsToDelete, ft.Tx.ID)
 					}
 				}
-				store.lock.Unlock()
+				if len(idsToDelete) > 0 {
+					accountTxIds[acc] = idsToDelete
+				}
 			}
-			if reapCount > 0 {
-				t.Logger.Debugw("reapLoop: reaped finished transactions", "count", reapCount)
+
+			if len(accountTxIds) > 0 {
+				reapCount := t.AccountStore.DeleteAllFinishedTxs(accountTxIds)
+				if reapCount > 0 {
+					t.Logger.Debugw("reapLoop: reaped finished transactions", "count", reapCount)
+				}
 			}
 		case <-t.Stop:
 			return
@@ -515,28 +509,24 @@ func (t *TronTxm) reapLoop() {
 
 // GetTransactionStatus translates internal TXM transaction statuses to chainlink common statuses
 func (t *TronTxm) GetTransactionStatus(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error) {
-	for acc := range t.AccountStore.store {
-		store := t.AccountStore.GetTxStore(acc)
-		state, exists := store.GetStatus(transactionID)
-		if exists {
-			switch state {
-			case Pending, Broadcasted:
-				return commontypes.Pending, nil
-			case Confirmed:
-				return commontypes.Unconfirmed, nil
-			case Finalized:
-				return commontypes.Finalized, nil
-			case Errored:
-				return commontypes.Failed, nil
-			case FatallyErrored:
-				return commontypes.Fatal, nil
-			default:
-				return commontypes.Unknown, fmt.Errorf("found unknown transaction state for id %s", transactionID)
-			}
+	state, exists := t.AccountStore.GetStatusAll(transactionID)
+	if exists {
+		switch state {
+		case Pending, Broadcasted:
+			return commontypes.Pending, nil
+		case Confirmed:
+			return commontypes.Unconfirmed, nil
+		case Finalized:
+			return commontypes.Finalized, nil
+		case Errored:
+			return commontypes.Failed, nil
+		case FatallyErrored:
+			return commontypes.Fatal, nil
+		default:
+			return commontypes.Unknown, fmt.Errorf("found unknown transaction state for id %s", transactionID)
 		}
 	}
 	return commontypes.Unknown, fmt.Errorf("failed to find transaction with id %s", transactionID)
-
 }
 
 func (t *TronTxm) InflightCount() (int, int) {

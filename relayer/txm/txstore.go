@@ -237,6 +237,51 @@ func (s *TxStore) GetUnconfirmed() []*InflightTx {
 	return unconfirmed
 }
 
+func (s *TxStore) GetConfirmed() []*InflightTx {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	confirmed := maps.Values(s.confirmedTxs)
+
+	sort.Slice(confirmed, func(i, j int) bool {
+		a := confirmed[i]
+		b := confirmed[j]
+		return a.ExpirationMs < b.ExpirationMs
+	})
+
+	return confirmed
+}
+
+func (s *TxStore) GetFinished() []*FinishedTx {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	finished := maps.Values(s.finishedTxs)
+
+	sort.Slice(finished, func(i, j int) bool {
+		a := finished[i]
+		b := finished[j]
+		return a.RetentionTs.Before(b.RetentionTs)
+	})
+
+	return finished
+}
+
+func (s *TxStore) DeleteFinishedTxs(ids []string) int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	deletedCount := 0
+	for _, id := range ids {
+		if ft, exists := s.finishedTxs[id]; exists {
+			delete(s.finishedTxs, id)
+			delete(s.hashToId, ft.Hash)
+			deletedCount++
+		}
+	}
+	return deletedCount
+}
+
 func (s *TxStore) Has(id string) bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -348,4 +393,55 @@ func (c *AccountStore) GetAllUnconfirmed() map[string][]*InflightTx {
 		allUnconfirmed[fromAddressStr] = store.GetUnconfirmed()
 	}
 	return allUnconfirmed
+}
+
+func (c *AccountStore) GetAllConfirmed() map[string][]*InflightTx {
+	// use read lock for methods that read underlying data
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	allConfirmed := map[string][]*InflightTx{}
+	for fromAddressStr, store := range c.store {
+		allConfirmed[fromAddressStr] = store.GetConfirmed()
+	}
+	return allConfirmed
+}
+
+func (c *AccountStore) GetAllFinished() map[string][]*FinishedTx {
+	// use read lock for methods that read underlying data
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	allFinished := map[string][]*FinishedTx{}
+	for fromAddressStr, store := range c.store {
+		allFinished[fromAddressStr] = store.GetFinished()
+	}
+	return allFinished
+}
+
+func (c *AccountStore) DeleteAllFinishedTxs(accountTxIds map[string][]string) int {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	totalDeleted := 0
+	for acc, txIds := range accountTxIds {
+		if store, exists := c.store[acc]; exists {
+			deletedCount := store.DeleteFinishedTxs(txIds)
+			totalDeleted += deletedCount
+		}
+	}
+	return totalDeleted
+}
+
+func (c *AccountStore) GetStatusAll(id string) (TxState, bool) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	for _, store := range c.store {
+		status, exists := store.GetStatus(id)
+		if exists {
+			return status, true
+		}
+	}
+	return 0, false
 }
