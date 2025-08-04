@@ -1,3 +1,0 @@
-FROM smartcontract/chainlink:2.19.0
-COPY --chmod=755 chainlink-tron /usr/local/bin/chainlink-tron
-ENV CL_TRON_CMD=chainlink-tron 
