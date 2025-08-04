@@ -196,9 +196,19 @@ func runOCR2Test(
 	mintAmount := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
 	mintAmount = mintAmount.Mul(mintAmount, big.NewInt(50000))
 
-	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "grantMintAndBurnRoles(address)", "address", pubAddress)
+	err = txmgr.Enqueue(txm.TronTxmRequest{
+		FromAddress:     pubAddress,
+		ContractAddress: linkTokenAddress,
+		Method:          "grantMintAndBurnRoles(address)",
+		Params:          []any{"address", pubAddress},
+	})
 	require.NoError(t, err)
-	err = txmgr.Enqueue(pubAddress, linkTokenAddress, "mint(address,uint256)", "address", ocr2AggregatorAddress, "uint256", mintAmount.String())
+	err = txmgr.Enqueue(txm.TronTxmRequest{
+		FromAddress:     pubAddress,
+		ContractAddress: linkTokenAddress,
+		Method:          "mint(address,uint256)",
+		Params:          []any{"address", ocr2AggregatorAddress, "uint256", mintAmount.String()},
+	})
 	require.NoError(t, err)
 	testutils.WaitForInflightTxs(clientLogger, txmgr, time.Second*time.Duration(txnWaitTime))
 
@@ -237,13 +247,12 @@ func runOCR2Test(
 	}
 
 	// TODO: should we set onchainConfig as offchainConfig?
-	err = txmgr.Enqueue(pubAddress, ocr2AggregatorAddress, "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
-		/* signers= */ "address[]", signerAddresses,
-		/* trasmitters= */ "address[]", transmitterAddresses,
-		/* f= */ "uint8", fmt.Sprintf("%d", f),
-		/* onchainConfig= */ "bytes", onchainConfigBytes,
-		/* offchainConfigVersion= */ "uint64", fmt.Sprintf("%d", offchainConfigVersion),
-		/* offchainConfig= */ "bytes", offchainConfig)
+	err = txmgr.Enqueue(txm.TronTxmRequest{
+		FromAddress:     pubAddress,
+		ContractAddress: ocr2AggregatorAddress,
+		Method:          "setConfig(address[],address[],uint8,bytes,uint64,bytes)",
+		Params:          []any{"address[]", signerAddresses, "address[]", transmitterAddresses, "uint8", fmt.Sprintf("%d", f), "bytes", onchainConfigBytes, "uint64", fmt.Sprintf("%d", offchainConfigVersion), "bytes", offchainConfig},
+	})
 	require.NoError(t, err)
 
 	// TODO: we need to fix the txmgr from returning 0 inflight count when it's processing a single transaction with nothing queued.

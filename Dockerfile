@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=local_chainlink
 
-FROM golang:1.23.3-bullseye as buildplugins
+FROM golang:1.24.2-bullseye as buildplugins
 RUN go version
 
 WORKDIR /build

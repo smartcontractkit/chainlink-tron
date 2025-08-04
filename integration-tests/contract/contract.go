@@ -55,7 +55,7 @@ func loadContract(jsonPath string) (*ABI, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(filepath.Join(gitRoot, "tron", "integration-tests", "artifacts", jsonPath))
+	data, err := os.ReadFile(filepath.Join(gitRoot, "integration-tests", "artifacts", jsonPath))
 	if err != nil {
 		return nil, err
 	}

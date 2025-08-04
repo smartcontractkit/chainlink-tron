@@ -161,7 +161,7 @@ func (cc *ChainlinkClient) GetSetConfigArgs(t *testing.T) (
 			AlphaAcceptInfinite: false,
 			AlphaAcceptPPB:      5000000,
 			DeltaC:              time.Hour * 24,
-		}.Encode(),     // reportingPluginConfig []byte,
+		}.Encode(), // reportingPluginConfig []byte,
 		nil,            // maxDurationInitialization *time.Duration,
 		2*time.Second,  // maxDurationQuery time.Duration,
 		12*time.Second, // maxDurationObservation time.Duration,
@@ -300,6 +300,7 @@ func connectChainlinkNodes(e *environment.Environment) ([]*client.ChainlinkClien
 				log.Error().
 					Str("Service", service.Attributes.Name).
 					Str("Status", service.Attributes.Status).
+					Str("Output", service.Attributes.Output).
 					Msg("HealthCheck")
 			}
 		}
