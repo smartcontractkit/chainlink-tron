@@ -98,9 +98,11 @@ func runOCR2Test(
 	require.NoError(t, err, "Could not create relay logger")
 
 	testKeystore := testutils.NewTestKeystore(pubAddress.String(), privateKey)
-	txmgr := txm.New(clientLogger, testKeystore, combinedClient.FullNodeClient(), txm.TronTxmConfig{
+	txmgr := txm.New(clientLogger, testKeystore, combinedClient, txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		RetentionPeriod:   8 * time.Minute,
+		ReapInterval:      10 * time.Second,
 	})
 	err = txmgr.Start(context.Background())
 	require.NoError(t, err)
@@ -149,10 +151,10 @@ func runOCR2Test(
 	deployContract := func(contractName string, artifact *contract.Artifact, params []interface{}) address.Address {
 		txHash := testutils.SignAndDeployContract(t, combinedClient, testKeystore, pubAddress, contractName, artifact.AbiJson, artifact.Bytecode, feeLimit, params)
 		// use full node client for quicker feedback
-		txInfo := testutils.WaitForTransactionInfo(t, combinedClient.FullNodeClient(), txHash, txnWaitTime)
+		txInfo := testutils.WaitForTransactionInfo(t, combinedClient, txHash, txnWaitTime)
 		contractAddress, err := address.StringToAddress(txInfo.ContractAddress)
 		require.NoError(t, err)
-		contractDeployed := testutils.CheckContractDeployed(t, combinedClient.FullNodeClient(), contractAddress)
+		contractDeployed := testutils.CheckContractDeployed(t, combinedClient, contractAddress)
 		require.True(t, contractDeployed, "Contract not deployed")
 		return contractAddress
 	}

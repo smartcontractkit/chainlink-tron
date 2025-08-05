@@ -19,6 +19,10 @@ var defaultConfigSet = chainConfigSet{
 	OCR2CachePollPeriod: 5 * time.Second,
 	// time to live for OCR2 contract cache
 	OCR2CacheTTL: time.Minute,
+	// retention period for transaction manager
+	RetentionPeriod: 0,
+	// reap interval for transaction manager
+	ReapInterval: 1 * time.Minute,
 }
 
 // opt: remove
@@ -28,6 +32,8 @@ type chainConfigSet struct {
 	OCR2CachePollPeriod time.Duration
 	OCR2CacheTTL        time.Duration
 	BalancePollPeriod   time.Duration
+	RetentionPeriod     time.Duration
+	ReapInterval        time.Duration
 }
 
 type ChainConfig struct {
@@ -36,6 +42,8 @@ type ChainConfig struct {
 	OCR2CachePollPeriod *time.Duration
 	OCR2CacheTTL        *time.Duration
 	BalancePollPeriod   *time.Duration
+	RetentionPeriod     *time.Duration
+	ReapInterval        *time.Duration
 }
 
 func (c *ChainConfig) SetDefaults() {
@@ -53,6 +61,12 @@ func (c *ChainConfig) SetDefaults() {
 	}
 	if c.BalancePollPeriod == nil {
 		c.BalancePollPeriod = &defaultConfigSet.BalancePollPeriod
+	}
+	if c.RetentionPeriod == nil {
+		c.RetentionPeriod = &defaultConfigSet.RetentionPeriod
+	}
+	if c.ReapInterval == nil {
+		c.ReapInterval = &defaultConfigSet.ReapInterval
 	}
 }
 

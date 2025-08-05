@@ -85,6 +85,8 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 		EnergyMultiplier:  1.5, // TODO: This was the exisiting value for DF, longer term this should be a config option
+		RetentionPeriod:   cfg.RetentionPeriod(),
+		ReapInterval:      cfg.ReapInterval(),
 	})
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {

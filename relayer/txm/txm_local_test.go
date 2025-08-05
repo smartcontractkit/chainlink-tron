@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"net/url"
 	"os"
 	"strconv"
 	"testing"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -53,19 +53,27 @@ func TestTxmLocal(t *testing.T) {
 	ipAddress := testutils.GetTronNodeIpAddress()
 	rpcAddress := "http://" + ipAddress + ":" + testutils.FullNodePort + "/wallet"
 
-	fullnodeClient := fullnode.NewClient(rpcAddress, sdk.CreateHttpClientWithTimeout(15*time.Second))
+	fullnodeUrl, err := url.ParseRequestURI(rpcAddress)
+	require.NoError(t, err)
+	solidityUrl, err := url.ParseRequestURI(rpcAddress + "solidity")
+	require.NoError(t, err)
+
+	combinedClient, err := sdk.CreateCombinedClient(fullnodeUrl, solidityUrl)
+	require.NoError(t, err)
 
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		RetentionPeriod:   10 * time.Second,
+		ReapInterval:      1 * time.Second,
 		// EnergyMultiplier is set to 1.5 by default
 	}
 
-	runTxmTest(t, logger, fullnodeClient, config, keystore, genesisAddress, 10)
+	runTxmTest(t, logger, combinedClient, config, keystore, genesisAddress, 10)
 }
 
-func runTxmTest(t *testing.T, logger logger.Logger, fullnodeClient *fullnode.Client, config txm.TronTxmConfig, keystore loop.Keystore, fromAddress address.Address, iterations int) {
-	txmgr := txm.New(logger, keystore, fullnodeClient, config)
+func runTxmTest(t *testing.T, logger logger.Logger, combinedClient sdk.CombinedClient, config txm.TronTxmConfig, keystore loop.Keystore, fromAddress address.Address, iterations int) {
+	txmgr := txm.New(logger, keystore, combinedClient, config)
 	err := txmgr.Start(context.Background())
 	require.NoError(t, err)
 
@@ -102,7 +110,7 @@ func runTxmTest(t *testing.T, logger logger.Logger, fullnodeClient *fullnode.Cli
 	testutils.WaitForInflightTxs(logger, txmgr, 30*time.Second)
 
 	// not strictly necessary, but docs note: "For constant call you can use the all-zero address."
-	txExtention, err := txmgr.GetClient().TriggerConstantContract(address.ZeroAddress, contractAddress, "count()", nil)
+	txExtention, err := txmgr.GetClient().TriggerConstantContractFullNode(address.ZeroAddress, contractAddress, "count()", nil)
 	require.NoError(t, err)
 
 	constantResult := txExtention.ConstantResult

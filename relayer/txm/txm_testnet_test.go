@@ -3,13 +3,13 @@
 package txm_test
 
 import (
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -23,13 +23,18 @@ func TestTxmShasta(t *testing.T) {
 }
 
 func TestTxmNile(t *testing.T) {
-	runTestnetTest(t, "grpc.nile.trongrid.io:50051")
+	runTestnetTest(t, "https://nile.trongrid.io/wallet")
 }
 
-func runTestnetTest(t *testing.T, fullnodeUrl string) {
+func runTestnetTest(t *testing.T, uri string) {
 	logger := logger.Test(t)
 
-	fullnodeClient := fullnode.NewClient(fullnodeUrl, sdk.CreateHttpClientWithTimeout(15*time.Second))
+	fullnodeUrl, err := url.ParseRequestURI(uri)
+	require.NoError(t, err)
+	solidityUrl, err := url.ParseRequestURI(uri + "solidity")
+	require.NoError(t, err)
+	combinedClient, err := sdk.CreateCombinedClient(fullnodeUrl, solidityUrl)
+	require.NoError(t, err)
 
 	privateKeyHex := os.Getenv("PRIVATE_KEY")
 	if privateKeyHex == "" {
@@ -48,7 +53,9 @@ func runTestnetTest(t *testing.T, fullnodeUrl string) {
 	config := txm.TronTxmConfig{
 		BroadcastChanSize: 100,
 		ConfirmPollSecs:   2,
+		RetentionPeriod:   10 * time.Second,
+		ReapInterval:      1 * time.Second,
 	}
 
-	runTxmTest(t, logger, fullnodeClient, config, keystore, pubAddress, 5)
+	runTxmTest(t, logger, combinedClient, config, keystore, pubAddress, 5)
 }
