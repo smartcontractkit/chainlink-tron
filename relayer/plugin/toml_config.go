@@ -151,6 +151,12 @@ func setFromChain(c, f *ChainConfig) {
 	if f.OCR2CacheTTL != nil {
 		c.OCR2CacheTTL = f.OCR2CacheTTL
 	}
+	if f.RetentionPeriod != nil {
+		c.RetentionPeriod = f.RetentionPeriod
+	}
+	if f.ReapInterval != nil {
+		c.ReapInterval = f.ReapInterval
+	}
 }
 
 func (c *TOMLConfig) ValidateConfig() error {
@@ -202,6 +208,18 @@ func (c *TOMLConfig) OCR2CachePollPeriod() time.Duration {
 
 func (c *TOMLConfig) OCR2CacheTTL() time.Duration {
 	return *c.ChainConfig.OCR2CacheTTL
+}
+
+func (c *TOMLConfig) RetentionPeriod() time.Duration {
+	return *c.ChainConfig.RetentionPeriod
+}
+
+func (c *TOMLConfig) ReapInterval() time.Duration {
+	return *c.ChainConfig.ReapInterval
+}
+
+func (c *TOMLConfig) SetDefaults() {
+	c.ChainConfig.SetDefaults()
 }
 
 func NewDefault() *TOMLConfig {

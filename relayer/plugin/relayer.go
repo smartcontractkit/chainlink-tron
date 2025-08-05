@@ -50,7 +50,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		idNum, ok = new(big.Int).SetString(id[2:], 16)
 	} else {
 		idNum, ok = new(big.Int).SetString(id, 10)
-	}	
+	}
 
 	if !ok {
 		return nil, fmt.Errorf("couldn't parse chain id %s", id)
@@ -85,6 +85,8 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
 		ConfirmPollSecs:   uint(cfg.ConfirmPollPeriod().Seconds()),
 		EnergyMultiplier:  1.5, // TODO: This was the exisiting value for DF, longer term this should be a config option
+		RetentionPeriod:   cfg.RetentionPeriod(),
+		ReapInterval:      cfg.ReapInterval(),
 	})
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
