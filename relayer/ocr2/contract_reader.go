@@ -61,7 +61,7 @@ func (c *contractReader) LatestConfig(ctx context.Context, changedInBlock uint64
 }
 
 func (c *contractReader) LatestBlockHeight(ctx context.Context) (uint64, error) {
-	return c.reader.BaseReader().LatestBlockHeight()
+	return c.reader.BaseReader().LatestBlockHeight(ctx)
 }
 
 func (c *contractReader) LatestTransmissionDetails(

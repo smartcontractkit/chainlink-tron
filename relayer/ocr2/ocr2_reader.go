@@ -46,7 +46,7 @@ func (c *OCR2ReaderClient) BaseReader() reader.Reader {
 }
 
 func (c *OCR2ReaderClient) BillingDetails(ctx context.Context, address tronaddress.Address) (BillingDetails, error) {
-	res, err := c.r.CallContract(address, "getBilling", nil)
+	res, err := c.r.CallContract(ctx, address, "getBilling", nil)
 	if err != nil {
 		return BillingDetails{}, fmt.Errorf("failed to call contract: %w", err)
 	}
@@ -67,7 +67,7 @@ func (c *OCR2ReaderClient) BillingDetails(ctx context.Context, address tronaddre
 }
 
 func (c *OCR2ReaderClient) LatestConfigDetails(ctx context.Context, address tronaddress.Address) (ContractConfigDetails, error) {
-	res, err := c.r.CallContract(address, "latestConfigDetails", nil)
+	res, err := c.r.CallContract(ctx, address, "latestConfigDetails", nil)
 	if err != nil {
 		return ContractConfigDetails{}, fmt.Errorf("couldn't call the contract: %w", err)
 	}
@@ -90,7 +90,7 @@ func (c *OCR2ReaderClient) LatestConfigDetails(ctx context.Context, address tron
 func (c *OCR2ReaderClient) LatestTransmissionDetails(ctx context.Context, address tronaddress.Address) (TransmissionDetails, error) {
 	// We explicitly use the fullnode api rather than solidity api (default) to get the latest transmission details as this speeds up the tx confirmation
 	// for ocr2 rounds, rather than waiting for transaction finality which can take up to 1 minute (and as a result sending duplicate or retrying transmits).
-	res, err := c.r.CallContractFullNode(address, "latestTransmissionDetails", nil)
+	res, err := c.r.CallContractFullNode(ctx, address, "latestTransmissionDetails", nil)
 	if err != nil {
 		return TransmissionDetails{}, fmt.Errorf("couldn't call the contract: %w", err)
 	}
@@ -128,7 +128,7 @@ func (c *OCR2ReaderClient) LatestTransmissionDetails(ctx context.Context, addres
 }
 
 func (c *OCR2ReaderClient) LatestRoundData(ctx context.Context, address tronaddress.Address) (RoundData, error) {
-	res, err := c.r.CallContract(address, "latestRoundData", nil)
+	res, err := c.r.CallContract(ctx, address, "latestRoundData", nil)
 	if err != nil {
 		return RoundData{}, fmt.Errorf("couldn't call the contract: %w", err)
 	}
@@ -160,7 +160,7 @@ func (c *OCR2ReaderClient) LatestRoundData(ctx context.Context, address tronaddr
 }
 
 func (c *OCR2ReaderClient) LinkAvailableForPayment(ctx context.Context, address tronaddress.Address) (*big.Int, error) {
-	res, err := c.r.CallContract(address, "linkAvailableForPayment", nil)
+	res, err := c.r.CallContract(ctx, address, "linkAvailableForPayment", nil)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't call the contract: %w", err)
 	}
@@ -174,7 +174,7 @@ func (c *OCR2ReaderClient) LinkAvailableForPayment(ctx context.Context, address 
 }
 
 func (c *OCR2ReaderClient) ConfigFromEventAt(ctx context.Context, address tronaddress.Address, blockNum uint64) (ContractConfig, error) {
-	events, err := c.r.GetEventsFromBlock(address, "ConfigSet", blockNum)
+	events, err := c.r.GetEventsFromBlock(ctx, address, "ConfigSet", blockNum)
 	if err != nil {
 		return ContractConfig{}, fmt.Errorf("failed to fetch ConfigSet event logs: %w", err)
 	}

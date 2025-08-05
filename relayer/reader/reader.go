@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -17,10 +18,11 @@ import (
 
 //go:generate mockery --name Reader --output ../mocks/
 type Reader interface {
-	CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
-	CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
-	LatestBlockHeight() (uint64, error)
-	GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
+	CallContract(ctx context.Context, contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
+	CallContractByAbi(ctx context.Context, abi *common.JSONABI, contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
+	CallContractFullNode(ctx context.Context, contractAddress address.Address, method string, params []any) (map[string]interface{}, error)
+	LatestBlockHeight(ctx context.Context) (uint64, error)
+	GetEventsFromBlock(ctx context.Context, contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error)
 
 	BaseClient() sdk.CombinedClient
 }
@@ -45,14 +47,14 @@ func (c *ReaderClient) BaseClient() sdk.CombinedClient {
 	return c.rpc
 }
 
-func (c *ReaderClient) getContractABI(contractAddress address.Address) (*common.JSONABI, error) {
+func (c *ReaderClient) getContractABI(ctx context.Context, contractAddress address.Address) (*common.JSONABI, error) {
 	// return cached abi if cached
 	if abi, ok := c.abi[contractAddress.String()]; ok {
 		return abi, nil
 	}
 
 	// otherwise fetch from chain
-	response, err := c.rpc.GetContract(contractAddress)
+	response, err := c.rpc.GetContract(ctx, contractAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract ABI: %w", err)
 	}
@@ -61,9 +63,9 @@ func (c *ReaderClient) getContractABI(contractAddress address.Address) (*common.
 	return response.ABI, nil
 }
 
-func (c *ReaderClient) CallContract(contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
+func (c *ReaderClient) CallContract(ctx context.Context, contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
 	// get contract abi
-	abi, err := c.getContractABI(contractAddress)
+	abi, err := c.getContractABI(ctx, contractAddress)
 	if err != nil {
 		return map[string]interface{}{}, fmt.Errorf("error fetching abi: %w", err)
 	}
@@ -76,6 +78,46 @@ func (c *ReaderClient) CallContract(contractAddress address.Address, method stri
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContract(
+		ctx,
+		/* from= */ address.ZeroAddress,
+		/* contractAddress= */ contractAddress,
+		/* method= */ methodSignature,
+		/* params= */ params,
+	)
+	if err != nil {
+		return map[string]interface{}{}, fmt.Errorf("failed to call triggerconstantcontract: %w", err)
+	}
+	if !res.Result.Result || len(res.ConstantResult) == 0 {
+		return map[string]interface{}{}, fmt.Errorf("failed to call contract: res=%+v", res)
+	}
+
+	// parse return value
+	parser, err := abi.GetOutputParser(method)
+	if err != nil {
+		return map[string]interface{}{}, fmt.Errorf("failed to get abi parser: %w", err)
+	}
+	result := map[string]interface{}{}
+	constantResultBytes, err := hex.DecodeString(res.ConstantResult[0])
+	if err != nil {
+		return map[string]interface{}{}, fmt.Errorf("failed to decode constant result: %w", err)
+	}
+	err = parser.UnpackIntoMap(result, constantResultBytes)
+	if err != nil {
+		return map[string]interface{}{}, fmt.Errorf("failed to unpack result: %w", err)
+	}
+	return result, nil
+}
+
+func (c *ReaderClient) CallContractByAbi(ctx context.Context, abi *common.JSONABI, contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
+	// get method signature
+	methodSignature, err := abi.GetFunctionSignature(method)
+	if err != nil {
+		return map[string]interface{}{}, fmt.Errorf("failed to get method sighash: %w", err)
+	}
+
+	// call triggerconstantcontract
+	res, err := c.rpc.TriggerConstantContract(
+		ctx,
 		/* from= */ address.ZeroAddress,
 		/* contractAddress= */ contractAddress,
 		/* method= */ methodSignature,
@@ -106,9 +148,9 @@ func (c *ReaderClient) CallContract(contractAddress address.Address, method stri
 }
 
 // Same as CallContract, but uses the fullnode client instead of the solidity client, which means it uses the non-finalized state of the chain.
-func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
+func (c *ReaderClient) CallContractFullNode(ctx context.Context, contractAddress address.Address, method string, params []any) (map[string]interface{}, error) {
 	// get contract abi
-	abi, err := c.getContractABI(contractAddress)
+	abi, err := c.getContractABI(ctx, contractAddress)
 	if err != nil {
 		return map[string]interface{}{}, fmt.Errorf("error fetching abi: %w", err)
 	}
@@ -121,6 +163,7 @@ func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, met
 
 	// call triggerconstantcontract
 	res, err := c.rpc.TriggerConstantContractFullNode(
+		ctx,
 		/* from= */ address.ZeroAddress,
 		/* contractAddress= */ contractAddress,
 		/* method= */ methodSignature,
@@ -150,8 +193,8 @@ func (c *ReaderClient) CallContractFullNode(contractAddress address.Address, met
 	return result, nil
 }
 
-func (c *ReaderClient) LatestBlockHeight() (uint64, error) {
-	nowBlock, err := c.rpc.GetNowBlock()
+func (c *ReaderClient) LatestBlockHeight(ctx context.Context) (uint64, error) {
+	nowBlock, err := c.rpc.GetNowBlock(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get latest block: %w", err)
 	}
@@ -159,14 +202,14 @@ func (c *ReaderClient) LatestBlockHeight() (uint64, error) {
 	return uint64(nowBlock.BlockHeader.RawData.Number), nil
 }
 
-func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
+func (c *ReaderClient) GetEventsFromBlock(ctx context.Context, contractAddress address.Address, eventName string, blockNum uint64) ([]map[string]interface{}, error) {
 	// check if block number fits in int32
 	if blockNum > uint64(math.MaxInt32) {
 		return nil, fmt.Errorf("block number %d exceeds maximum int32 value", blockNum)
 	}
 
 	// get abi
-	abi, err := c.getContractABI(contractAddress)
+	abi, err := c.getContractABI(ctx, contractAddress)
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get contract abi: %w", err))
 		return nil, err
@@ -181,7 +224,7 @@ func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, event
 	eventTopicHash := relayer.GetEventTopicHash(eventSignature)
 
 	// get block
-	block, err := c.rpc.GetBlockByNum(int32(blockNum))
+	block, err := c.rpc.GetBlockByNum(ctx, int32(blockNum))
 	if err != nil {
 		c.lggr.Error(fmt.Errorf("failed to get block by number: %w", err))
 		return nil, err
@@ -203,7 +246,7 @@ func (c *ReaderClient) GetEventsFromBlock(contractAddress address.Address, event
 		if contractAddressHex != contract[0].Parameter.Value.ContractAddress {
 			continue
 		}
-		transactionInfo, err := c.rpc.GetTransactionInfoById(tx.TxID)
+		transactionInfo, err := c.rpc.GetTransactionInfoById(ctx, tx.TxID)
 		if err != nil {
 			c.lggr.Error(fmt.Errorf("failed to fetch transaction info: %w", err))
 			continue

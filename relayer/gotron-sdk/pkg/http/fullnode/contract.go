@@ -2,6 +2,7 @@ package fullnode
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -33,7 +34,7 @@ type DeployContractResponse struct {
 	ContractAddress string `json:"contract_address"`
 }
 
-func (tc *Client) DeployContract(ownerAddress address.Address, contractName, abiJson, bytecode string, oeLimit, curPercent, feeLimit int, params []interface{}) (*DeployContractResponse, error) {
+func (tc *Client) DeployContract(ctx context.Context, ownerAddress address.Address, contractName, abiJson, bytecode string, oeLimit, curPercent, feeLimit int, params []interface{}) (*DeployContractResponse, error) {
 	parsedABI, err := eABI.JSON(bytes.NewReader([]byte(abiJson)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ABI: %w", err)
@@ -61,7 +62,7 @@ func (tc *Client) DeployContract(ownerAddress address.Address, contractName, abi
 	}
 
 	response := DeployContractResponse{}
-	if err := tc.Post("/deploycontract", reqBody, &response); err != nil {
+	if err := tc.Post(ctx, "/deploycontract", reqBody, &response); err != nil {
 		return nil, err
 	}
 
@@ -85,9 +86,9 @@ type GetContractResponse struct {
 	CodeHash                   string          `json:"code_hash,omitempty"`                     // code hash
 }
 
-func (tc *Client) GetContract(contractAddress address.Address) (*GetContractResponse, error) {
+func (tc *Client) GetContract(ctx context.Context, contractAddress address.Address) (*GetContractResponse, error) {
 	contractInfo := GetContractResponse{}
-	err := tc.Post("/getcontract",
+	err := tc.Post(ctx, "/getcontract",
 		&GetContractRequest{
 			Value:   contractAddress.String(),
 			Visible: true,
@@ -128,7 +129,7 @@ type TriggerSmartContractResponse struct {
 	Transaction *common.Transaction `json:"transaction"`
 }
 
-func (tc *Client) TriggerSmartContract(from, contractAddress address.Address, method string, params []any, feeLimit int32, tAmount int64) (*TriggerSmartContractResponse, error) {
+func (tc *Client) TriggerSmartContract(ctx context.Context, from, contractAddress address.Address, method string, params []any, feeLimit int32, tAmount int64) (*TriggerSmartContractResponse, error) {
 	paramBytes, err := abi.GetPaddedParam(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params: %w", err)
@@ -143,7 +144,7 @@ func (tc *Client) TriggerSmartContract(from, contractAddress address.Address, me
 		Visible:          true,
 	}
 	contractResponse := TriggerSmartContractResponse{}
-	err = tc.Post("/triggersmartcontract", tcRequest, &contractResponse)
+	err = tc.Post(ctx, "/triggersmartcontract", tcRequest, &contractResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ type BroadcastResponse struct {
 	Message string `json:"message"`
 }
 
-func (tc *Client) BroadcastTransaction(reqBody *common.Transaction) (*BroadcastResponse, error) {
+func (tc *Client) BroadcastTransaction(ctx context.Context, reqBody *common.Transaction) (*BroadcastResponse, error) {
 	if reqBody == nil {
 		return nil, errors.New("empty body")
 	}
@@ -172,7 +173,7 @@ func (tc *Client) BroadcastTransaction(reqBody *common.Transaction) (*BroadcastR
 	}
 
 	response := BroadcastResponse{}
-	err := tc.Post("/broadcasttransaction", reqBody, &response)
+	err := tc.Post(ctx, "/broadcasttransaction", reqBody, &response)
 
 	if err != nil {
 		return nil, err

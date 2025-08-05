@@ -1,6 +1,7 @@
 package soliditynode
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 
@@ -29,7 +30,7 @@ type TriggerConstantContractResponse struct {
 	Transaction    *common.ExecutedTransaction `json:"transaction"`     // Transaction information, refer to GetTransactionByID
 }
 
-func (tc *Client) TriggerConstantContract(from, contractAddress address.Address, method string, params []any) (*TriggerConstantContractResponse, error) {
+func (tc *Client) TriggerConstantContract(ctx context.Context, from, contractAddress address.Address, method string, params []any) (*TriggerConstantContractResponse, error) {
 	paramBytes, err := abi.GetPaddedParam(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params: %w", err)
@@ -42,7 +43,7 @@ func (tc *Client) TriggerConstantContract(from, contractAddress address.Address,
 		Visible:          true,
 	}
 	response := TriggerConstantContractResponse{}
-	err = tc.Post("/triggerconstantcontract", tcRequest, &response)
+	err = tc.Post(ctx, "/triggerconstantcontract", tcRequest, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ type EnergyEstimateResult struct {
 	EnergyRequired int64                `json:"energy_required"` // Estimated energy to run the contract
 }
 
-func (tc *Client) EstimateEnergy(from, contractAddress address.Address, method string, params []any, tAmount int64) (*EnergyEstimateResult, error) {
+func (tc *Client) EstimateEnergy(ctx context.Context, from, contractAddress address.Address, method string, params []any, tAmount int64) (*EnergyEstimateResult, error) {
 	paramBytes, err := abi.GetPaddedParam(params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode params: %w", err)
@@ -91,7 +92,7 @@ func (tc *Client) EstimateEnergy(from, contractAddress address.Address, method s
 	}
 
 	response := EnergyEstimateResult{}
-	err = tc.Post("/estimateenergy", reqBody, &response)
+	err = tc.Post(ctx, "/estimateenergy", reqBody, &response)
 	if err != nil {
 		return nil, err
 	}
