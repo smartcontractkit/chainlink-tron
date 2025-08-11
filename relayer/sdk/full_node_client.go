@@ -24,6 +24,7 @@ type FullNodeClient interface {
 	DeployContract(ownerAddress address.Address, contractName, abiJson, bytecode string, oeLimit, curPercent, feeLimit int, params []interface{}) (*fullnode.DeployContractResponse, error)
 	GetContract(address address.Address) (*fullnode.GetContractResponse, error)
 	TriggerSmartContract(from, contractAddress address.Address, method string, params []any, feeLimit int32, tAmount int64) (*fullnode.TriggerSmartContractResponse, error)
+	TriggerSmartContractWithData(from, contractAddress address.Address, data string, feeLimit int32, tAmount int64) (*fullnode.TriggerSmartContractResponse, error)
 	Transfer(fromAddress, toAddress address.Address, amount int64) (*common.Transaction, error)
 	BroadcastTransaction(reqBody *common.Transaction) (*fullnode.BroadcastResponse, error)
 	GetEnergyPrices() (*fullnode.EnergyPrices, error)

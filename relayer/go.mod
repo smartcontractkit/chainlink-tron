@@ -151,4 +151,4 @@ require (
 )
 
 // original author is not maintaining the repo anymore
-replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4
+replace github.com/fbsobreira/gotron-sdk => ./gotron-sdk
