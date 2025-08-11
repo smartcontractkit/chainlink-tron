@@ -151,6 +151,24 @@ func (tc *Client) TriggerSmartContract(from, contractAddress address.Address, me
 	return &contractResponse, nil
 }
 
+func (tc *Client) TriggerSmartContractWithData(from, contractAddress address.Address, data string, feeLimit int32, tAmount int64) (*TriggerSmartContractResponse, error) {
+	tcRequest := TriggerSmartContractRequest{
+		OwnerAddress:    from.String(),
+		ContractAddress: contractAddress.String(),
+		Data:            data,
+		FeeLimit:        feeLimit,
+		CallValue:       tAmount,
+		Visible:         true,
+	}
+	contractResponse := TriggerSmartContractResponse{}
+	err := tc.Post("/triggersmartcontract", tcRequest, &contractResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contractResponse, nil
+}
+
 type BroadcastResponse struct {
 	Result  bool   `json:"result"`
 	Code    string `json:"code"`
