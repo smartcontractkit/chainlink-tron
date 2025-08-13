@@ -52,3 +52,7 @@ func (l *loopKeystoreAdapter) Sign(ctx context.Context, account string, data []b
 	addr := tronAddr.EthAddress()
 	return l.ks.Sign(ctx, addr, data)
 }
+
+func (l *loopKeystoreAdapter) Decrypt(ctx context.Context, account string, data []byte) (decrypted []byte, err error) {
+	return nil, fmt.Errorf("decrypt not supported in loopKeystoreAdapter")
+}

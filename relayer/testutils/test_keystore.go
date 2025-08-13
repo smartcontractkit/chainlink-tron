@@ -3,6 +3,7 @@ package testutils
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -34,6 +35,10 @@ func (tk *TestKeystore) Sign(ctx context.Context, id string, hash []byte) ([]byt
 	}
 
 	return crypto.Sign(hash, privateKey)
+}
+
+func (tk *TestKeystore) Decrypt(ctx context.Context, id string, data []byte) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (tk *TestKeystore) Accounts(ctx context.Context) ([]string, error) {
