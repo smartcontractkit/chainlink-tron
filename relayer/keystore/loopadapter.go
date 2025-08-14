@@ -22,6 +22,7 @@ type KeysStore interface {
 // It handles the conversion between tron addresses and evm addresses whilst delegating the signing to the EVM keystore
 type loopKeystoreAdapter struct {
 	ks KeysStore
+	core.UnimplementedKeystore
 }
 
 // Creates a new LoopKeystoreAdapter which allows the EVM keystore to be used by the Tron TXM
