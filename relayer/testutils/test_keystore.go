@@ -8,10 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
 type TestKeystore struct {
 	Keys map[string]*ecdsa.PrivateKey
+	core.UnimplementedKeystore
 }
 
 var _ loop.Keystore = &TestKeystore{}
