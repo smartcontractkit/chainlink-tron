@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 )
 
@@ -16,7 +15,7 @@ type TestKeystore struct {
 	core.UnimplementedKeystore
 }
 
-var _ loop.Keystore = &TestKeystore{}
+var _ core.Keystore = &TestKeystore{}
 
 func NewTestKeystore(address string, privateKey *ecdsa.PrivateKey) *TestKeystore {
 	// TODO: we don't actually need a map if we only have a single key pair.
