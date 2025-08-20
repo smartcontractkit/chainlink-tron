@@ -17,13 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	relaylogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-tron/relayer/config"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/contract"
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
-	"github.com/smartcontractkit/chainlink-tron/relayer/plugin"
 	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
@@ -305,8 +306,8 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 	readerClient := reader.NewReader(combinedClient, ocrLogger)
 	ocrReader := ocr2.NewOCR2Reader(readerClient, ocrLogger)
 	contractReader := ocr2.NewContractReader(ocrAddress, ocrReader, ocrLogger)
-	ocr2Config := plugin.NewDefault()
-	transmissionsCache := ocr2.NewTransmissionsCache(ocr2Config, contractReader, ocrLogger)
+	ocr2Config := config.Defaults()
+	transmissionsCache := ocr2.NewTransmissionsCache(&ocr2Config, contractReader, ocrLogger)
 	err = transmissionsCache.Start()
 	require.NoError(t, err, "Failed to start transmissions cache")
 
