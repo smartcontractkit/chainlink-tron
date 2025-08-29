@@ -2,7 +2,7 @@
 # syntax = docker/dockerfile:1.4
 
 # Takes Chainlink core as a base image and layers in plugins
-ARG BASE_IMAGE=public.ecr.aws/chainlink/chainlink:v2.26.0
+ARG BASE_IMAGE=public.ecr.aws/chainlink/chainlink:2.26.0
 # Build the 'default' pkg if not set
 ARG NIX_BUILD_PKG=default
 
