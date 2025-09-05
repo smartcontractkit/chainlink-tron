@@ -484,6 +484,7 @@ func (t *TronTxm) checkFinalized() {
 func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
+	t.Logger.Debugw("reapLoop: started with interval", "interval", t.Config.ReapInterval)
 	defer ticker.Stop()
 	
 	// Get initial CPU stats
