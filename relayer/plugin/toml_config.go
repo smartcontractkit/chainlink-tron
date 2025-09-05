@@ -187,7 +187,7 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
-	return *c.ChainConfig.BalancePollPeriod
+	return c.ChainConfig.BalancePollPeriod.Duration()
 }
 
 func (c *TOMLConfig) BroadcastChanSize() uint64 {
@@ -203,19 +203,19 @@ func (c *TOMLConfig) ListNodes() NodeConfigs {
 }
 
 func (c *TOMLConfig) OCR2CachePollPeriod() time.Duration {
-	return *c.ChainConfig.OCR2CachePollPeriod
+	return c.ChainConfig.OCR2CachePollPeriod.Duration()
 }
 
 func (c *TOMLConfig) OCR2CacheTTL() time.Duration {
-	return *c.ChainConfig.OCR2CacheTTL
+	return c.ChainConfig.OCR2CacheTTL.Duration()
 }
 
 func (c *TOMLConfig) RetentionPeriod() time.Duration {
-	return *c.ChainConfig.RetentionPeriod
+	return c.ChainConfig.RetentionPeriod.Duration()
 }
 
 func (c *TOMLConfig) ReapInterval() time.Duration {
-	return *c.ChainConfig.ReapInterval
+	return c.ChainConfig.ReapInterval.Duration()
 }
 
 func (c *TOMLConfig) SetDefaults() {

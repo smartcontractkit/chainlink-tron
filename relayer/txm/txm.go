@@ -58,6 +58,8 @@ type TronTxmRequest struct {
 }
 
 func New(lgr logger.Logger, keystore loop.Keystore, client sdk.CombinedClient, config TronTxmConfig) *TronTxm {
+	lgr.Infow("txm.New called - creating new TronTxm instance")
+	
 	txm := &TronTxm{
 		Logger:                logger.Named(lgr, "TronTxm"),
 		Keystore:              keystore,
@@ -72,6 +74,7 @@ func New(lgr logger.Logger, keystore loop.Keystore, client sdk.CombinedClient, c
 	// Set defaults for missing config values
 	txm.setDefaults()
 
+	txm.Logger.Infow("TronTxm instance created in txm.New", "instance_pointer", fmt.Sprintf("%p", txm))
 	return txm
 }
 
@@ -100,6 +103,7 @@ func (t *TronTxm) GetClient() sdk.CombinedClient {
 
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
+		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
 		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
 		go t.broadcastLoop()
 		go t.confirmLoop()
@@ -484,7 +488,7 @@ func (t *TronTxm) checkFinalized() {
 func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
-	t.Logger.Debugw("reapLoop: started with interval", "interval", t.Config.ReapInterval)
+	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t))
 	defer ticker.Stop()
 	
 	// Get initial CPU stats

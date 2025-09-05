@@ -39,11 +39,11 @@ type chainConfigSet struct {
 type ChainConfig struct {
 	BroadcastChanSize   *uint64
 	ConfirmPollPeriod   *config.Duration
-	OCR2CachePollPeriod *time.Duration
-	OCR2CacheTTL        *time.Duration
-	BalancePollPeriod   *time.Duration
-	RetentionPeriod     *time.Duration
-	ReapInterval        *time.Duration
+	OCR2CachePollPeriod *config.Duration
+	OCR2CacheTTL        *config.Duration
+	BalancePollPeriod   *config.Duration
+	RetentionPeriod     *config.Duration
+	ReapInterval        *config.Duration
 }
 
 func (c *ChainConfig) SetDefaults() {
@@ -54,19 +54,19 @@ func (c *ChainConfig) SetDefaults() {
 		c.ConfirmPollPeriod = config.MustNewDuration(defaultConfigSet.ConfirmPollPeriod)
 	}
 	if c.OCR2CachePollPeriod == nil {
-		c.OCR2CachePollPeriod = &defaultConfigSet.OCR2CachePollPeriod
+		c.OCR2CachePollPeriod = config.MustNewDuration(defaultConfigSet.OCR2CachePollPeriod)
 	}
 	if c.OCR2CacheTTL == nil {
-		c.OCR2CacheTTL = &defaultConfigSet.OCR2CacheTTL
+		c.OCR2CacheTTL = config.MustNewDuration(defaultConfigSet.OCR2CacheTTL)
 	}
 	if c.BalancePollPeriod == nil {
-		c.BalancePollPeriod = &defaultConfigSet.BalancePollPeriod
+		c.BalancePollPeriod = config.MustNewDuration(defaultConfigSet.BalancePollPeriod)
 	}
 	if c.RetentionPeriod == nil {
-		c.RetentionPeriod = &defaultConfigSet.RetentionPeriod
+		c.RetentionPeriod = config.MustNewDuration(defaultConfigSet.RetentionPeriod)
 	}
 	if c.ReapInterval == nil {
-		c.ReapInterval = &defaultConfigSet.ReapInterval
+		c.ReapInterval = config.MustNewDuration(defaultConfigSet.ReapInterval)
 	}
 }
 
