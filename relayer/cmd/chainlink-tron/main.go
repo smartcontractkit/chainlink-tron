@@ -53,6 +53,7 @@ type pluginRelayer struct {
 var _ loop.PluginRelayer = &pluginRelayer{}
 
 func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
+	c.Logger.Infow("Creating new TronRelayer instance", "config", config)
 	d := toml.NewDecoder(strings.NewReader(config))
 	d.DisallowUnknownFields()
 
@@ -71,6 +72,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore,
 
 	cfg.SetDefaults()
 
+	c.Logger.Infow("Calling NewRelayer", "cfg", cfg)
 	relayer, err := tronplugin.NewRelayer(&cfg, c.Logger, keystore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relayer: %w", err)
