@@ -105,9 +105,23 @@ func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
 		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
 		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
-		go t.broadcastLoop()
-		go t.confirmLoop()
-		go t.reapLoop()
+		
+		// Create a context that will be cancelled when the parent context is cancelled
+		// This ensures loops can detect when the plugin should shut down
+		// loopCtx, cancel := context.WithCancel(ctx)
+		stopCtx, _ := utils.ContextFromChan(t.Stop) // context that ends when t.Stop is closed
+		ctx, cancel := context.WithCancel(stopCtx)   // context you’ll pass to loops + RPCs
+		go func() {
+			// <-ctx.Done()
+			// t.Logger.Infow("Parent context cancelled, shutting down TXM loops")
+			// close(t.Stop)
+			<-stopCtx.Done() // wait until stopCtx is canceled (i.e., t.Stop closed)
+			cancel()
+		}()
+		
+		go t.broadcastLoopWithContext(ctx)
+		go t.confirmLoopWithContext(ctx)
+		go t.reapLoopWithContext(ctx)
 
 		return nil
 	})
@@ -202,6 +216,47 @@ func (t *TronTxm) broadcastLoop() {
 			txStore.OnBroadcasted(txHash, coreTx.RawData.Expiration, tx)
 		case <-t.Stop:
 			t.Logger.Debugw("broadcastLoop: stopped")
+			return
+		}
+	}
+}
+
+func (t *TronTxm) broadcastLoopWithContext(ctx context.Context) {
+	defer t.Done.Done()
+
+	t.Logger.Debugw("broadcastLoop: started")
+	for {
+		select {
+		case tx := <-t.BroadcastChan:
+			triggerResponse, err := t.TriggerSmartContract(ctx, tx)
+			if err != nil {
+				// TODO: is it ok to leave this transaction unmarked as fatal?
+				t.Logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx, "txID", tx.ID)
+				continue
+			}
+
+			coreTx := triggerResponse.Transaction
+			txHash := coreTx.TxID
+
+			// RefBlockNum is optional and does not seem in use anymore.
+			t.Logger.Debugw("created transaction", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit, "txID", tx.ID)
+			txStore := t.AccountStore.GetTxStore(tx.FromAddress.String())
+
+			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
+			if err != nil {
+				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "triggerResponse", triggerResponse, "txID", tx.ID)
+				txStore.OnFatalError(tx.ID)
+				continue
+			}
+
+			t.Logger.Infow("transaction broadcasted", "method", tx.Method, "txHash", txHash, "timestampMs", coreTx.RawData.Timestamp, "expirationMs", coreTx.RawData.Expiration, "refBlockHash", coreTx.RawData.RefBlockHash, "feeLimit", coreTx.RawData.FeeLimit, "txID", tx.ID)
+
+			txStore.OnBroadcasted(txHash, coreTx.RawData.Expiration, tx)
+		// case <-t.Stop:
+		// 	t.Logger.Debugw("broadcastLoop: stopped")
+		// 	return
+		case <-ctx.Done():
+			t.Logger.Debugw("broadcastLoop: stopped due to context cancellation")
 			return
 		}
 	}
@@ -321,6 +376,34 @@ func (t *TronTxm) confirmLoop() {
 			tick = time.After(utils.WithJitter(remaining.Abs()))
 		case <-t.Stop:
 			t.Logger.Debugw("confirmLoop: stopped")
+			return
+		}
+	}
+}
+
+func (t *TronTxm) confirmLoopWithContext(ctx context.Context) {
+	defer t.Done.Done()
+
+	pollDuration := time.Duration(t.Config.ConfirmPollSecs) * time.Second
+	tick := time.After(pollDuration)
+
+	t.Logger.Debugw("confirmLoop: started")
+
+	for {
+		select {
+		case <-tick:
+			start := time.Now()
+
+			t.checkUnconfirmed()
+			t.checkFinalized()
+
+			remaining := pollDuration - time.Since(start)
+			tick = time.After(utils.WithJitter(remaining.Abs()))
+		// case <-t.Stop:
+		// 	t.Logger.Debugw("confirmLoop: stopped")
+		// 	return
+		case <-ctx.Done():
+			t.Logger.Debugw("confirmLoop: stopped due to context cancellation")
 			return
 		}
 	}
@@ -551,6 +634,80 @@ func (t *TronTxm) reapLoop() {
 				"memory_heap_mb", loopEndCPU.HeapAlloc / 1024 / 1024)
 		case <-t.Stop:
 			t.Logger.Debugw("reapLoop: stopped")
+			return
+		}
+	}
+}
+
+func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
+	defer t.Done.Done()
+	ticker := time.NewTicker(t.Config.ReapInterval)
+	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t))
+	defer ticker.Stop()
+	
+	// Get initial CPU stats
+	var startCPU runtime.MemStats
+	runtime.ReadMemStats(&startCPU)
+	startTime := time.Now()
+	
+	for {
+		select {
+		case <-ticker.C:
+			loopStartTime := time.Now()
+			var loopStartCPU runtime.MemStats
+			runtime.ReadMemStats(&loopStartCPU)
+			
+			t.Logger.Debugw("reapLoop: reaping finished transactions")
+			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
+			allFinished := t.AccountStore.GetAllFinished()
+			accountTxIds := make(map[string][]string)
+
+			for acc, finishedTxs := range allFinished {
+				t.Logger.Debugw("reapLoop: processing account", "account", acc, "tx_count", len(finishedTxs))
+				var idsToDelete []string
+				for _, ft := range finishedTxs {
+					if ft.RetentionTs.Before(cutoff) {
+						t.Logger.Debugw("reapLoop: deleting finished transaction", "txID", ft.Tx.ID)
+						idsToDelete = append(idsToDelete, ft.Tx.ID)
+					}
+				}
+				if len(idsToDelete) > 0 {
+					t.Logger.Debugw("reapLoop: adding account to delete", "account", acc, "tx_count", len(idsToDelete))
+					accountTxIds[acc] = idsToDelete
+				}
+			}
+
+			reapCount := 0
+			if len(accountTxIds) > 0 {
+				t.Logger.Debugw("reapLoop: deleting finished transactions", "account_count", len(accountTxIds))
+				reapCount = t.AccountStore.DeleteAllFinishedTxs(accountTxIds)
+				if reapCount > 0 {
+					t.Logger.Debugw("reapLoop: reaped finished transactions", "count", reapCount)
+				}
+			}
+			
+			// Calculate CPU and memory stats
+			loopDuration := time.Since(loopStartTime)
+			var loopEndCPU runtime.MemStats
+			runtime.ReadMemStats(&loopEndCPU)
+			
+			totalDuration := time.Since(startTime)
+			totalAllocs := loopEndCPU.TotalAlloc - startCPU.TotalAlloc
+			loopAllocs := loopEndCPU.TotalAlloc - loopStartCPU.TotalAlloc
+			
+			t.Logger.Debugw("reapLoop: completed", 
+				"duration_ms", loopDuration.Milliseconds(),
+				"total_duration_ms", totalDuration.Milliseconds(),
+				"reap_count", reapCount,
+				"account_count", len(allFinished),
+				"total_allocations", totalAllocs,
+				"loop_allocations", loopAllocs,
+				"memory_heap_mb", loopEndCPU.HeapAlloc / 1024 / 1024)
+		// case <-t.Stop:
+		// 	t.Logger.Debugw("reapLoop: stopped")
+		// 	return
+		case <-ctx.Done():
+			t.Logger.Debugw("reapLoop: stopped due to context cancellation")
 			return
 		}
 	}
