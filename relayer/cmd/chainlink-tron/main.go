@@ -31,23 +31,23 @@ func main() {
 	defer close(stopCh)
 
 	// Add connection monitoring to detect when gRPC connection is lost
-	connLostCh := make(chan struct{})
+	// connLostCh := make(chan struct{})
 	
-	// Monitor for connection loss and trigger cleanup
-	go func() {
-		select {
-		case <-connLostCh:
-			s.Logger.Infow("gRPC connection lost, triggering plugin cleanup")
-			s.Logger.ErrorIfFn(p.Close, "Failed to close plugin on connection loss")
-		case <-stopCh:
-			// Normal shutdown, no need to trigger cleanup
-		}
-	}()
+	// // Monitor for connection loss and trigger cleanup
+	// go func() {
+	// 	select {
+	// 	case <-connLostCh:
+	// 		s.Logger.Infow("gRPC connection lost, triggering plugin cleanup")
+	// 		s.Logger.ErrorIfFn(p.Close, "Failed to close plugin on connection loss")
+	// 	case <-stopCh:
+	// 		// Normal shutdown, no need to trigger cleanup
+	// 	}
+	// }()
 
 	// Start the plugin server in a goroutine so we can monitor it
-	serverDone := make(chan struct{})
-	go func() {
-		defer close(serverDone)
+	// serverDone := make(chan struct{})
+	// go func() {
+	// 	defer close(serverDone)
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: loop.PluginRelayerHandshakeConfig(),
 			Plugins: map[string]plugin.Plugin{
@@ -62,16 +62,16 @@ func main() {
 			},
 			GRPCServer: s.GRPCOpts.NewServer,
 		})
-	}()
+	// }()
 
-	// Monitor the server - if it exits unexpectedly, it means connection was lost
-	select {
-	case <-serverDone:
-		s.Logger.Infow("Plugin server exited, connection likely lost")
-		close(connLostCh)
-	case <-stopCh:
-		s.Logger.Infow("Stop channel closed, normal shutdown")
-	}
+	// // Monitor the server - if it exits unexpectedly, it means connection was lost
+	// select {
+	// case <-serverDone:
+	// 	s.Logger.Infow("Plugin server exited, connection likely lost")
+	// 	close(connLostCh)
+	// case <-stopCh:
+	// 	s.Logger.Infow("Stop channel closed, normal shutdown")
+	// }
 }
 
 type pluginRelayer struct {

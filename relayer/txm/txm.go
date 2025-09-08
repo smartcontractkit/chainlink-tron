@@ -657,7 +657,7 @@ func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
 			var loopStartCPU runtime.MemStats
 			runtime.ReadMemStats(&loopStartCPU)
 			
-			t.Logger.Debugw("reapLoop: reaping finished transactions")
+			t.Logger.Debugw("reapLoop: reaping finished transactions", "instance_pointer", fmt.Sprintf("%p", t))
 			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
 			allFinished := t.AccountStore.GetAllFinished()
 			accountTxIds := make(map[string][]string)
