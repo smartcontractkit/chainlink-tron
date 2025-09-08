@@ -101,6 +101,7 @@ func (c *contractCache) Start() error {
 
 func (c *contractCache) Close() error {
 	close(c.stop)
+	<-c.done
 	return nil
 }
 
