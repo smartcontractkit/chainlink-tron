@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -81,7 +82,6 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		return nil, fmt.Errorf("client chain id %s does not match config chain id %s", chainId, id)
 	}
 
-	lggr.Infow("Creating new TronTxm instance", "chainID", chainId)
 	txmgr := txm.New(lggr, keystore, client, txm.TronTxmConfig{
 		// TODO: stop changing uint64 fields here to uint?
 		BroadcastChanSize: uint(cfg.BroadcastChanSize()),
@@ -90,7 +90,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		RetentionPeriod:   cfg.RetentionPeriod(),
 		ReapInterval:      cfg.ReapInterval(),
 	})
-	lggr.Infow("TronTxm instance created", "chainID", id, "instance_pointer", fmt.Sprintf("%p", txmgr))
+	lggr.Infow("TronTxm instance created", "chainID", chainId, "instance_pointer", fmt.Sprintf("%p", txmgr), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
 		return client.SolidityClient(), nil
