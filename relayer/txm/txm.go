@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -642,7 +643,7 @@ func (t *TronTxm) reapLoop() {
 func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
-	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t))
+	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t), "relayer_pid", os.Getppid())
 	defer ticker.Stop()
 	
 	// Get initial CPU stats
@@ -657,7 +658,7 @@ func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
 			var loopStartCPU runtime.MemStats
 			runtime.ReadMemStats(&loopStartCPU)
 			
-			t.Logger.Debugw("reapLoop: reaping finished transactions", "instance_pointer", fmt.Sprintf("%p", t))
+			t.Logger.Debugw("reapLoop: reaping finished transactions", "instance_pointer", fmt.Sprintf("%p", t), "relayer_pid", os.Getppid())
 			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
 			allFinished := t.AccountStore.GetAllFinished()
 			accountTxIds := make(map[string][]string)
