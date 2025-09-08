@@ -67,20 +67,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
 	}
 
-	// check client chain id matches config chain id
-	blockInfo, err := client.GetBlockByNum(0)
-	if err != nil {
-		return nil, fmt.Errorf("error getting genesis block info: %w", err)
-	}
-	// last 4 bytes of genesis block is the chain id for Tron testnets and mainnet
-	chainIdHex := blockInfo.BlockID[len(blockInfo.BlockID)-8:]
-	chainId, ok := new(big.Int).SetString(chainIdHex, 16)
-	if !ok {
-		return nil, fmt.Errorf("couldn't parse chain id %s from genesis block", chainIdHex)
-	}
-	if chainId.Cmp(idNum) != 0 {
-		return nil, fmt.Errorf("client chain id %s does not match config chain id %s", chainId, id)
-	}
+	client = sdk.NewValidatedCombinedClient(client, idNum)
 
 	txmgr := txm.New(lggr, keystore, client, txm.TronTxmConfig{
 		// TODO: stop changing uint64 fields here to uint?
