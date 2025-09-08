@@ -135,6 +135,10 @@ func (c *validatedCombinedClient) validate() error {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	
+	if c.done { // double check since we re-locked
+		return c.err
+	}
 
 	// check client chain id matches config chain id
 	blockInfo, err := c.orig.GetBlockByNum(0)
