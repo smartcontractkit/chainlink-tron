@@ -60,6 +60,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
+	lggr.Infow("Using node config in chainlink-tron.relayer.plugin.NewRelayer", "nodeConfig", nodeConfig)
 	client, err := sdk.CreateCombinedClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
