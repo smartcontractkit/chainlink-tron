@@ -102,27 +102,39 @@ func (t *TronTxm) GetClient() sdk.CombinedClient {
 	return t.Client
 }
 
+// func (t *TronTxm) Start(ctx context.Context) error {
+// 	return t.Starter.StartOnce("TronTxm", func() error {
+// 		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
+// 		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
+		
+// 		// Create a context that will be cancelled when the parent context is cancelled
+// 		// This ensures loops can detect when the plugin should shut down
+// 		// loopCtx, cancel := context.WithCancel(ctx)
+// 		stopCtx, _ := utils.ContextFromChan(t.Stop) // context that ends when t.Stop is closed
+// 		ctx, cancel := context.WithCancel(stopCtx)   // context you’ll pass to loops + RPCs
+// 		go func() {
+// 			// <-ctx.Done()
+// 			// t.Logger.Infow("Parent context cancelled, shutting down TXM loops")
+// 			// close(t.Stop)
+// 			<-stopCtx.Done() // wait until stopCtx is canceled (i.e., t.Stop closed)
+// 			cancel()
+// 		}()
+		
+// 		go t.broadcastLoopWithContext(ctx)
+// 		go t.confirmLoopWithContext(ctx)
+// 		go t.reapLoopWithContext(ctx)
+
+// 		return nil
+// 	})
+// }
+
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
-		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
 		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
-		
-		// Create a context that will be cancelled when the parent context is cancelled
-		// This ensures loops can detect when the plugin should shut down
-		// loopCtx, cancel := context.WithCancel(ctx)
-		stopCtx, _ := utils.ContextFromChan(t.Stop) // context that ends when t.Stop is closed
-		ctx, cancel := context.WithCancel(stopCtx)   // context you’ll pass to loops + RPCs
-		go func() {
-			// <-ctx.Done()
-			// t.Logger.Infow("Parent context cancelled, shutting down TXM loops")
-			// close(t.Stop)
-			<-stopCtx.Done() // wait until stopCtx is canceled (i.e., t.Stop closed)
-			cancel()
-		}()
-		
-		go t.broadcastLoopWithContext(ctx)
-		go t.confirmLoopWithContext(ctx)
-		go t.reapLoopWithContext(ctx)
+		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
+		go t.broadcastLoop()
+		go t.confirmLoop()
+		go t.reapLoop()
 
 		return nil
 	})
