@@ -131,6 +131,11 @@ func (k keystore) Sign(ctx context.Context, id string, hash []byte) ([]byte, err
 	return nil, nil
 }
 
+func (k keystore) Decrypt(ctx context.Context, id string, hash []byte) ([]byte, error) {
+	// No Op
+	return nil, nil
+}
+
 type MockSolidityGRPCClient struct {
 	GetAccountBalanceFunc func(accountAddress address.Address) (int64, error)
 }
