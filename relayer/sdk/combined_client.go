@@ -135,7 +135,7 @@ func (c *validatedCombinedClient) validate() error {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.done { // double check since we re-locked
 		return c.err
 	}
@@ -206,7 +206,7 @@ func (c *validatedCombinedClient) DeployContract(ownerAddress address.Address, c
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
-	return c.DeployContract(ownerAddress, contractName, abiJson, bytecode, oeLimit, curPercent, feeLimit, params)
+	return c.orig.DeployContract(ownerAddress, contractName, abiJson, bytecode, oeLimit, curPercent, feeLimit, params)
 }
 
 func (c *validatedCombinedClient) GetContract(address address.Address) (*fullnode.GetContractResponse, error) {
@@ -279,6 +279,8 @@ func (c *validatedCombinedClient) GetTransactionInfoByIdFullNode(txhash string) 
 	return c.orig.GetTransactionInfoByIdFullNode(txhash)
 }
 
-func (c *validatedCombinedClient) FullNodeClient() *fullnode.Client { return c.FullNodeClient() }
+func (c *validatedCombinedClient) FullNodeClient() *fullnode.Client { return c.orig.FullNodeClient() }
 
-func (c *validatedCombinedClient) SolidityClient() *soliditynode.Client { return c.SolidityClient() }
+func (c *validatedCombinedClient) SolidityClient() *soliditynode.Client {
+	return c.orig.SolidityClient()
+}
