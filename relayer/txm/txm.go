@@ -528,7 +528,6 @@ func (t *TronTxm) maybeRetry(unconfirmedTx *InflightTx, bumpEnergy bool, isOutOf
 }
 
 func (t *TronTxm) checkFinalized() {
-	startTime := time.Now()
 	allConfirmed := t.AccountStore.GetAllConfirmed()
 	
 	for acc, confirmedTxs := range allConfirmed {
@@ -561,12 +560,6 @@ func (t *TronTxm) checkFinalized() {
 			}
 		}
 	}
-	
-	duration := time.Since(startTime)
-	t.Logger.Debugw("checkFinalized completed", 
-		"duration_ms", duration.Milliseconds(),
-		"total_tx_count", len(allConfirmed),
-		)
 }
 
 func (t *TronTxm) reapLoop() {
