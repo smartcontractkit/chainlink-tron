@@ -1,4 +1,4 @@
-package plugin
+package config
 
 import (
 	"errors"
@@ -11,7 +11,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -118,10 +117,14 @@ type TOMLConfig struct {
 	Nodes NodeConfigs
 }
 
-var _ ocr2.Config = (*TOMLConfig)(nil)
-
 func (c *TOMLConfig) IsEnabled() bool {
 	return c.Enabled == nil || *c.Enabled
+}
+
+func (c *TOMLConfig) SetDefaults() {
+	def := Defaults()
+	def.SetFrom(c)
+	*c = def
 }
 
 func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
@@ -187,7 +190,7 @@ func (c *TOMLConfig) TOMLString() (string, error) {
 }
 
 func (c *TOMLConfig) BalancePollPeriod() time.Duration {
-	return *c.ChainConfig.BalancePollPeriod
+	return c.ChainConfig.BalancePollPeriod.Duration()
 }
 
 func (c *TOMLConfig) BroadcastChanSize() uint64 {
@@ -203,23 +206,19 @@ func (c *TOMLConfig) ListNodes() NodeConfigs {
 }
 
 func (c *TOMLConfig) OCR2CachePollPeriod() time.Duration {
-	return *c.ChainConfig.OCR2CachePollPeriod
+	return c.ChainConfig.OCR2CachePollPeriod.Duration()
 }
 
 func (c *TOMLConfig) OCR2CacheTTL() time.Duration {
-	return *c.ChainConfig.OCR2CacheTTL
+	return c.ChainConfig.OCR2CacheTTL.Duration()
 }
 
 func (c *TOMLConfig) RetentionPeriod() time.Duration {
-	return *c.ChainConfig.RetentionPeriod
+	return c.ChainConfig.RetentionPeriod.Duration()
 }
 
 func (c *TOMLConfig) ReapInterval() time.Duration {
-	return *c.ChainConfig.ReapInterval
-}
-
-func (c *TOMLConfig) SetDefaults() {
-	c.ChainConfig.SetDefaults()
+	return c.ChainConfig.ReapInterval.Duration()
 }
 
 func NewDefault() *TOMLConfig {

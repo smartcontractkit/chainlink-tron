@@ -1,0 +1,6 @@
+ChainID = '<id>'
+
+[[Tron.Nodes]]
+Name = 'primary'
+URL = '<full node http url>'
+SolidityURL = '<solidity http url>'

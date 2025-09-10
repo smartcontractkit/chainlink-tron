@@ -1,0 +1,26 @@
+# ChainID is the Tron chain ID.
+ChainID = 'foobar' # Example
+# Enabled enables this chain.
+Enabled = true # Default
+# BalancePollPeriod is the poll period for balance monitoring
+BalancePollPeriod = '5s' # Default
+# BroadcastChanSize is the transaction broadcast channel size
+BroadcastChanSize = 4096 # Default
+# ConfirmPollPeriod is the polling period for transaction confirmation
+ConfirmPollPeriod = '500ms' # Default
+# OCR2CachePollPeriod is the polling period for OCR2 contract cache
+OCR2CachePollPeriod = '5s' # Default
+# OCR2CacheTTL is the time to live for OCR2 contract cache
+OCR2CacheTTL = '1m' # Default
+# RetentionPeriod is the time for the tx manager to retain txes.
+RetentionPeriod = 0 # Default
+# ReapInterval is how often the tx manager cleans up old txes.
+ReapInterval = '1m' # Default
+
+[[Nodes]]
+# Name is a unique (per-chain) identifier for this node.
+Name = 'primary' # Example
+# URL is the full node HTTP endpoint for this node.
+URL = 'https://api.trongrid.io/wallet' # Example
+# SolidityURL is the solidity node HTTP endpoint for this node.
+SolidityURL = 'http://api.trongrid.io/wallet' # Example
