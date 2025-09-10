@@ -1,4 +1,4 @@
-package plugin
+package config
 
 import (
 	"errors"
@@ -11,7 +11,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 )
 
 type TOMLConfigs []*TOMLConfig
@@ -118,10 +117,14 @@ type TOMLConfig struct {
 	Nodes NodeConfigs
 }
 
-var _ ocr2.Config = (*TOMLConfig)(nil)
-
 func (c *TOMLConfig) IsEnabled() bool {
 	return c.Enabled == nil || *c.Enabled
+}
+
+func (c *TOMLConfig) SetDefaults() {
+	def := Defaults()
+	def.SetFrom(c)
+	*c = def
 }
 
 func (c *TOMLConfig) SetFrom(f *TOMLConfig) {
@@ -216,10 +219,6 @@ func (c *TOMLConfig) RetentionPeriod() time.Duration {
 
 func (c *TOMLConfig) ReapInterval() time.Duration {
 	return c.ChainConfig.ReapInterval.Duration()
-}
-
-func (c *TOMLConfig) SetDefaults() {
-	c.ChainConfig.SetDefaults()
 }
 
 func NewDefault() *TOMLConfig {

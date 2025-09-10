@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink-tron/relayer/config"
 
 	tronplugin "github.com/smartcontractkit/chainlink-tron/relayer/plugin"
 )
@@ -30,48 +31,20 @@ func main() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	// Add connection monitoring to detect when gRPC connection is lost
-	// connLostCh := make(chan struct{})
-	
-	// // Monitor for connection loss and trigger cleanup
-	// go func() {
-	// 	select {
-	// 	case <-connLostCh:
-	// 		s.Logger.Infow("gRPC connection lost, triggering plugin cleanup")
-	// 		s.Logger.ErrorIfFn(p.Close, "Failed to close plugin on connection loss")
-	// 	case <-stopCh:
-	// 		// Normal shutdown, no need to trigger cleanup
-	// 	}
-	// }()
-
-	// Start the plugin server in a goroutine so we can monitor it
-	// serverDone := make(chan struct{})
-	// go func() {
-	// 	defer close(serverDone)
-		plugin.Serve(&plugin.ServeConfig{
-			HandshakeConfig: loop.PluginRelayerHandshakeConfig(),
-			Plugins: map[string]plugin.Plugin{
-				loop.PluginRelayerName: &loop.GRPCPluginRelayer{
-					PluginServer: p,
-					BrokerConfig: loop.BrokerConfig{
-						StopCh:   stopCh,
-						Logger:   s.Logger,
-						GRPCOpts: s.GRPCOpts,
-					},
+	plugin.Serve(&plugin.ServeConfig{
+		HandshakeConfig: loop.PluginRelayerHandshakeConfig(),
+		Plugins: map[string]plugin.Plugin{
+			loop.PluginRelayerName: &loop.GRPCPluginRelayer{
+				PluginServer: p,
+				BrokerConfig: loop.BrokerConfig{
+					StopCh:   stopCh,
+					Logger:   s.Logger,
+					GRPCOpts: s.GRPCOpts,
 				},
 			},
-			GRPCServer: s.GRPCOpts.NewServer,
-		})
-	// }()
-
-	// // Monitor the server - if it exits unexpectedly, it means connection was lost
-	// select {
-	// case <-serverDone:
-	// 	s.Logger.Infow("Plugin server exited, connection likely lost")
-	// 	close(connLostCh)
-	// case <-stopCh:
-	// 	s.Logger.Infow("Stop channel closed, normal shutdown")
-	// }
+		},
+		GRPCServer: s.GRPCOpts.NewServer,
+	})
 }
 
 type pluginRelayer struct {
@@ -80,15 +53,15 @@ type pluginRelayer struct {
 
 var _ loop.PluginRelayer = &pluginRelayer{}
 
-func (c *pluginRelayer) NewRelayer(ctx context.Context, config string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
+func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
 	c.Logger.Infow("Creating new TronRelayer instance")
-	d := toml.NewDecoder(strings.NewReader(config))
+	d := toml.NewDecoder(strings.NewReader(configTOML))
 	d.DisallowUnknownFields()
 
-	var cfg tronplugin.TOMLConfig
+	var cfg config.TOMLConfig
 
 	if err := d.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, config)
+		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, configTOML)
 	}
 
 	if err := cfg.ValidateConfig(); err != nil {

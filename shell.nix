@@ -15,7 +15,7 @@ pkgs.mkShell {
       delve
       golangci-lint
       gotools
-      go-mockery
+      go-mockery_2
 
       # Extra tools
       git
