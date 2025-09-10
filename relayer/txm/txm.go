@@ -577,77 +577,6 @@ func (t *TronTxm) checkFinalized() {
 func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
-	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t))
-	defer ticker.Stop()
-	
-	// Get initial CPU stats
-	var startCPU runtime.MemStats
-	runtime.ReadMemStats(&startCPU)
-	startTime := time.Now()
-	
-	for {
-		select {
-		case <-ticker.C:
-			loopStartTime := time.Now()
-			var loopStartCPU runtime.MemStats
-			runtime.ReadMemStats(&loopStartCPU)
-			
-			t.Logger.Debugw("reapLoop: reaping finished transactions", "instance_pointer", fmt.Sprintf("%p", t))
-			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
-			allFinished := t.AccountStore.GetAllFinished()
-			accountTxIds := make(map[string][]string)
-
-			for acc, finishedTxs := range allFinished {
-				t.Logger.Debugw("reapLoop: processing account", "account", acc, "tx_count", len(finishedTxs))
-				var idsToDelete []string
-				for _, ft := range finishedTxs {
-					if ft.RetentionTs.Before(cutoff) {
-						t.Logger.Debugw("reapLoop: deleting finished transaction", "txID", ft.Tx.ID)
-						idsToDelete = append(idsToDelete, ft.Tx.ID)
-					}
-				}
-				if len(idsToDelete) > 0 {
-					t.Logger.Debugw("reapLoop: adding account to delete", "account", acc, "tx_count", len(idsToDelete))
-					accountTxIds[acc] = idsToDelete
-				}
-			}
-
-			reapCount := 0
-			if len(accountTxIds) > 0 {
-				t.Logger.Debugw("reapLoop: deleting finished transactions", "account_count", len(accountTxIds))
-				reapCount = t.AccountStore.DeleteAllFinishedTxs(accountTxIds)
-				if reapCount > 0 {
-					t.Logger.Debugw("reapLoop: reaped finished transactions", "count", reapCount)
-				}
-			}
-			
-			// Calculate CPU and memory stats
-			loopDuration := time.Since(loopStartTime)
-			var loopEndCPU runtime.MemStats
-			runtime.ReadMemStats(&loopEndCPU)
-			
-			totalDuration := time.Since(startTime)
-			totalAllocs := loopEndCPU.TotalAlloc - startCPU.TotalAlloc
-			loopAllocs := loopEndCPU.TotalAlloc - loopStartCPU.TotalAlloc
-			
-			t.Logger.Debugw("reapLoop: completed", 
-				"duration_ms", loopDuration.Milliseconds(),
-				"total_duration_ms", totalDuration.Milliseconds(),
-				"reap_count", reapCount,
-				"account_count", len(allFinished),
-				"total_allocations", totalAllocs,
-				"loop_allocations", loopAllocs,
-				"memory_heap_mb", loopEndCPU.HeapAlloc / 1024 / 1024)
-		case <-t.Stop:
-			t.Logger.Debugw("reapLoop: stopped")
-			return
-		}
-	}
-}
-
-func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
-	defer t.Done.Done()
-	ticker := time.NewTicker(t.Config.ReapInterval)
 	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
 	defer ticker.Stop()
 	
@@ -709,11 +638,8 @@ func (t *TronTxm) reapLoopWithContext(ctx context.Context) {
 				"total_allocations", totalAllocs,
 				"loop_allocations", loopAllocs,
 				"memory_heap_mb", loopEndCPU.HeapAlloc / 1024 / 1024)
-		// case <-t.Stop:
-		// 	t.Logger.Debugw("reapLoop: stopped")
-		// 	return
-		case <-ctx.Done():
-			t.Logger.Debugw("reapLoop: stopped due to context cancellation")
+		case <-t.Stop:
+			t.Logger.Debugw("reapLoop: stopped")
 			return
 		}
 	}
