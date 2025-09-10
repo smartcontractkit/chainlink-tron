@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
@@ -62,6 +63,7 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
+	lggr.Infow("Using node config in chainlink-tron.relayer.plugin.NewRelayer", "nodeConfig", nodeConfig)
 	client, err := sdk.CreateCombinedClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
@@ -77,6 +79,7 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 		RetentionPeriod:   cfg.RetentionPeriod(),
 		ReapInterval:      cfg.ReapInterval(),
 	})
+	lggr.Infow("TronTxm instance created", "chainID", id, "instance_pointer", fmt.Sprintf("%p", txmgr), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
 		return client.SolidityClient(), nil

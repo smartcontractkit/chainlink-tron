@@ -76,6 +76,7 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keyst
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relayer: %w", err)
 	}
+	c.Logger.Infow("NewRelayer returned", "relayer", relayer, "instance_pointer", fmt.Sprintf("%p", relayer))
 
 	c.SubService(relayer)
 

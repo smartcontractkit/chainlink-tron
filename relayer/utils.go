@@ -30,6 +30,15 @@ func PublicKeyToTronAddress(pubKey string) (address.Address, error) {
 		return nil, fmt.Errorf("public key cannot be empty")
 	}
 
+	// already a tron address
+	if pubKey[0] == 'T' {
+		addr, err := address.StringToAddress(pubKey)
+		if err != nil {
+			return nil, err
+		}
+		return addr, nil
+	}
+
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return nil, err

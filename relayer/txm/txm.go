@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -100,6 +101,7 @@ func (t *TronTxm) GetClient() sdk.CombinedClient {
 func (t *TronTxm) Start(ctx context.Context) error {
 	return t.Starter.StartOnce("TronTxm", func() error {
 		t.Done.Add(3) // waitgroup: broadcast loop, confirm loop, and reap loop
+		t.Logger.Infow("TronTxm Start called - starting loops", "instance_pointer", fmt.Sprintf("%p", t))
 		go t.broadcastLoop()
 		go t.confirmLoop()
 		go t.reapLoop()
@@ -476,13 +478,15 @@ func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
 	defer ticker.Stop()
+	t.Logger.Infow("reapLoop: started with interval", "interval", t.Config.ReapInterval, "instance_pointer", fmt.Sprintf("%p", t), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
+
 	for {
 		select {
 		case <-ticker.C:
+			t.Logger.Debugw("reapLoop: reaping finished transactions", "instance_pointer", fmt.Sprintf("%p", t), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
 			cutoff := time.Now().Add(-t.Config.RetentionPeriod)
 			allFinished := t.AccountStore.GetAllFinished()
 			accountTxIds := make(map[string][]string)
-
 			for acc, finishedTxs := range allFinished {
 				var idsToDelete []string
 				for _, ft := range finishedTxs {
