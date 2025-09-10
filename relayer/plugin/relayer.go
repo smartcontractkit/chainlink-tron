@@ -26,6 +26,7 @@ import (
 )
 
 type TronRelayer struct {
+	types.UnimplementedRelayer
 	services.StateMachine
 
 	chainId    string
@@ -105,7 +106,6 @@ func (t *TronRelayer) Start(ctx context.Context) error {
 		return ms.Start(ctx, t.txm, t.balanceMonitor)
 	})
 }
-
 func (t *TronRelayer) Close() error {
 	return t.StopOnce("TronRelayer", func() error {
 		t.lggr.Debug("Stopping")
@@ -148,10 +148,6 @@ func (t *TronRelayer) ListNodeStatuses(ctx context.Context, pageSize int32, page
 	return chains.ListNodeStatuses(int(pageSize), pageToken, t.listNodeStatuses)
 }
 
-func (t *TronRelayer) Transact(ctx context.Context, from, to string, amount *big.Int, balanceCheck bool) error {
-	return errors.New("TODO")
-}
-
 func (t *TronRelayer) listNodeStatuses(start, end int) ([]types.NodeStatus, int, error) {
 	stats := make([]types.NodeStatus, 0)
 	total := len(t.cfg.Nodes)
@@ -185,15 +181,6 @@ func nodeStatus(n *NodeConfig, id string) (types.NodeStatus, error) {
 	return s, nil
 }
 
-// Relayer interface
-func (t *TronRelayer) NewContractWriter(_ context.Context, _ []byte) (types.ContractWriter, error) {
-	return nil, errors.New("not supported")
-}
-
-func (t *TronRelayer) NewContractReader(ctx context.Context, contractReaderConfig []byte) (types.ContractReader, error) {
-	return nil, errors.New("not supported")
-}
-
 func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArgs) (types.ConfigProvider, error) {
 	// todo: unmarshal args.RelayConfig into a struct if required
 	reader := reader.NewReader(t.client, t.lggr)
@@ -213,10 +200,6 @@ func (t *TronRelayer) NewConfigProvider(ctx context.Context, args types.RelayArg
 func (t *TronRelayer) NewPluginProvider(ctx context.Context, relayargs types.RelayArgs, pluginargs types.PluginArgs) (types.PluginProvider, error) {
 	// TODO: is this necessary? should we just return an error?
 	return t.NewMedianProvider(ctx, relayargs, pluginargs)
-}
-
-func (t *TronRelayer) NewLLOProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.LLOProvider, error) {
-	return nil, errors.New("TODO")
 }
 
 // implement MedianProvider type from github.com/smartcontractkit/chainlink-common/pkg/loop/internal/types
@@ -245,46 +228,6 @@ func (t *TronRelayer) NewMedianProvider(ctx context.Context, relayargs types.Rel
 	return medianProvider, nil
 }
 
-func (t *TronRelayer) LatestHead(ctx context.Context) (types.Head, error) {
-	return types.Head{}, errors.New("TODO")
-}
-
-func (t *TronRelayer) Replay(ctx context.Context, fromBlock string, args map[string]any) error {
-	return errors.New("TODO")
-}
-
-func (r *TronRelayer) NewFunctionsProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.FunctionsProvider, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) NewAutomationProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.AutomationProvider, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) NewMercuryProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.MercuryProvider, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) NewCCIPCommitProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.CCIPCommitProvider, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) NewCCIPExecProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.CCIPExecProvider, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) NewOCR3CapabilityProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.OCR3CapabilityProvider, error) {
-	return nil, errors.New("ocr3 capability provider is not supported for solana")
-}
-
-func (r *TronRelayer) EVM() (types.EVMService, error) {
-	return nil, errors.New("unimplemented")
-}
-
-func (r *TronRelayer) TON() (types.TONService, error) {
-	return nil, errors.New("unimplemented")
-}
-
 func (r *TronRelayer) GetChainInfo(ctx context.Context) (types.ChainInfo, error) {
 	networkName, err := chainselectors.TronNameFromChainId(r.chainIdNum.Uint64())
 	if err != nil {
@@ -302,8 +245,4 @@ func (r *TronRelayer) GetChainInfo(ctx context.Context) (types.ChainInfo, error)
 		NetworkName:     envName,
 		NetworkNameFull: networkName,
 	}, nil
-}
-
-func (r *TronRelayer) NewCCIPProvider(ctx context.Context, rargs types.RelayArgs) (types.CCIPProvider, error) {
-	return nil, errors.New("unimplemented")
 }
