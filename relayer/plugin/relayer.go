@@ -67,7 +67,7 @@ func NewRelayer(cfg *TOMLConfig, lggr logger.Logger, keystore core.Keystore) (*T
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
 	}
 
-	// client = sdk.NewValidatedCombinedClient(client, idNum)
+	client = sdk.NewValidatedCombinedClient(client, idNum)
 
 	txmgr := txm.New(lggr, keystore, client, txm.TronTxmConfig{
 		// TODO: stop changing uint64 fields here to uint?

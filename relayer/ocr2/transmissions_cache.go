@@ -133,7 +133,7 @@ func (c *transmissionsCache) Start() error {
 
 func (c *transmissionsCache) Close() error {
 	close(c.stop)
-	// <-c.done
+	<-c.done
 	return nil
 }
 
