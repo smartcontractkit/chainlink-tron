@@ -64,6 +64,14 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
 	lggr.Infow("Using node config in chainlink-tron.relayer.plugin.NewRelayer", "nodeConfig", nodeConfig)
+	if nodeConfig.URL == nil || nodeConfig.SolidityURL == nil {
+		lggr.Errorw("node config has no URL or SolidityURL", "nodeConfig", nodeConfig)
+		return nil, fmt.Errorf("node config has no URL or SolidityURL")
+	}
+	if nodeConfig.URL.URL() == nil || nodeConfig.SolidityURL.URL() == nil {
+		lggr.Errorw("node config has no URL or SolidityURL", "nodeConfig", nodeConfig)
+		return nil, fmt.Errorf("node config has no URL or SolidityURL")
+	}
 	client, err := sdk.CreateCombinedClient(nodeConfig.URL.URL(), nodeConfig.SolidityURL.URL())
 	if err != nil {
 		return nil, fmt.Errorf("error in NewConfigProvider chain.Reader: %w", err)
