@@ -39,6 +39,7 @@ type NodeConfig struct {
 }
 
 func (n *NodeConfig) ValidateConfig() error {
+	log.Println("nodeConfig in ValidateConfig", n)
 	var err error
 	if n.Name == nil {
 		err = errors.Join(err, config.ErrMissing{Name: "Name", Msg: "required for all nodes"})

@@ -54,6 +54,7 @@ type pluginRelayer struct {
 var _ loop.PluginRelayer = &pluginRelayer{}
 
 func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keystore, csaKeystore core.Keystore, capabilityRegistry core.CapabilitiesRegistry) (loop.Relayer, error) {
+	c.Logger.Infow("configToml", "configToml", configTOML)
 	d := toml.NewDecoder(strings.NewReader(configTOML))
 	d.DisallowUnknownFields()
 
@@ -62,6 +63,8 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keyst
 	if err := d.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode config toml: %w:\n\t%s", err, configTOML)
 	}
+
+	c.Logger.Infow("Decoded toml", "decodedToml", cfg)
 
 	if err := cfg.ValidateConfig(); err != nil {
 		return nil, fmt.Errorf("invalid tron config: %w", err)
