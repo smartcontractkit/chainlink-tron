@@ -61,8 +61,13 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 
 	nodeConfig, err := cfg.ListNodes().SelectRandom()
 	if err != nil {
+		lggr.Errorw("failed to get node config", "err", err)
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
+	lggr.Infow("Using node config via random selection", "nodeConfig", nodeConfig)
+	nodeConfig = cfg.ListNodes()[0]
+	lggr.Infow("Using node config via first index", "nodeConfig", nodeConfig)
+	
 	lggr.Infow("Using node config in chainlink-tron.relayer.plugin.NewRelayer", "nodeConfig", nodeConfig)
 	if nodeConfig.URL == nil || nodeConfig.SolidityURL == nil {
 		lggr.Errorw("node config has no URL or SolidityURL", "nodeConfig", nodeConfig)
