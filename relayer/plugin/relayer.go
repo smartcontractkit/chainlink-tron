@@ -59,14 +59,15 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 		return nil, fmt.Errorf("couldn't parse chain id %s", id)
 	}
 
+	allNodeConfigs := cfg.ListNodes()
+	lggr.Infow("All node configs", "allNodeConfigs", allNodeConfigs)
+	
 	nodeConfig, err := cfg.ListNodes().SelectRandom()
 	if err != nil {
 		lggr.Errorw("failed to get node config", "err", err)
 		return nil, fmt.Errorf("failed to get node config: %w", err)
 	}
 	lggr.Infow("Using node config via random selection", "nodeConfig", nodeConfig)
-	nodeConfig = cfg.ListNodes()[0]
-	lggr.Infow("Using node config via first index", "nodeConfig", nodeConfig)
 	
 	lggr.Infow("Using node config in chainlink-tron.relayer.plugin.NewRelayer", "nodeConfig", nodeConfig)
 	if nodeConfig.URL == nil || nodeConfig.SolidityURL == nil {
