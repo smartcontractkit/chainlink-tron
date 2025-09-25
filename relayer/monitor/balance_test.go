@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-tron/relayer"
 	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
@@ -29,7 +30,7 @@ func TestBalanceMonitor(t *testing.T) {
 		pubKeyHex := generatePublicKeyHex()
 		addr, err := relayer.PublicKeyToTronAddress(pubKeyHex)
 		assert.NoError(t, err)
-		ks = append(ks, pubKeyHex)
+		ks.keys = append(ks.keys, pubKeyHex)
 		accounts = append(accounts, addr)
 	}
 
@@ -56,7 +57,7 @@ func TestBalanceMonitor(t *testing.T) {
 		return 0, fmt.Errorf("address not found")
 	}
 	cfg := &config{balancePollPeriod: time.Second}
-	b := newBalanceMonitor(chainID, cfg, logger.Test(t), ks, func() (BalanceClient, error) {
+	b := newBalanceMonitor(chainID, cfg, logger.Test(t), &ks, func() (BalanceClient, error) {
 		return mockClient, nil
 	})
 	var got []update
@@ -116,11 +117,14 @@ func (c *config) BalancePollPeriod() time.Duration {
 	return c.balancePollPeriod
 }
 
-type keystore []string
+type keystore struct {
+	core.UnimplementedKeystore
+	keys []string
+}
 
 func (k keystore) Accounts(ctx context.Context) ([]string, error) {
 	ks := []string{}
-	for _, acc := range k {
+	for _, acc := range k.keys {
 		ks = append(ks, acc)
 	}
 	return ks, nil
