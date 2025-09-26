@@ -92,11 +92,11 @@ func (ns NodeConfigs) SelectRandom() (*NodeConfig, error) {
 	}
 
 	index := rand.Perm(len(ns))
-	if index[0] == 0 {
-		// somehow first node was empty
-		// allNodeConfigs":[{"Name":"","SolidityURL":"","URL":""},{"Name":"primary_simplystaking"...}]
-		index[0] = 1
-	}
+	// if index[0] == 0 {
+	// 	// somehow first node was empty
+	// 	// allNodeConfigs":[{"Name":"","SolidityURL":"","URL":""},{"Name":"primary_simplystaking"...}]
+	// 	index[0] = 1
+	// }
 	node := ns[index[0]]
 
 	return node, nil
