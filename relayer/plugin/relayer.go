@@ -78,7 +78,7 @@ func NewRelayer(cfg *config.TOMLConfig, lggr logger.Logger, keystore core.Keysto
 		RetentionPeriod:   cfg.RetentionPeriod(),
 		ReapInterval:      cfg.ReapInterval(),
 	})
-	lggr.Infow("TronTxm instance created", "chainID", id, "instance_pointer", fmt.Sprintf("%p", txmgr), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
+	lggr.Debugw("TronTxm instance created", "chainID", id, "instance_pointer", fmt.Sprintf("%p", txmgr), "relayer_pid", os.Getpid(), "core_pid", os.Getppid())
 
 	balanceMonitor := monitor.NewBalanceMonitor(id, cfg, lggr, keystore, func() (monitor.BalanceClient, error) {
 		return client.SolidityClient(), nil
