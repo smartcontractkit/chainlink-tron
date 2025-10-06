@@ -30,9 +30,16 @@ func PublicKeyToTronAddress(pubKey string) (address.Address, error) {
 		return nil, fmt.Errorf("public key cannot be empty")
 	}
 
+	// Try Base58 first
+	addr, err := address.StringToAddress(pubKey)
+	if err == nil {
+		return addr, nil
+	}
+
+	// Otherwise, treat as pubkey
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid pubkey: %w", err)
 	}
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(pubKeyBytes[1:]) // remove the 0x04 format identifier prefix
