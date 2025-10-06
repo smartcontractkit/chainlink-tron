@@ -476,7 +476,6 @@ func (t *TronTxm) reapLoop() {
 	defer t.Done.Done()
 	ticker := time.NewTicker(t.Config.ReapInterval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ticker.C:

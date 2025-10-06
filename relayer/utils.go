@@ -25,19 +25,19 @@ func ByteArrayToStr(b [][]byte) string {
 	return str[:len(str)-1] + "]"
 }
 
-func ParseTronAddress(input string) (address.Address, error) {
-	if input == "" {
-		return nil, fmt.Errorf("input cannot be empty")
+func PublicKeyToTronAddress(pubKey string) (address.Address, error) {
+	if pubKey == "" {
+		return nil, fmt.Errorf("public key cannot be empty")
 	}
 
 	// Try Base58 first
-	addr, err := address.StringToAddress(input)
+	addr, err := address.StringToAddress(pubKey)
 	if err == nil {
 		return addr, nil
 	}
 
 	// Otherwise, treat as pubkey
-	pubKeyBytes, err := hex.DecodeString(input)
+	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pubkey: %w", err)
 	}
