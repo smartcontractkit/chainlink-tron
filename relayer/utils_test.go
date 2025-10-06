@@ -3,6 +3,7 @@ package relayer_test
 import (
 	"testing"
 
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
 	"github.com/stretchr/testify/require"
 
@@ -94,4 +95,50 @@ func TestByteArrToStr(t *testing.T) {
 	}
 	str := relayer.ByteArrayToStr(b)
 	require.Equal(t, "[0x010203,0x040506]", str)
+}
+
+func TestPublicKeyToTronAddress(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		expectErr  bool
+		verifyFunc func(addr address.Address) bool
+	}{
+		{
+			name:      "empty public key",
+			input:     "",
+			expectErr: true,
+		},
+		{
+			name:      "invalid hex public key",
+			input:     "ZZZ123",
+			expectErr: true,
+		},
+		{
+			name:      "valid tron base58 address",
+			input:     "TRvVjWF1XHh2Tw5rVcRvrc9ZwDtWGqBp9v", // any valid address
+			expectErr: false,
+			verifyFunc: func(addr address.Address) bool {
+				return addr.String() == "TRvVjWF1XHh2Tw5rVcRvrc9ZwDtWGqBp9v"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			addr, err := relayer.ParseTronAddress(tt.input)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, addr)
+
+			if tt.verifyFunc != nil {
+				require.True(t, tt.verifyFunc(addr), "unexpected address result: %s", addr.String())
+			}
+		})
+	}
 }

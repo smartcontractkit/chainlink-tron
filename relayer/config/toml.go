@@ -169,7 +169,7 @@ func (c *TOMLConfig) ValidateConfig() error {
 	} else if *c.ChainID == "" {
 		err = errors.Join(err, config.ErrEmpty{Name: "ChainID", Msg: "required for all chains"})
 	}
-	
+
 	if len(c.Nodes) == 0 {
 		err = errors.Join(err, config.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	} else {

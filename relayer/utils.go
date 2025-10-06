@@ -25,26 +25,24 @@ func ByteArrayToStr(b [][]byte) string {
 	return str[:len(str)-1] + "]"
 }
 
-func PublicKeyToTronAddress(pubKey string) (address.Address, error) {
-	if pubKey == "" {
-		return nil, fmt.Errorf("public key cannot be empty")
+func ParseTronAddress(input string) (address.Address, error) {
+	if input == "" {
+		return nil, fmt.Errorf("input cannot be empty")
 	}
 
-	// already a tron address
-	if pubKey[0] == 'T' {
-		addr, err := address.StringToAddress(pubKey)
-		if err != nil {
-			return nil, err
-		}
+	// Try Base58 first
+	addr, err := address.StringToAddress(input)
+	if err == nil {
 		return addr, nil
 	}
 
-	pubKeyBytes, err := hex.DecodeString(pubKey)
+	// Otherwise, treat as pubkey
+	pubKeyBytes, err := hex.DecodeString(input)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid pubkey: %w", err)
 	}
 	hash := sha3.NewLegacyKeccak256()
-	hash.Write(pubKeyBytes[1:]) // remove the 0x04 format identifier prefix
+	hash.Write(pubKeyBytes[1:])
 	hashed := hash.Sum(nil)
 	addressBytes := hashed[len(hashed)-20:]
 	tronHexAddress := "41" + hex.EncodeToString(addressBytes)
