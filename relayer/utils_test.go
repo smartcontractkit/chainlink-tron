@@ -3,8 +3,8 @@ package relayer_test
 import (
 	"testing"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer"

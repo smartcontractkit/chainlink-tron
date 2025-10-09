@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 // this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to
 // recreate the key if it doesn't start with a 0 prefix and can take significantly longer.
 // the function we need is keystore.newKey which is unfortunately private.
-// ref: https://github.com/fbsobreira/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
+// ref: https://github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/blob/1e824406fe8ce02f2fec4c96629d122560a3598f/pkg/keystore/key.go#L146
 
 type TestKey struct {
 	ID uuid.UUID // Version 4 "random" for unique id not derived from key data

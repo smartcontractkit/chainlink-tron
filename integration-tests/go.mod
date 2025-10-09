@@ -4,13 +4,13 @@ go 1.24.5
 
 require (
 	github.com/ethereum/go-ethereum v1.16.2
-	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/rs/zerolog v1.33.0
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250925164243-ae45911b332e
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335
+	github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.6
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250904200054-728267c473f1
 	github.com/smartcontractkit/chainlink/v2 v2.26.0-debug-tracing.0.20250904200054-728267c473f1
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
@@ -246,6 +246,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
+	github.com/shengdoushi/base58 v1.0.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
@@ -362,11 +363,11 @@ require (
 )
 
 replace (
-	// original author is not maintaining the repo anymore
-	github.com/fbsobreira/gotron-sdk => ../relayer/gotron-sdk
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
 	// using the most updated relayer version
 	github.com/smartcontractkit/chainlink-tron/relayer => ../relayer
+	// original author is not maintaining the repo anymore
+	github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk => ../relayer/gotron-sdk
 )

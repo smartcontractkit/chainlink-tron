@@ -3,8 +3,8 @@ package monitor
 import (
 	"testing"
 
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	tronaddress "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

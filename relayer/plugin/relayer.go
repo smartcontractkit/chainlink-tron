@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 

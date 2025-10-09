@@ -4,7 +4,6 @@ go 1.24.5
 
 require (
 	github.com/ethereum/go-ethereum v1.15.3
-	github.com/fbsobreira/gotron-sdk v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/pelletier/go-toml/v2 v2.2.4
@@ -12,6 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/smartcontractkit/chain-selectors v1.0.67
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250925164243-ae45911b332e
+	github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.6
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
@@ -146,6 +146,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
-
-// original author is not maintaining the repo anymore
-replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.4

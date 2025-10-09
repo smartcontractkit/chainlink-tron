@@ -1,9 +1,9 @@
 package monitor
 
 import (
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	tronaddress "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 var promTronBalance = promauto.NewGaugeVec(

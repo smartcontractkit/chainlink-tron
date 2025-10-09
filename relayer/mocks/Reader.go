@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	address "github.com/fbsobreira/gotron-sdk/pkg/address"
+	address "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 	mock "github.com/stretchr/testify/mock"
 
 	sdk "github.com/smartcontractkit/chainlink-tron/relayer/sdk"
