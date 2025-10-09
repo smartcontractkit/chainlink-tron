@@ -10,7 +10,7 @@ import (
 
 	eCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fbsobreira/gotron-sdk/pkg/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/common"
 )
 
 const (

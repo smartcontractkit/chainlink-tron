@@ -3,7 +3,7 @@ package soliditynode
 import (
 	"errors"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
 )
 
 type BlockHeaderRaw struct {

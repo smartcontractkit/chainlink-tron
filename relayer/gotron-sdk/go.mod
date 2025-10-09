@@ -1,4 +1,4 @@
-module github.com/fbsobreira/gotron-sdk
+module github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk
 
 go 1.23.3
 

@@ -1,7 +1,7 @@
 package soliditynode
 
 import (
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 type GetAccountRequest struct {
