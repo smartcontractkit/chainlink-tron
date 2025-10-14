@@ -4,7 +4,7 @@
 
 dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-container_image="tronprotocol/java-tron:GreatVoyage-v4.7.4"
+container_image="tronprotocol/java-tron:GreatVoyage-v4.8.0"
 
 node_count=1
 
@@ -102,7 +102,7 @@ for ((i=1; i<=$node_count; i++)); do
       prev_output="${output}"
     fi
 
-    if [[ $output == *"Update solid block number to 2"* ]]; then
+    if [[ $output == *"PushBlock block number: 2"* ]]; then
       echo ""
       echo "${container_name} is ready."
       break
