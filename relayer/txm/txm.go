@@ -12,6 +12,7 @@ import (
 	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
 	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
+	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -171,14 +172,37 @@ func (t *TronTxm) broadcastLoop() {
 	for {
 		select {
 		case tx := <-t.BroadcastChan:
-			triggerResponse, err := t.TriggerSmartContract(ctx, tx)
+			feeLimit, err := t.calculateFeeLimit(tx)
 			if err != nil {
-				// TODO: is it ok to leave this transaction unmarked as fatal?
-				t.Logger.Errorw("failed to trigger smart contract", "error", err, "tx", tx, "txID", tx.ID)
+				t.Logger.Errorw("failed to calculate fee limit", "error", err, "txID", tx.ID)
 				continue
 			}
 
-			coreTx := triggerResponse.Transaction
+			// Get the latest block info
+			refBlockBytes, refBlockHash, err := t.computeRefBlockBytesAndHash()
+			if err != nil {
+				t.Logger.Errorw("failed to compute ref block bytes and hash", "error", err, "txID", tx.ID)
+				continue
+			}
+
+			txSerializer := Serializer{
+				TransactionType: core.Transaction_Contract_TriggerSmartContract,
+				FromAddress:     tx.FromAddress,
+				ContractAddress: tx.ContractAddress,
+				Method:          tx.Method,
+				Params:          tx.Params,
+				CallValueSun:    0,
+				FeeLimitSun:     int64(feeLimit),
+				RefBlockBytes:   refBlockBytes,
+				RefBlockHash:    refBlockHash,
+			}
+
+			coreTx, err := txSerializer.BuildTransaction()
+			if err != nil {
+				t.Logger.Errorw("failed to build transaction", "error", err, "txID", tx.ID)
+				continue
+			}
+
 			txHash := coreTx.TxID
 
 			// RefBlockNum is optional and does not seem in use anymore.
@@ -187,7 +211,7 @@ func (t *TronTxm) broadcastLoop() {
 
 			_, err = t.SignAndBroadcast(ctx, tx.FromAddress, coreTx)
 			if err != nil {
-				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "triggerResponse", triggerResponse, "txID", tx.ID)
+				t.Logger.Errorw("transaction failed to broadcast", "txHash", txHash, "error", err, "tx", tx, "coreTx", coreTx, "txID", tx.ID)
 				txStore.OnFatalError(tx.ID)
 				continue
 			}
@@ -200,6 +224,47 @@ func (t *TronTxm) broadcastLoop() {
 			return
 		}
 	}
+}
+
+func (t *TronTxm) computeRefBlockBytesAndHash() ([]byte, []byte, error) {
+	nowBlock, err := t.GetClient().GetNowBlockFullNode()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get now block: %+w", err)
+	}
+
+	blockNumber := nowBlock.BlockHeader.RawData.Number
+	blockId, err := hex.DecodeString(nowBlock.BlockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode block id: %+w", err)
+	}
+
+	refBlockBytes := []byte{byte((blockNumber >> 8) & 0xFF), byte(blockNumber & 0xFF)} // last 2 bytes
+	refBlockHash := blockId[8:16]
+	return refBlockBytes, refBlockHash, nil
+}
+
+func (t *TronTxm) calculateFeeLimit(tx *TronTx) (int32, error) {
+	energyUsed, err := t.estimateEnergy(tx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to estimate energy: %+w", err)
+	}
+
+	energyUnitPrice := DEFAULT_ENERGY_UNIT_PRICE
+
+	if energyPrices, err := t.GetClient().GetEnergyPrices(); err == nil {
+		if parsedPrice, err := ParseLatestEnergyPrice(energyPrices.Prices); err == nil {
+			energyUnitPrice = parsedPrice
+		} else {
+			t.Logger.Errorw("error parsing energy unit price", "error", err, "txID", tx.ID)
+		}
+	} else {
+		t.Logger.Errorw("failed to get energy unit price", "error", err, "txID", tx.ID)
+	}
+
+	feeLimit := energyUnitPrice * int32(energyUsed)
+	paddedFeeLimit := CalculatePaddedFeeLimit(feeLimit, tx.EnergyBumpTimes, t.Config.EnergyMultiplier)
+
+	return paddedFeeLimit, nil
 }
 
 func (t *TronTxm) TriggerSmartContract(ctx context.Context, tx *TronTx) (*fullnode.TriggerSmartContractResponse, error) {
