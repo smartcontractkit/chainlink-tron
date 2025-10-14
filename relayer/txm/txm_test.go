@@ -59,6 +59,7 @@ func createDefaultMockClient(t *testing.T) *mocks.CombinedClient {
 	txid, _ := hex.DecodeString("2a037789237971c1c1d648f7b90b70c68a9aa6b0a2892f947213286346d0210d")
 
 	combinedClient.On("GetNowBlockFullNode").Maybe().Return(&soliditynode.Block{
+		BlockID: "000000000325a7105234af0154beb7fcb0363b809cb469fe7e0e0fd571bbd054",
 		BlockHeader: &soliditynode.BlockHeader{
 			RawData: &soliditynode.BlockHeaderRaw{
 				Timestamp: 1000,
