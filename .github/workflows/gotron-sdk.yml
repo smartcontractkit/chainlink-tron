@@ -14,7 +14,7 @@ jobs:
     outputs:
       found: ${{ steps.c.outputs.found }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/changes
         id: c
         with:
@@ -32,7 +32,7 @@ jobs:
           go-version: ${{ steps.go-version.outputs.version }}
 
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Run tests
         run: cd relayer/gotron-sdk && go test ./...
