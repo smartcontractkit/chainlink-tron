@@ -384,7 +384,8 @@ func TestTxmTransactionReaping(t *testing.T) {
 
 		reapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
-			ConfirmPollSecs:   1,
+			// Keep confirm loop idle so this test only validates reaping behavior.
+			ConfirmPollSecs:   60,
 			RetentionPeriod:   500 * time.Millisecond,
 			ReapInterval:      50 * time.Millisecond,
 		}

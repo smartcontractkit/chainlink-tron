@@ -58,7 +58,6 @@ flowchart LR
 	classDef outline stroke-dasharray:6,fill:none;
 	class chainlink-common-repo,chainlink-protos-repo outline
 ```
-
 ## All modules
 ```mermaid
 flowchart LR
