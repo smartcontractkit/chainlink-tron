@@ -9,8 +9,8 @@ pkgs.mkShell {
       # nix tooling
       alejandra
 
-      # Go 1.24 + tools
-      go_1_24
+      # Prefer Go 1.25 (required by chainlink-common), fallback for older nixpkgs channels.
+      (if pkgs ? go_1_25 then go_1_25 else go_1_24)
       gopls
       delve
       golangci-lint
