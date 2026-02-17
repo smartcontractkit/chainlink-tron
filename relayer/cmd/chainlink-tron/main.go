@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-tron/relayer/config"
@@ -71,6 +72,38 @@ func (c *pluginRelayer) NewRelayer(ctx context.Context, configTOML string, keyst
 	}
 
 	cfg.SetDefaults()
+
+	rawNodes := make([]map[string]string, 0, len(cfg.Nodes))
+	for _, n := range cfg.Nodes {
+		if n == nil {
+			continue
+		}
+		nodeURLs := make(map[string]string)
+		if n.URL != nil {
+			nodeURLs["URL"] = n.URL.String()
+		}
+		if n.SolidityURL != nil {
+			nodeURLs["SolidityURL"] = n.SolidityURL.String()
+		}
+		if len(nodeURLs) == 0 {
+			continue
+		}
+		rawNodes = append(rawNodes, nodeURLs)
+	}
+	chainID := ""
+	if cfg.ChainID != nil {
+		chainID = *cfg.ChainID
+	}
+	emitter := loop.NewPluginRelayerConfigEmitter(
+		c.Logger,
+		beholder.GetClient().Config.AuthPublicKeyHex,
+		chainID,
+		rawNodes,
+	)
+	if err := emitter.Start(ctx); err != nil {
+		return nil, fmt.Errorf("failed to start plugin relayer config emitter: %w", err)
+	}
+	c.SubService(emitter)
 
 	relayer, err := tronplugin.NewRelayer(&cfg, c.Logger, keystore)
 	if err != nil {
