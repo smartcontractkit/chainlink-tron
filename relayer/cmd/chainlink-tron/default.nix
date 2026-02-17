@@ -4,7 +4,7 @@
 }: let
   package-info = builtins.fromJSON (builtins.readFile ../../../package.json);
 in
-  pkgs.buildGo124Module rec {
+  pkgs.buildGo125Module rec {
     inherit (package-info) version;
     pname = "chainlink-tron";
 
