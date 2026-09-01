@@ -19,3 +19,5 @@ jobs:
     secrets:
       SLACK_TOKEN: ${{ secrets.DEPENDABUMP_SLACK_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.DEPENDABUMP_SLACK_CHANNEL_ID }}
+    with:
+      post-bump-command: nix develop -c go run github.com/jmank88/gomods@v0.1.6 tidy && nix develop -c go run github.com/jmank88/gomods@v0.1.6 -go generate ./... && nix develop -c ./modgraph > go.md
