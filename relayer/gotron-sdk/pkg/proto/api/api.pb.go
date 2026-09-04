@@ -7,7 +7,7 @@
 package api
 
 import (
-	core "github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	core "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/core"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -5587,7 +5587,7 @@ const file_api_api_proto_rawDesc = "" +
 	"\aMonitor\x12x\n" +
 	"\fGetStatsInfo\x12\x16.protocol.EmptyMessage\x1a\x15.protocol.MetricsInfo\"9\x82\xd3\xe4\x93\x023:\x01*Z\x17\x12\x15/monitor/getstatsinfo\"\x15/monitor/getstatsinfo2\t\n" +
 	"\aNetworkBG\n" +
-	"\forg.tron.apiB\aGrpcAPIZ.github.com/fbsobreira/gotron-sdk/pkg/proto/apib\x06proto3"
+	"\forg.tron.apiB\aGrpcAPIZ.github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/apib\x06proto3"
 
 var (
 	file_api_api_proto_rawDescOnce sync.Once

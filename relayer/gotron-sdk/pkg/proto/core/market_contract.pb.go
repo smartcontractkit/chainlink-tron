@@ -164,7 +164,7 @@ const file_core_contract_market_contract_proto_rawDesc = "" +
 	"\x19MarketCancelOrderContract\x12#\n" +
 	"\rowner_address\x18\x01 \x01(\fR\fownerAddress\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\fR\aorderIdBK\n" +
-	"\x18org.tron.protos.contractZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x18org.tron.protos.contractZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_contract_market_contract_proto_rawDescOnce sync.Once

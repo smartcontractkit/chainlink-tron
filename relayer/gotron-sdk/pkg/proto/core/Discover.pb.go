@@ -413,7 +413,7 @@ const file_core_Discover_proto_rawDesc = "" +
 	"\rBackupMessage\x12\x12\n" +
 	"\x04flag\x18\x01 \x01(\bR\x04flag\x12\x1a\n" +
 	"\bpriority\x18\x02 \x01(\x05R\bpriorityBL\n" +
-	"\x0forg.tron.protosB\bDiscoverZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x0forg.tron.protosB\bDiscoverZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_Discover_proto_rawDescOnce sync.Once

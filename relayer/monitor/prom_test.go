@@ -3,10 +3,11 @@ package monitor
 import (
 	"testing"
 
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	tronaddress "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 func TestBalanceMonitorUpdateProm(t *testing.T) {

@@ -4,7 +4,6 @@ go 1.25.7
 
 require (
 	github.com/ethereum/go-ethereum v1.17.2
-	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.11.1
 	github.com/rs/zerolog v1.34.0
@@ -246,6 +245,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
+	github.com/shengdoushi/base58 v1.0.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
@@ -370,8 +370,6 @@ require (
 )
 
 replace (
-	// original author is not maintaining the repo anymore
-	github.com/fbsobreira/gotron-sdk => ../relayer/gotron-sdk
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 

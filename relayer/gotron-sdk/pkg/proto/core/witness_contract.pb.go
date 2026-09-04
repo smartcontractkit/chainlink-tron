@@ -257,7 +257,7 @@ const file_core_contract_witness_contract_proto_rawDesc = "" +
 	"\fvote_address\x18\x01 \x01(\fR\vvoteAddress\x12\x1d\n" +
 	"\n" +
 	"vote_count\x18\x02 \x01(\x03R\tvoteCountBK\n" +
-	"\x18org.tron.protos.contractZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x18org.tron.protos.contractZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_contract_witness_contract_proto_rawDescOnce sync.Once

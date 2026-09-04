@@ -12,7 +12,6 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/common"
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/contract"
 	"github.com/smartcontractkit/chainlink-tron/integration-tests/utils"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
@@ -401,7 +401,7 @@ func validateRounds(t *testing.T, combinedClient sdk.CombinedClient, ocrAddress 
 		require.Equal(t, stuck, false, "Round + epochs should not be stuck")
 	}
 
-	/// Test proxy reading
+	// / Test proxy reading
 	// TODO: would be good to test proxy switching underlying feeds
 	latestRoundData, err := ocrReader.LatestRoundData(ctx, ocrProxyAddress)
 	if !isSoak {

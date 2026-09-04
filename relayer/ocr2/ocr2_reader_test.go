@@ -7,11 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/abi"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -20,6 +15,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-tron/relayer"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/abi"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/fullnode"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/soliditynode"
 	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-tron/relayer/ocr2"
 	"github.com/smartcontractkit/chainlink-tron/relayer/reader"

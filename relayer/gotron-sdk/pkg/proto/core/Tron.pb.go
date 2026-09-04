@@ -8017,7 +8017,7 @@ const file_core_Tron_proto_rawDesc = "" +
 	"\vNOT_WITNESS\x10%\x12\x13\n" +
 	"\x0fNO_SUCH_MESSAGE\x10&\x12\f\n" +
 	"\aUNKNOWN\x10\xff\x01BL\n" +
-	"\x0forg.tron.protosB\bProtocolZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x0forg.tron.protosB\bProtocolZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_Tron_proto_rawDescOnce sync.Once
