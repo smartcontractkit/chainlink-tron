@@ -788,7 +788,7 @@ const file_core_contract_shield_contract_proto_rawDesc = "" +
 	"\x11binding_signature\x18\x05 \x01(\fR\x10bindingSignature\x124\n" +
 	"\x16transparent_to_address\x18\x06 \x01(\fR\x14transparentToAddress\x12\x1b\n" +
 	"\tto_amount\x18\a \x01(\x03R\btoAmountBK\n" +
-	"\x18org.tron.protos.contractZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x18org.tron.protos.contractZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_contract_shield_contract_proto_rawDescOnce sync.Once

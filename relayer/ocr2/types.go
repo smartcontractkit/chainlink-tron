@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 type ContractConfigDetails struct {

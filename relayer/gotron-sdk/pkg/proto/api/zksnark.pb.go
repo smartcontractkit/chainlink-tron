@@ -7,7 +7,7 @@
 package api
 
 import (
-	core "github.com/fbsobreira/gotron-sdk/pkg/proto/core"
+	core "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/core"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -198,7 +198,7 @@ const file_api_zksnark_proto_rawDesc = "" +
 	"\x06FAILED\x10\x012Y\n" +
 	"\vTronZksnark\x12J\n" +
 	"\x11CheckZksnarkProof\x12\x18.protocol.ZksnarkRequest\x1a\x19.protocol.ZksnarkResponse\"\x00BN\n" +
-	"\forg.tron.apiB\x0eZksnarkGrpcAPIZ.github.com/fbsobreira/gotron-sdk/pkg/proto/apib\x06proto3"
+	"\forg.tron.apiB\x0eZksnarkGrpcAPIZ.github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/apib\x06proto3"
 
 var (
 	file_api_zksnark_proto_rawDescOnce sync.Once

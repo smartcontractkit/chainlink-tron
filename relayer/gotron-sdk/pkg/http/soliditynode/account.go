@@ -1,7 +1,7 @@
 package soliditynode
 
 import (
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 type GetAccountRequest struct {
@@ -36,11 +36,11 @@ type Key struct {
 
 type Permission struct {
 	Type           string `json:"type"`
-	ID             int32  `json:"id,omitempty"` //Owner id=0, Witness id=1, Active id start by 2
+	ID             int32  `json:"id,omitempty"` // Owner id=0, Witness id=1, Active id start by 2
 	PermissionName string `json:"permission_name,omitempty"`
 	Threshold      int64  `json:"threshold,omitempty"`
 	ParentId       int32  `json:"parent_id,omitempty"`
-	Operations     string `json:"operations,omitempty"` //1 bit 1 contract
+	Operations     string `json:"operations,omitempty"` // 1 bit 1 contract
 	Keys           []*Key `json:"keys,omitempty"`
 }
 

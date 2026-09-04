@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/google/uuid"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 // this is copied from keystore.NewKeyFromDirectICAP, which keeps trying to

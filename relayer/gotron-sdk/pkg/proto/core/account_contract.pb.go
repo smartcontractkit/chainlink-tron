@@ -290,7 +290,7 @@ const file_core_contract_account_contract_proto_rawDesc = "" +
 	"\x05owner\x18\x02 \x01(\v2\x14.protocol.PermissionR\x05owner\x12.\n" +
 	"\awitness\x18\x03 \x01(\v2\x14.protocol.PermissionR\awitness\x12.\n" +
 	"\aactives\x18\x04 \x03(\v2\x14.protocol.PermissionR\aactivesBK\n" +
-	"\x18org.tron.protos.contractZ/github.com/fbsobreira/gotron-sdk/pkg/proto/coreb\x06proto3"
+	"\x18org.tron.protos.contractZ/github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/coreb\x06proto3"
 
 var (
 	file_core_contract_account_contract_proto_rawDescOnce sync.Once
