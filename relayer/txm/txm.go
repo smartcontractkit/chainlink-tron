@@ -8,11 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -21,6 +16,11 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/fullnode"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/soliditynode"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/core"
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 )
 

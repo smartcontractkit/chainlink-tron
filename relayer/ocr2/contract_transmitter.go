@@ -5,13 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-tron/relayer/txm"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 type ContractTransmitter interface {

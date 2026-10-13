@@ -5,7 +5,7 @@ package mocks
 import (
 	big "math/big"
 
-	address "github.com/fbsobreira/gotron-sdk/pkg/address"
+	address "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 
 	context "context"
 

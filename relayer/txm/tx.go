@@ -3,7 +3,7 @@ package txm
 import (
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 type TronTx struct {

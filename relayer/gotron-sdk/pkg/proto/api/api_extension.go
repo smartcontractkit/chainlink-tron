@@ -4,8 +4,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	core "github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/core"
 )
 
 func (x *TransactionExtention) SetData(memo string) error {

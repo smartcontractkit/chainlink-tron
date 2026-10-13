@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/abi"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/proto/core"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/abi"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/proto/core"
 )
 
 type Serializer struct {

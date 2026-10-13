@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/abi"
-	"github.com/fbsobreira/gotron-sdk/pkg/address"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/abi"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
 )
 
 type TriggerConstantContractRequest struct {

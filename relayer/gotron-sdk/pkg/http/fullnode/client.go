@@ -3,7 +3,7 @@ package fullnode
 import (
 	"net/http"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/soliditynode"
 )
 
 type Client struct {

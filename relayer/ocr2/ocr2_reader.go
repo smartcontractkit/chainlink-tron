@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	tronaddress "github.com/fbsobreira/gotron-sdk/pkg/address"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-tron/relayer/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	tronaddress "github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/address"
 )
 
 //go:generate mockery --name OCR2Reader --output ../mocks/

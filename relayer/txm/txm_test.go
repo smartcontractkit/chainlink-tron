@@ -15,13 +15,12 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/fbsobreira/gotron-sdk/pkg/http/common"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/fullnode"
-	"github.com/fbsobreira/gotron-sdk/pkg/http/soliditynode"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/common"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/fullnode"
+	"github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk/pkg/http/soliditynode"
 	"github.com/smartcontractkit/chainlink-tron/relayer/mocks"
 	"github.com/smartcontractkit/chainlink-tron/relayer/sdk"
 	"github.com/smartcontractkit/chainlink-tron/relayer/testutils"
@@ -385,9 +384,9 @@ func TestTxmTransactionReaping(t *testing.T) {
 		reapConfig := &trontxm.TronTxmConfig{
 			BroadcastChanSize: 100,
 			// Keep confirm loop idle so this test only validates reaping behavior.
-			ConfirmPollSecs:   60,
-			RetentionPeriod:   500 * time.Millisecond,
-			ReapInterval:      50 * time.Millisecond,
+			ConfirmPollSecs: 60,
+			RetentionPeriod: 500 * time.Millisecond,
+			ReapInterval:    50 * time.Millisecond,
 		}
 
 		txm, _, _ := setupTxm(t, combinedClient, reapConfig)
